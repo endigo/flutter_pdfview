@@ -48,11 +48,7 @@
         NSString* channelName = [NSString stringWithFormat:@"plugins.endigo.io/pdfview_%lld", viewId];
         _channel = [FlutterMethodChannel methodChannelWithName:channelName binaryMessenger:messenger];
         
-        if (@available(iOS 11.0, *)) {
-            _pdfView = [[PDFView alloc] initWithFrame:frame];
-        } else {
-            // Fallback on earlier versions
-        }
+        _pdfView = [[PDFView alloc] initWithFrame:frame];
         
         __weak __typeof__(self) weakSelf = self;
         [_channel setMethodCallHandler:^(FlutterMethodCall* call, FlutterResult result) {
@@ -62,19 +58,15 @@
         
         NSString* filePath = args[@"filePath"];
         if ([filePath isKindOfClass:[NSString class]]) {
-            NSURL * sourcePDFUrl = [NSURL URLWithString:filePath];
-            if (@available(iOS 11.0, *)) {
-                PDFDocument * document = [[PDFDocument alloc] initWithURL: sourcePDFUrl];
-                _pdfView.document = document;
-                _pdfView.displayMode = kPDFDisplaySinglePageContinuous;
-            } else {
-                // Fallback on earlier versions
-            }
+            NSURL * sourcePDFUrl = [NSURL fileURLWithPath:filePath];
+            PDFDocument * document = [[PDFDocument alloc] initWithURL: sourcePDFUrl];
             
-            
-//            _pdfView.
-            
-//            [_pdfView usePageViewController:YES withViewOptions:nil];
+            _pdfView.document = document;
+            _pdfView.displayMode = kPDFDisplaySinglePageContinuous;
+//            _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
+            _pdfView.displayDirection = kPDFDisplayDirectionVertical;
+            _pdfView.backgroundColor = UIColor.whiteColor;
+            [_pdfView usePageViewController:YES withViewOptions:nil];
         }
     }
     return self;

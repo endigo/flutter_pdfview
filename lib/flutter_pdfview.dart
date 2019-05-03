@@ -96,6 +96,9 @@ class _CreationParams {
       'filePath': filePath,
 //      'settings': settings.toMap(),
       'enableSwipe': true,
+      'swipeHorizontal': true,
+      'pageFling': true,
+      'pageSnap': true,
     };
   }
 }
