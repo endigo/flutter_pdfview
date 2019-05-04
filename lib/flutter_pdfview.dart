@@ -18,7 +18,19 @@ typedef void PDFViewCreatedCallback(PDFViewController controller);
 //}
 
 class PDFView extends StatefulWidget {
-  const PDFView({Key key, this.onWebViewCreated, this.gestureRecognizers, @required this.filePath,}) : super(key: key);
+  const PDFView({
+    Key key,
+    this.onWebViewCreated,
+    this.gestureRecognizers,
+    @required this.filePath,
+    this.enableSwipe = true,
+    this.swipeHorizontal = false,
+    this.password,
+    this.nightMode = false,
+    this.autoSpacing = true,
+    this.pageFling = true,
+    this.pageSnap = true,
+  }) : super(key: key);
 
   @override
   _PDFViewState createState() => _PDFViewState();
@@ -39,10 +51,19 @@ class PDFView extends StatefulWidget {
 
   /// The initial URL to load.
   final String filePath;
+
+  final bool enableSwipe;
+  final bool swipeHorizontal;
+  final bool password;
+  final bool nightMode;
+  final bool autoSpacing;
+  final bool pageFling;
+  final bool pageSnap;
 }
 
 class _PDFViewState extends State<PDFView> {
-  final Completer<PDFViewController> _controller = Completer<PDFViewController>();
+  final Completer<PDFViewController> _controller =
+      Completer<PDFViewController>();
   @override
   Widget build(BuildContext context) {
     if (defaultTargetPlatform == TargetPlatform.android) {
@@ -73,17 +94,25 @@ class _PDFViewState extends State<PDFView> {
       widget.onWebViewCreated(controller);
     }
   }
+
+  @override
+  void didUpdateWidget(PDFView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _controller.future.then(
+            (PDFViewController controller) => controller._updateWidget(widget));
+  }
 }
 
 class _CreationParams {
-  _CreationParams(
-      {this.filePath, this.settings, });
+  _CreationParams({
+    this.filePath,
+    this.settings,
+  });
 
   static _CreationParams fromWidget(PDFView widget) {
     return _CreationParams(
       filePath: widget.filePath,
       settings: _PDFViewSettings.fromWidget(widget),
-
     );
   }
 
@@ -92,55 +121,89 @@ class _CreationParams {
   final _PDFViewSettings settings;
 
   Map<String, dynamic> toMap() {
-    return <String, dynamic>{
+    Map<String, dynamic> params = {
       'filePath': filePath,
-//      'settings': settings.toMap(),
-      'enableSwipe': true,
-      'swipeHorizontal': true,
-      'pageFling': true,
-      'pageSnap': true,
     };
+
+    params.addAll(settings.toMap());
+
+    return params;
   }
 }
 
 class _PDFViewSettings {
-  _PDFViewSettings();
+  _PDFViewSettings({
+    this.enableSwipe,
+    this.swipeHorizontal,
+    this.password,
+    this.nightMode,
+    this.autoSpacing,
+    this.pageFling,
+    this.pageSnap,
+  });
 
   static _PDFViewSettings fromWidget(PDFView widget) {
     return _PDFViewSettings(
-
+      enableSwipe: widget.enableSwipe,
+      swipeHorizontal: widget.swipeHorizontal,
+      password: widget.password,
+      nightMode: widget.nightMode,
+      autoSpacing: widget.autoSpacing,
+      pageFling: widget.pageFling,
+      pageSnap: widget.pageSnap,
     );
   }
 
-//  final JavascriptMode javascriptMode;
-//  final bool hasNavigationDelegate;
+  final bool enableSwipe;
+  final bool swipeHorizontal;
+  final bool password;
+  final bool nightMode;
+  final bool autoSpacing;
+  final bool pageFling;
+  final bool pageSnap;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
-//      'jsMode': javascriptMode.index,
-//      'hasNavigationDelegate': hasNavigationDelegate,
+      'enableSwipe': enableSwipe,
+      'swipeHorizontal': swipeHorizontal,
+      'password': password,
+      'nightMode': nightMode,
+      'autoSpacing': autoSpacing,
+      'pageFling': pageFling,
+      'pageSnap': pageSnap,
     };
   }
 
   Map<String, dynamic> updatesMap(_PDFViewSettings newSettings) {
     final Map<String, dynamic> updates = <String, dynamic>{};
-//    if (javascriptMode != newSettings.javascriptMode) {
-//      updates['jsMode'] = newSettings.javascriptMode.index;
+    if (enableSwipe != newSettings.enableSwipe) {
+      updates['enableSwipe'] = newSettings.enableSwipe;
+    }
+//    if (swipeHorizontal != newSettings.swipeHorizontal) {
+//      updates['swipeHorizontal'] = newSettings.swipeHorizontal;
 //    }
-//    if (hasNavigationDelegate != newSettings.hasNavigationDelegate) {
-//      updates['hasNavigationDelegate'] = newSettings.hasNavigationDelegate;
+//    if (password != newSettings.password) {
+//      updates['password'] = newSettings.password;
 //    }
+//    if (autoSpacing != newSettings.autoSpacing) {
+//      updates['autoSpacing'] = newSettings.autoSpacing;
+//    }
+    if (pageFling != newSettings.pageFling) {
+      updates['pageFling'] = newSettings.pageFling;
+    }
+    if (pageSnap != newSettings.pageSnap) {
+      updates['pageSnap'] = newSettings.pageSnap;
+    }
+
     return updates;
   }
 }
 
-
-
 class PDFViewController {
   PDFViewController._(
-      int id,
-      this._widget,
-      ) : _channel = MethodChannel('plugins.endigo.io/pdfview_$id') {
+    int id,
+    this._widget,
+  ) : _channel = MethodChannel('plugins.endigo.io/pdfview_$id') {
     _settings = _PDFViewSettings.fromWidget(_widget);
     _channel.setMethodCallHandler(_onMethodCall);
   }
@@ -153,7 +216,7 @@ class PDFViewController {
 
   Future<bool> _onMethodCall(MethodCall call) async {
 //    switch (call.method) {
-//      case 'javascriptChannelMessage':
+//      case 'pageCount':
 //        final String channel = call.arguments['channel'];
 //        final String message = call.arguments['message'];
 //        _javascriptChannels[channel]
@@ -177,7 +240,38 @@ class PDFViewController {
 //
 //        return null;
 //    }
-//    throw MissingPluginException(
-//        '${call.method} was invoked but has no handler');
+    throw MissingPluginException(
+        '${call.method} was invoked but has no handler');
+  }
+
+  Future<int> getPageCount() async {
+    final int pageCount = await _channel.invokeMethod('pageCount');
+    return pageCount;
+  }
+
+  Future<int> getCurrentPage() async {
+    final int currentPage = await _channel.invokeMethod('currentPage');
+    return currentPage;
+  }
+
+  Future<bool> setPage(int page) async {
+    final bool isSet = await _channel.invokeMethod('setPage', <String, dynamic>{
+      'page': page,
+    });
+    return isSet;
+  }
+
+  Future<void> _updateWidget(PDFView widget) async {
+    _widget = widget;
+    await _updateSettings(_PDFViewSettings.fromWidget(widget));
+  }
+
+  Future<void> _updateSettings(_PDFViewSettings setting) async {
+    final Map<String, dynamic> updateMap = _settings.updatesMap(setting);
+    if (updateMap == null || updateMap.isEmpty) {
+      return null;
+    }
+    _settings = setting;
+    return _channel.invokeMethod('updateSettings', updateMap);
   }
 }
