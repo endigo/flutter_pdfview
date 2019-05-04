@@ -9,9 +9,11 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.platform.PlatformView;
 import java.io.File;
+import java.util.HashMap;
 import java.util.Map;
 
 import com.github.barteksc.pdfviewer.PDFView;
+import com.github.barteksc.pdfviewer.listener.OnPageChangeListener;
 
 public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private final PDFView pdfView;
@@ -37,6 +39,14 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                 .autoSpacing(getBoolean(params,"autoSpacing"))
                 .pageFling(getBoolean(params,"pageFling"))
                 .pageSnap(getBoolean(params,"pageSnap"))
+                .onPageChange(new OnPageChangeListener() {
+                    @Override
+                    public void onPageChanged(int page, int pageCount) {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("page", page);
+                        methodChannel.invokeMethod("onPageChanged", args);
+                    }
+                })
                 .enableDoubletap(true)
                 .defaultPage(0)
                 .load();
@@ -110,7 +120,6 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
             }
         }
     }
-
 
     @Override
     public void dispose() {
