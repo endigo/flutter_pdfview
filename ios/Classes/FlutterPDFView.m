@@ -88,7 +88,7 @@
         
         _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight|UIViewAutoresizingFlexibleTopMargin|UIViewAutoresizingFlexibleBottomMargin;
         
-//        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(PDFViewPageChangedNotification:) name:PDFViewPageChangedNotification object:self];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(handlePageChanged:) name:PDFViewPageChangedNotification object:_pdfView];
         
     }
     return self;
@@ -134,8 +134,8 @@
     result(nil);
 }
 
-//-(void)PDFViewPageChangedNotification:(NSNotification*)notification {
-//    [notification userInfo];
-//}
+-(void)handlePageChanged:(NSNotification*)notification {
+    [_channel invokeMethod:@"onPageChanged" arguments:@{@"page" : [NSNumber numberWithUnsignedLong: [_pdfView.document indexForPage: _pdfView.currentPage]]}];
+}
 
 @end

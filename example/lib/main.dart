@@ -92,6 +92,9 @@ class PDFScreen extends StatelessWidget {
                 onViewCreated: (PDFViewController pdfViewController) {
                   _controller.complete(pdfViewController);
                 },
+                onPageChanged: (int page) {
+                  print('page change: $page');
+                },
               ),
             ),
             Expanded(
