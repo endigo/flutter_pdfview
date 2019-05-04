@@ -87,8 +87,8 @@ class PDFScreen extends StatelessWidget {
               flex: 3,
               child: PDFView(
                 filePath: pathPDF,
-                swipeHorizontal: true,
-                autoSpacing: false,
+                swipeHorizontal: false,
+                autoSpacing: true,
                 onViewCreated: (PDFViewController pdfViewController) {
                   _controller.complete(pdfViewController);
                 },
@@ -100,12 +100,23 @@ class PDFScreen extends StatelessWidget {
                 future: _controller.future,
                 builder: (context, AsyncSnapshot<PDFViewController> snapshot) {
                   if (snapshot.hasData) {
-                    return FutureBuilder<int>(
-                      future: snapshot.data.getPageCount(),
-                      builder: (context, AsyncSnapshot<int> snapshot) {
-                        if (snapshot.hasData) return Text('${snapshot.data}');
-                        return Container();
-                      },
+                    return Column(
+                      children: <Widget>[
+                        FutureBuilder<int>(
+                          future: snapshot.data.getPageCount(),
+                          builder: (context, AsyncSnapshot<int> snapshot) {
+                            if (snapshot.hasData)
+                              return Text('${snapshot.data}');
+                            return Container();
+                          },
+                        ),
+                        RaisedButton(
+                          child: Text('Go to 8'),
+                          onPressed: () async {
+                            await snapshot.data.setPage(16);
+                          },
+                        )
+                      ],
                     );
                   }
 

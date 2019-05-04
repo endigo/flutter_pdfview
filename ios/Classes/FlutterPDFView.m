@@ -35,7 +35,8 @@
     PDFView* _pdfView;
     int64_t _viewId;
     FlutterMethodChannel* _channel;
-    NSString* _currentUrl;
+    NSNumber* _pageCount;
+    NSNumber* _currentPage;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -56,18 +57,39 @@
         }];
 //        NSDictionary<NSString*, id>* settings = args[@"settings"];
         
+        BOOL autoSpacing = [args[@"autoSpacing"] boolValue];
+        _pdfView.autoScales = autoSpacing;
+        _pdfView.minScaleFactor = [_pdfView scaleFactorForSizeToFit];
+        _pdfView.maxScaleFactor = 4.0;
+        [_pdfView usePageViewController:autoSpacing withViewOptions:nil];
+        _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+        
         NSString* filePath = args[@"filePath"];
         if ([filePath isKindOfClass:[NSString class]]) {
             NSURL * sourcePDFUrl = [NSURL fileURLWithPath:filePath];
             PDFDocument * document = [[PDFDocument alloc] initWithURL: sourcePDFUrl];
             
             _pdfView.document = document;
-            _pdfView.displayMode = kPDFDisplaySinglePageContinuous;
-//            _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
-            _pdfView.displayDirection = kPDFDisplayDirectionVertical;
-            _pdfView.backgroundColor = UIColor.whiteColor;
-            [_pdfView usePageViewController:YES withViewOptions:nil];
         }
+        
+        NSString* password = args[@"password"];
+        if ([password isKindOfClass:[NSString class]] && [_pdfView.document isEncrypted]) {
+            [_pdfView.document unlockWithPassword:password];
+        }
+        
+        BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
+        
+        if (swipeHorizontal) {
+            _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
+            _pdfView.displayMode = kPDFDisplaySinglePageContinuous;
+        } else {
+            _pdfView.displayDirection = kPDFDisplayDirectionVertical;
+        }
+        
+        _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight|UIViewAutoresizingFlexibleTopMargin|UIViewAutoresizingFlexibleBottomMargin;
+        
+//        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(PDFViewPageChangedNotification:) name:PDFViewPageChangedNotification object:self];
+        
     }
     return self;
 }
@@ -77,11 +99,43 @@
 }
 
 - (void)onMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
-    if ([[call method] isEqualToString:@"updateSettings"]) {
-//        [self onUpdateSettings:call result:result];
+    if ([[call method] isEqualToString:@"pageCount"]) {
+        [self getPageCount:call result:result];
+    } else if ([[call method] isEqualToString:@"currentPage"]) {
+        [self getCurrentPage:call result:result];
+    } else if ([[call method] isEqualToString:@"setPage"]) {
+        [self setPage:call result:result];
+    } else if ([[call method] isEqualToString:@"updateSettings"]) {
+        [self onUpdateSettings:call result:result];
     } else {
         result(FlutterMethodNotImplemented);
     }
 }
+
+- (void)getPageCount:(FlutterMethodCall*)call result:(FlutterResult)result {
+    _pageCount = [NSNumber numberWithUnsignedLong: [[_pdfView document] pageCount]];
+    result(_pageCount);
+}
+
+- (void)getCurrentPage:(FlutterMethodCall*)call result:(FlutterResult)result {
+    _currentPage = [NSNumber numberWithUnsignedLong: [_pdfView.document indexForPage: _pdfView.currentPage]];
+    result(_currentPage);
+}
+
+- (void)setPage:(FlutterMethodCall*)call result:(FlutterResult)result {
+    NSDictionary<NSString*, NSNumber*>* arguments = [call arguments];
+    NSNumber* page = arguments[@"page"];
+    
+    [_pdfView goToPage: [_pdfView.document pageAtIndex: page.unsignedLongValue ]];
+    result(_currentPage);
+}
+
+- (void)onUpdateSettings:(FlutterMethodCall*)call result:(FlutterResult)result {
+    result(nil);
+}
+
+//-(void)PDFViewPageChangedNotification:(NSNotification*)notification {
+//    [notification userInfo];
+//}
 
 @end

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 typedef void PDFViewCreatedCallback(PDFViewController controller);
+typedef void PageChangedCallback(int page);
 
 //class FlutterNativePdfReader {
 //  static const MethodChannel _channel =
@@ -30,6 +31,7 @@ class PDFView extends StatefulWidget {
     this.autoSpacing = true,
     this.pageFling = true,
     this.pageSnap = true,
+    this.onPageChanged,
   }) : super(key: key);
 
   @override
@@ -37,6 +39,7 @@ class PDFView extends StatefulWidget {
 
   /// If not null invoked once the web view is created.
   final PDFViewCreatedCallback onViewCreated;
+  final PageChangedCallback onPageChanged;
 
   /// Which gestures should be consumed by the web view.
   ///
@@ -99,7 +102,7 @@ class _PDFViewState extends State<PDFView> {
   void didUpdateWidget(PDFView oldWidget) {
     super.didUpdateWidget(oldWidget);
     _controller.future.then(
-            (PDFViewController controller) => controller._updateWidget(widget));
+        (PDFViewController controller) => controller._updateWidget(widget));
   }
 }
 
@@ -215,31 +218,14 @@ class PDFViewController {
   PDFView _widget;
 
   Future<bool> _onMethodCall(MethodCall call) async {
-//    switch (call.method) {
-//      case 'pageCount':
-//        final String channel = call.arguments['channel'];
-//        final String message = call.arguments['message'];
-//        _javascriptChannels[channel]
-//            .onMessageReceived(JavascriptMessage(message));
-//        return true;
-//      case 'navigationRequest':
-//        final NavigationRequest request = NavigationRequest._(
-//          url: call.arguments['url'],
-//          isForMainFrame: call.arguments['isForMainFrame'],
-//        );
-//        // _navigationDelegate can be null if the widget was rebuilt with no
-//        // navigation delegate after a navigation happened and just before we
-//        // got the navigationRequest message.
-//        final bool allowNavigation = _widget.navigationDelegate == null ||
-//            _widget.navigationDelegate(request) == NavigationDecision.navigate;
-//        return allowNavigation;
-//      case 'onPageFinished':
-//        if (_widget.onPageFinished != null) {
-//          _widget.onPageFinished(call.arguments['url']);
-//        }
-//
-//        return null;
-//    }
+   switch (call.method) {
+     case 'onPageChanged':
+       if (_widget.onPageChanged != null) {
+         _widget.onPageChanged(call.arguments['page']);
+       }
+
+       return null;
+   }
     throw MissingPluginException(
         '${call.method} was invoked but has no handler');
   }
