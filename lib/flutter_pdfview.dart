@@ -20,7 +20,7 @@ typedef void PDFViewCreatedCallback(PDFViewController controller);
 class PDFView extends StatefulWidget {
   const PDFView({
     Key key,
-    this.onWebViewCreated,
+    this.onViewCreated,
     this.gestureRecognizers,
     @required this.filePath,
     this.enableSwipe = true,
@@ -36,7 +36,7 @@ class PDFView extends StatefulWidget {
   _PDFViewState createState() => _PDFViewState();
 
   /// If not null invoked once the web view is created.
-  final PDFViewCreatedCallback onWebViewCreated;
+  final PDFViewCreatedCallback onViewCreated;
 
   /// Which gestures should be consumed by the web view.
   ///
@@ -90,8 +90,8 @@ class _PDFViewState extends State<PDFView> {
   void _onPlatformViewCreated(int id) {
     final PDFViewController controller = PDFViewController._(id, widget);
     _controller.complete(controller);
-    if (widget.onWebViewCreated != null) {
-      widget.onWebViewCreated(controller);
+    if (widget.onViewCreated != null) {
+      widget.onViewCreated(controller);
     }
   }
 

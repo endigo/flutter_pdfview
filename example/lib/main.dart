@@ -28,7 +28,8 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<File> createFileOfPdfUrl() async {
-    final url = "https://berlin2017.droidcon.cod.newthinking.net/sites/global.droidcon.cod.newthinking.net/files/media/documents/Flutter%20-%2060FPS%20UI%20of%20the%20future%20%20-%20DroidconDE%2017.pdf";
+    final url =
+        "https://berlin2017.droidcon.cod.newthinking.net/sites/global.droidcon.cod.newthinking.net/files/media/documents/Flutter%20-%2060FPS%20UI%20of%20the%20future%20%20-%20DroidconDE%2017.pdf";
     final filename = url.substring(url.lastIndexOf("/") + 1);
     var request = await HttpClient().getUrl(Uri.parse(url));
     var response = await request.close();
@@ -46,42 +47,73 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       home: Scaffold(
         appBar: AppBar(title: const Text('Plugin example app')),
-        body: Center(
-          child: Builder(
-            builder: (BuildContext context) {
-              return RaisedButton(
-                child: Text("Open PDF"),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => PDFScreen(pathPDF)),
-                ),
-              );
-            },
-          )
-        ),
+        body: Center(child: Builder(
+          builder: (BuildContext context) {
+            return RaisedButton(
+              child: Text("Open PDF"),
+              onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => PDFScreen(pathPDF)),
+                  ),
+            );
+          },
+        )),
       ),
     );
   }
 }
 
-
 class PDFScreen extends StatelessWidget {
   final String pathPDF;
+  final Completer<PDFViewController> _controller =
+      Completer<PDFViewController>();
   PDFScreen(this.pathPDF);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Document"),
-        actions: <Widget>[
-          IconButton(
-            icon: Icon(Icons.share),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: PDFView(filePath: pathPDF, swipeHorizontal: true, autoSpacing: false,)
-    );
+        appBar: AppBar(
+          title: Text("Document"),
+          actions: <Widget>[
+            IconButton(
+              icon: Icon(Icons.share),
+              onPressed: () {},
+            ),
+          ],
+        ),
+        body: Column(
+          children: <Widget>[
+            Expanded(
+              flex: 3,
+              child: PDFView(
+                filePath: pathPDF,
+                swipeHorizontal: true,
+                autoSpacing: false,
+                onViewCreated: (PDFViewController pdfViewController) {
+                  _controller.complete(pdfViewController);
+                },
+              ),
+            ),
+            Expanded(
+              flex: 1,
+              child: FutureBuilder<PDFViewController>(
+                future: _controller.future,
+                builder: (context, AsyncSnapshot<PDFViewController> snapshot) {
+                  if (snapshot.hasData) {
+                    return FutureBuilder<int>(
+                      future: snapshot.data.getPageCount(),
+                      builder: (context, AsyncSnapshot<int> snapshot) {
+                        if (snapshot.hasData) return Text('${snapshot.data}');
+                        return Container();
+                      },
+                    );
+                  }
+
+                  return Container();
+                },
+              ),
+            )
+          ],
+        ));
   }
 }
