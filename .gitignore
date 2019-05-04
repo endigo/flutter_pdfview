@@ -3,5 +3,6 @@
 
 .packages
 .pub/
+.idea/
 
 build/
