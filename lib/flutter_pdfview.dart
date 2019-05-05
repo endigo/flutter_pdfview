@@ -172,15 +172,6 @@ class _PDFViewSettings {
     if (enableSwipe != newSettings.enableSwipe) {
       updates['enableSwipe'] = newSettings.enableSwipe;
     }
-//    if (swipeHorizontal != newSettings.swipeHorizontal) {
-//      updates['swipeHorizontal'] = newSettings.swipeHorizontal;
-//    }
-//    if (password != newSettings.password) {
-//      updates['password'] = newSettings.password;
-//    }
-//    if (autoSpacing != newSettings.autoSpacing) {
-//      updates['autoSpacing'] = newSettings.autoSpacing;
-//    }
     if (pageFling != newSettings.pageFling) {
       updates['pageFling'] = newSettings.pageFling;
     }
@@ -208,14 +199,14 @@ class PDFViewController {
   PDFView _widget;
 
   Future<bool> _onMethodCall(MethodCall call) async {
-   switch (call.method) {
-     case 'onPageChanged':
-       if (_widget.onPageChanged != null) {
-         _widget.onPageChanged(call.arguments['page']);
-       }
+    switch (call.method) {
+      case 'onPageChanged':
+        if (_widget.onPageChanged != null) {
+          _widget.onPageChanged(call.arguments['page']);
+        }
 
-       return null;
-   }
+        return null;
+    }
     throw MissingPluginException(
         '${call.method} was invoked but has no handler');
   }

@@ -57,3 +57,9 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | autoSpacing             |    ✅    |  ✅ |
 | pageFling               |    ✅    |  ❌ |
 | pageSnap                |    ✅    |  ❌ |
+
+# Dependencies
+### Android
+[AndroidPdfViewer](https://github.com/barteksc/AndroidPdfViewer)
+### iOS (only support> 11.0)
+[PDFKit](https://developer.apple.com/documentation/pdfkit)
