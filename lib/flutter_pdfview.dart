@@ -8,22 +8,13 @@ import 'package:flutter/widgets.dart';
 typedef void PDFViewCreatedCallback(PDFViewController controller);
 typedef void PageChangedCallback(int page);
 
-//class FlutterNativePdfReader {
-//  static const MethodChannel _channel =
-//      const MethodChannel('flutter_native_pdf_reader');
-//
-//  static Future<String> get platformVersion async {
-//    final String version = await _channel.invokeMethod('getPlatformVersion');
-//    return version;
-//  }
-//}
-
 class PDFView extends StatefulWidget {
   const PDFView({
     Key key,
-    this.onViewCreated,
-    this.gestureRecognizers,
     @required this.filePath,
+    this.onViewCreated,
+    this.onPageChanged,
+    this.gestureRecognizers,
     this.enableSwipe = true,
     this.swipeHorizontal = false,
     this.password,
@@ -31,7 +22,6 @@ class PDFView extends StatefulWidget {
     this.autoSpacing = true,
     this.pageFling = true,
     this.pageSnap = true,
-    this.onPageChanged,
   }) : super(key: key);
 
   @override
@@ -41,14 +31,14 @@ class PDFView extends StatefulWidget {
   final PDFViewCreatedCallback onViewCreated;
   final PageChangedCallback onPageChanged;
 
-  /// Which gestures should be consumed by the web view.
+  /// Which gestures should be consumed by the pdf view.
   ///
-  /// It is possible for other gesture recognizers to be competing with the web view on pointer
-  /// events, e.g if the web view is inside a [ListView] the [ListView] will want to handle
-  /// vertical drags. The web view will claim gestures that are recognized by any of the
+  /// It is possible for other gesture recognizers to be competing with the pdf view on pointer
+  /// events, e.g if the pdf view is inside a [ListView] the [ListView] will want to handle
+  /// vertical drags. The pdf view will claim gestures that are recognized by any of the
   /// recognizers on this list.
   ///
-  /// When this set is empty or null, the web view will only handle pointer events for gestures that
+  /// When this set is empty or null, the pdf view will only handle pointer events for gestures that
   /// were not claimed by any other gesture recognizer.
   final Set<Factory<OneSequenceGestureRecognizer>> gestureRecognizers;
 

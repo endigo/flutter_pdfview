@@ -1,8 +1,8 @@
 name: flutter_pdfview
-description: A new flutter plugin project.
-version: 0.0.1
-author:
-homepage:
+description: Native PDF View for iOS and Android
+version: 1.0.0
+author: endigo <endigo.18@gmail.com>
+homepage: https://github.com/endigo/flutter_pdfview
 
 environment:
   sdk: ">=2.1.0 <3.0.0"
