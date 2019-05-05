@@ -70,6 +70,8 @@
             PDFDocument * document = [[PDFDocument alloc] initWithURL: sourcePDFUrl];
             
             _pdfView.document = document;
+
+            _pdfView.displayMode = kPDFDisplaySinglePageContinuous;
         }
         
         NSString* password = args[@"password"];
@@ -86,7 +88,6 @@
         }
         
         _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight|UIViewAutoresizingFlexibleTopMargin|UIViewAutoresizingFlexibleBottomMargin;
-        _pdfView.displayMode = kPDFDisplaySinglePageContinuous;
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(handlePageChanged:) name:PDFViewPageChangedNotification object:_pdfView];
         
     }
