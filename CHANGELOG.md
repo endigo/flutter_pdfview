@@ -1,6 +1,6 @@
 ## 1.0.0+3
 
-* Support `enableSwipe`
+* Support `enableSwipe` in iOS
 
 ## 1.0.0+2
 
