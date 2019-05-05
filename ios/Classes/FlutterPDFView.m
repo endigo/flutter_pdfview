@@ -81,13 +81,12 @@
         
         if (swipeHorizontal) {
             _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
-            _pdfView.displayMode = kPDFDisplaySinglePageContinuous;
         } else {
             _pdfView.displayDirection = kPDFDisplayDirectionVertical;
         }
         
         _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight|UIViewAutoresizingFlexibleTopMargin|UIViewAutoresizingFlexibleBottomMargin;
-        
+        _pdfView.displayMode = kPDFDisplaySinglePageContinuous;
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(handlePageChanged:) name:PDFViewPageChangedNotification object:_pdfView];
         
     }
