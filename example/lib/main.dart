@@ -28,8 +28,9 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<File> createFileOfPdfUrl() async {
-    final url =
-        "https://berlin2017.droidcon.cod.newthinking.net/sites/global.droidcon.cod.newthinking.net/files/media/documents/Flutter%20-%2060FPS%20UI%20of%20the%20future%20%20-%20DroidconDE%2017.pdf";
+    // final url =
+    // "https://berlin2017.droidcon.cod.newthinking.net/sites/global.droidcon.cod.newthinking.net/files/media/documents/Flutter%20-%2060FPS%20UI%20of%20the%20future%20%20-%20DroidconDE%2017.pdf";
+    final url = "https://pdfkit.org/docs/guide.pdf";
     final filename = url.substring(url.lastIndexOf("/") + 1);
     var request = await HttpClient().getUrl(Uri.parse(url));
     var response = await request.close();
@@ -50,12 +51,16 @@ class _MyAppState extends State<MyApp> {
         body: Center(child: Builder(
           builder: (BuildContext context) {
             return RaisedButton(
-              child: Text("Open PDF"),
-              onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => PDFScreen(pathPDF)),
-                  ),
-            );
+                child: Text("Open PDF"),
+                onPressed: () {
+                  if (pathPDF != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => PDFScreen(pathPDF)),
+                    );
+                  }
+                });
           },
         )),
       ),
@@ -72,62 +77,42 @@ class PDFScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
-          title: Text("Document"),
-          actions: <Widget>[
-            IconButton(
-              icon: Icon(Icons.share),
-              onPressed: () {},
-            ),
-          ],
-        ),
-        body: Column(
-          children: <Widget>[
-            Expanded(
-              flex: 3,
-              child: PDFView(
-                filePath: pathPDF,
-                swipeHorizontal: false,
-                autoSpacing: true,
-                onViewCreated: (PDFViewController pdfViewController) {
-                  _controller.complete(pdfViewController);
-                },
-                onPageChanged: (int page) {
-                  print('page change: $page');
-                },
-              ),
-            ),
-            Expanded(
-              flex: 1,
-              child: FutureBuilder<PDFViewController>(
-                future: _controller.future,
-                builder: (context, AsyncSnapshot<PDFViewController> snapshot) {
-                  if (snapshot.hasData) {
-                    return Column(
-                      children: <Widget>[
-                        FutureBuilder<int>(
-                          future: snapshot.data.getPageCount(),
-                          builder: (context, AsyncSnapshot<int> snapshot) {
-                            if (snapshot.hasData)
-                              return Text('${snapshot.data}');
-                            return Container();
-                          },
-                        ),
-                        RaisedButton(
-                          child: Text('Go to 8'),
-                          onPressed: () async {
-                            await snapshot.data.setPage(16);
-                          },
-                        )
-                      ],
-                    );
-                  }
+      appBar: AppBar(
+        title: Text("Document"),
+        actions: <Widget>[
+          IconButton(
+            icon: Icon(Icons.share),
+            onPressed: () {},
+          ),
+        ],
+      ),
+      body: PDFView(
+        filePath: pathPDF,
+        swipeHorizontal: true,
+        autoSpacing: false,
+        pageFling: false,
+        onViewCreated: (PDFViewController pdfViewController) {
+          _controller.complete(pdfViewController);
+        },
+        onPageChanged: (int page) {
+          print('page change: $page');
+        },
+      ),
+      floatingActionButton: FutureBuilder<PDFViewController>(
+        future: _controller.future,
+        builder: (context, AsyncSnapshot<PDFViewController> snapshot) {
+          if (snapshot.hasData) {
+            return FloatingActionButton.extended(
+              label: Text("Go to 16"),
+              onPressed: () async {
+                await snapshot.data.setPage(16);
+              },
+            );
+          }
 
-                  return Container();
-                },
-              ),
-            )
-          ],
-        ));
+          return Container();
+        },
+      ),
+    );
   }
 }

@@ -55,39 +55,57 @@
         [_channel setMethodCallHandler:^(FlutterMethodCall* call, FlutterResult result) {
             [weakSelf onMethodCall:call result:result];
         }];
-//        NSDictionary<NSString*, id>* settings = args[@"settings"];
         
         BOOL autoSpacing = [args[@"autoSpacing"] boolValue];
-        _pdfView.autoScales = autoSpacing;
-        _pdfView.minScaleFactor = [_pdfView scaleFactorForSizeToFit];
-        _pdfView.maxScaleFactor = 4.0;
-        [_pdfView usePageViewController:autoSpacing withViewOptions:nil];
-        _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
-        
+        BOOL pageFling = [args[@"pageFling"] boolValue];
         NSString* filePath = args[@"filePath"];
         if ([filePath isKindOfClass:[NSString class]]) {
             NSURL * sourcePDFUrl = [NSURL fileURLWithPath:filePath];
             PDFDocument * document = [[PDFDocument alloc] initWithURL: sourcePDFUrl];
             
-            _pdfView.document = document;
-
+            _pdfView.autoresizesSubviews = YES;
+            _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+            
+            _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+            BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
+            if (swipeHorizontal) {
+                _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
+            } else {
+                _pdfView.displayDirection = kPDFDisplayDirectionVertical;
+            }
+            
+            [_pdfView usePageViewController:pageFling withViewOptions:nil];
+            _pdfView.autoScales = autoSpacing;
             _pdfView.displayMode = kPDFDisplaySinglePageContinuous;
+            _pdfView.document = document;
+            
+            PDFPage* page = [document pageAtIndex:0];
+            
+            CGRect bounds = [page boundsForBox:[_pdfView displayBox]];
+            
+            CGRect screenRect = [[UIScreen mainScreen] bounds];
+            
+            CGFloat scale = 1.0f;
+            if (screenRect.size.width / screenRect.size.height >= bounds.size.width / bounds.size.height) {
+                scale = screenRect.size.height / bounds.size.height;
+            } else {
+                scale = screenRect.size.width / bounds.size.width;
+            }
+            
+            NSLog(@"scale %f", scale);
+            
+            _pdfView.scaleFactor = scale;
+            
+            _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
+            _pdfView.maxScaleFactor = 4.0;
         }
+        
         
         NSString* password = args[@"password"];
         if ([password isKindOfClass:[NSString class]] && [_pdfView.document isEncrypted]) {
             [_pdfView.document unlockWithPassword:password];
         }
         
-        BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
-        
-        if (swipeHorizontal) {
-            _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
-        } else {
-            _pdfView.displayDirection = kPDFDisplayDirectionVertical;
-        }
-        
-        _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight|UIViewAutoresizingFlexibleTopMargin|UIViewAutoresizingFlexibleBottomMargin;
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(handlePageChanged:) name:PDFViewPageChangedNotification object:_pdfView];
         
     }
