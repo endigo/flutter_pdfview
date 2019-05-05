@@ -1,3 +1,7 @@
+## 1.0.0+3
+
+* Support `enableSwipe`
+
 ## 1.0.0+2
 
 * Set correct scale in iOS

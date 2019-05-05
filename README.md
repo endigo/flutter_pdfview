@@ -49,13 +49,13 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | onPageChanged           |    ✅    |  ✅ |
 | gestureRecognizers      |    ✅    |  ✅ |
 | filePath                |    ✅    |  ✅ |
-| enableSwipe             |    ✅    |  ❌ |
+| enableSwipe             |    ✅    |  ✅ |
 | swipeHorizontal         |    ✅    |  ✅ |
 | password                |    ✅    |  ✅ |
 | nightMode               |    ✅    |  ❌ |
 | password                |    ✅    |  ✅ |
 | autoSpacing             |    ✅    |  ✅ |
-| pageFling               |    ✅    |  ❌ |
+| pageFling               |    ✅    |  ✅ |
 | pageSnap                |    ✅    |  ❌ |
 
 # Dependencies

@@ -88,6 +88,7 @@ class PDFScreen extends StatelessWidget {
       ),
       body: PDFView(
         filePath: pathPDF,
+        enableSwipe: true,
         swipeHorizontal: true,
         autoSpacing: false,
         pageFling: false,
