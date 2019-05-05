@@ -82,15 +82,19 @@
             
             PDFPage* page = [document pageAtIndex:0];
             
-            CGRect bounds = [page boundsForBox:[_pdfView displayBox]];
+            CGRect pageRect = [page boundsForBox:[_pdfView displayBox]];
             
-            CGRect screenRect = [[UIScreen mainScreen] bounds];
+            CGRect parentRect = [[UIScreen mainScreen] bounds];
+
+            if (frame.size.width > 0 && frame.size.height > 0) {
+                parentRect = frame;
+            }
             
             CGFloat scale = 1.0f;
-            if (screenRect.size.width / screenRect.size.height >= bounds.size.width / bounds.size.height) {
-                scale = screenRect.size.height / bounds.size.height;
+            if (parentRect.size.width / parentRect.size.height >= pageRect.size.width / pageRect.size.height) {
+                scale = parentRect.size.height / pageRect.size.height;
             } else {
-                scale = screenRect.size.width / bounds.size.width;
+                scale = parentRect.size.width / pageRect.size.width;
             }
             
             NSLog(@"scale %f", scale);
