@@ -10,7 +10,7 @@ Add this to your package's pubspec.yaml file:
 
 ```
 dependencies:
-  flutter_pdfview: ^1.0.0
+  flutter_pdfview: ^1.0.0+4
 ```
 
 
@@ -57,6 +57,14 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | autoSpacing             |    ✅    |  ✅ |
 | pageFling               |    ✅    |  ✅ |
 | pageSnap                |    ✅    |  ❌ |
+
+## Controller Options
+
+| Name                    |    Description       | Parameters | Return         |
+| :---------------------- | :------------------: | :--------: |:-------------: |
+| getPageCount            | Get total page count | -          | `Future<int>`  |
+| getCurrentPage          | Get current page     | -          | `Future<int>`  |
+| setPage                 | Go to/Set page       | `int page` | `Future<bool>` |
 
 # Dependencies
 ### Android

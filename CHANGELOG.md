@@ -1,3 +1,6 @@
+## 1.0.0+4
+
+* Add controller functions description in document
 ## 1.0.0+3
 
 * Support `enableSwipe` in iOS
