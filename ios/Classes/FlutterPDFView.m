@@ -103,6 +103,8 @@
             
             _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
             _pdfView.maxScaleFactor = 4.0;
+            
+            [self handleRenderCompleted];
         }
         
         
@@ -158,7 +160,11 @@
 }
 
 -(void)handlePageChanged:(NSNotification*)notification {
-    [_channel invokeMethod:@"onPageChanged" arguments:@{@"page" : [NSNumber numberWithUnsignedLong: [_pdfView.document indexForPage: _pdfView.currentPage]]}];
+    [_channel invokeMethod:@"onPageChanged" arguments:@{@"page" : [NSNumber numberWithUnsignedLong: [_pdfView.document indexForPage: _pdfView.currentPage]], @"total" : [NSNumber numberWithUnsignedLong: [_pdfView.document pageCount]]}];
+}
+
+-(void)handleRenderCompleted {
+    [_channel invokeMethod:@"onRender" arguments:@{@"pages" : [NSNumber numberWithUnsignedLong: [_pdfView.document pageCount]]}];
 }
 
 @end

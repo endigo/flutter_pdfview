@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 
@@ -19,12 +20,18 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    createFileOfPdfUrl().then((f) {
+    fromAsset('assets/demo.pdf').then((f) {
       setState(() {
         pathPDF = f.path;
         print(pathPDF);
       });
     });
+    // createFileOfPdfUrl().then((f) {
+    //   setState(() {
+    //     pathPDF = f.path;
+    //     print(pathPDF);
+    //   });
+    // });
   }
 
   Future<File> createFileOfPdfUrl() async {
@@ -39,6 +46,24 @@ class _MyAppState extends State<MyApp> {
     File file = new File('$dir/$filename');
     await file.writeAsBytes(bytes);
     return file;
+  }
+
+  Future<File> fromAsset(String asset) async {
+    // To open from assets, you can copy them to the app storage folder, and the access them "locally"
+    Completer<File> completer = Completer();
+
+    try {
+      var dir = await getApplicationDocumentsDirectory();
+      File file = File("${dir.path}/large.pdf");
+      var data = await rootBundle.load(asset);
+      var bytes = data.buffer.asUint8List();
+      await file.writeAsBytes(bytes, flush: true);
+      completer.complete(file);
+    } catch (e) {
+      throw Exception('Error parsing asset file!');
+    }
+    
+    return completer.future;
   }
 
   @override
@@ -57,7 +82,7 @@ class _MyAppState extends State<MyApp> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => PDFScreen(pathPDF)),
+                          builder: (context) => PDFScreen(path: pathPDF)),
                     );
                   }
                 });
@@ -68,11 +93,19 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-class PDFScreen extends StatelessWidget {
-  final String pathPDF;
+class PDFScreen extends StatefulWidget {
+  final String path;
+
+  PDFScreen({Key key, this.path}) : super(key: key);
+
+  _PDFScreenState createState() => _PDFScreenState();
+}
+
+class _PDFScreenState extends State<PDFScreen> {
   final Completer<PDFViewController> _controller =
       Completer<PDFViewController>();
-  PDFScreen(this.pathPDF);
+  int pages = 0;
+  bool isReady = false;
 
   @override
   Widget build(BuildContext context) {
@@ -86,27 +119,48 @@ class PDFScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: PDFView(
-        filePath: pathPDF,
-        enableSwipe: true,
-        swipeHorizontal: true,
-        autoSpacing: false,
-        pageFling: false,
-        onViewCreated: (PDFViewController pdfViewController) {
-          _controller.complete(pdfViewController);
-        },
-        onPageChanged: (int page) {
-          print('page change: $page');
-        },
+      body: Stack(
+        children: <Widget>[
+          PDFView(
+            filePath: widget.path,
+            enableSwipe: true,
+            swipeHorizontal: true,
+            autoSpacing: false,
+            pageFling: false,
+            onRender: (_pages) {
+              setState(() {
+                pages = _pages;
+                isReady = true;
+              });
+            },
+            onError: (error) {
+              print(error.toString());
+            },
+            onPageError: (page, error) {
+              print('$page: ${error.toString()}');
+            },
+            onViewCreated: (PDFViewController pdfViewController) {
+              _controller.complete(pdfViewController);
+            },
+            onPageChanged: (int page, int total) {
+              print('page change: $page/$total');
+            },
+          ),
+          !isReady
+              ? Center(
+                  child: CircularProgressIndicator(),
+                )
+              : Container()
+        ],
       ),
       floatingActionButton: FutureBuilder<PDFViewController>(
         future: _controller.future,
         builder: (context, AsyncSnapshot<PDFViewController> snapshot) {
           if (snapshot.hasData) {
             return FloatingActionButton.extended(
-              label: Text("Go to 16"),
+              label: Text("Go to ${pages ~/ 2}"),
               onPressed: () async {
-                await snapshot.data.setPage(16);
+                await snapshot.data.setPage(pages ~/ 2);
               },
             );
           }

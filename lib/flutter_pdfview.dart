@@ -6,14 +6,20 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 typedef void PDFViewCreatedCallback(PDFViewController controller);
-typedef void PageChangedCallback(int page);
+typedef void RenderCallback(int pages);
+typedef void PageChangedCallback(int page, int total);
+typedef void ErrorCallback(dynamic error);
+typedef void PageErrorCallback(int page, dynamic error);
 
 class PDFView extends StatefulWidget {
   const PDFView({
     Key key,
     @required this.filePath,
     this.onViewCreated,
+    this.onRender,
     this.onPageChanged,
+    this.onError,
+    this.onPageError,
     this.gestureRecognizers,
     this.enableSwipe = true,
     this.swipeHorizontal = false,
@@ -29,7 +35,10 @@ class PDFView extends StatefulWidget {
 
   /// If not null invoked once the web view is created.
   final PDFViewCreatedCallback onViewCreated;
+  final RenderCallback onRender;
   final PageChangedCallback onPageChanged;
+  final ErrorCallback onError;
+  final PageErrorCallback onPageError;
 
   /// Which gestures should be consumed by the pdf view.
   ///
@@ -200,9 +209,27 @@ class PDFViewController {
 
   Future<bool> _onMethodCall(MethodCall call) async {
     switch (call.method) {
+      case 'onRender':
+        if (_widget.onRender != null) {
+          _widget.onRender(call.arguments['pages']);
+        }
+
+        return null;
       case 'onPageChanged':
         if (_widget.onPageChanged != null) {
-          _widget.onPageChanged(call.arguments['page']);
+          _widget.onPageChanged(call.arguments['page'], call.arguments['total']);
+        }
+
+        return null;
+      case 'onError':
+        if (_widget.onError != null) {
+          _widget.onError(call.arguments['error']);
+        }
+
+        return null;
+      case 'onPageError':
+        if (_widget.onPageError != null) {
+          _widget.onPageError(call.arguments['page'], call.arguments['error']);
         }
 
         return null;

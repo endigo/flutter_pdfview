@@ -13,7 +13,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.github.barteksc.pdfviewer.PDFView;
-import com.github.barteksc.pdfviewer.listener.OnPageChangeListener;
+import com.github.barteksc.pdfviewer.listener.*;
+import com.github.barteksc.pdfviewer.util.Constants;
 
 public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private final PDFView pdfView;
@@ -31,6 +32,8 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
             File file = new File(filePath);
 
+            Constants.PRELOAD_OFFSET = 3;
+
             pdfView.fromFile(file)
                 .enableSwipe(getBoolean(params, "enableSwipe"))
                 .swipeHorizontal(getBoolean(params, "swipeHorizontal"))
@@ -41,10 +44,36 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                 .pageSnap(getBoolean(params,"pageSnap"))
                 .onPageChange(new OnPageChangeListener() {
                     @Override
-                    public void onPageChanged(int page, int pageCount) {
+                    public void onPageChanged(int page, int total) {
                         Map<String, Object> args = new HashMap<>();
                         args.put("page", page);
+                        args.put("total", total);
                         methodChannel.invokeMethod("onPageChanged", args);
+                    }
+                })
+                .onError(new OnErrorListener() {
+                    @Override
+                    public void onError(Throwable t) {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("error", t);
+                        methodChannel.invokeMethod("onError", args);
+                    }
+                })
+                .onPageError(new OnPageErrorListener() {
+                    @Override
+                    public void onPageError(int page, Throwable t) {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("page", page);
+                        args.put("error", t);
+                        methodChannel.invokeMethod("onPageError", args);
+                    }
+                })
+                .onRender(new OnRenderListener() {
+                    @Override
+                    public void onInitiallyRendered(int pages) {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("pages", pages);
+                        methodChannel.invokeMethod("onRender", args);
                     }
                 })
                 .enableDoubletap(true)
@@ -74,10 +103,6 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
             default:
                 result.notImplemented();
         }
-
-        // total page count - pdfView.getPageCount();
-        // current page -  pdfView.getCurrentPage();
-//        pdfView.on
     }
 
     void getPageCount(Result result) {

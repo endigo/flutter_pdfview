@@ -10,7 +10,7 @@ Add this to your package's pubspec.yaml file:
 
 ```
 dependencies:
-  flutter_pdfview: ^1.0.0
+  flutter_pdfview: ^1.0.0+4
 ```
 
 
@@ -46,7 +46,10 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | Name                    | Android  | iOS  |
 | :---------------------- | :------: | :--: |
 | onViewCreated           |    ✅    |  ✅ |
+| onRender                |    ✅    |  ✅ |
 | onPageChanged           |    ✅    |  ✅ |
+| onError                 |    ✅    |  ❌ |
+| onPageError             |    ✅    |  ❌ |
 | gestureRecognizers      |    ✅    |  ✅ |
 | filePath                |    ✅    |  ✅ |
 | enableSwipe             |    ✅    |  ✅ |
@@ -57,6 +60,44 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | autoSpacing             |    ✅    |  ✅ |
 | pageFling               |    ✅    |  ✅ |
 | pageSnap                |    ✅    |  ❌ |
+
+## Controller Options
+
+| Name                    |    Description       | Parameters | Return         |
+| :---------------------- | :------------------: | :--------: |:-------------: |
+| getPageCount            | Get total page count | -          | `Future<int>`  |
+| getCurrentPage          | Get current page     | -          | `Future<int>`  |
+| setPage                 | Go to/Set page       | `int page` | `Future<bool>` |
+
+## Example
+
+```dart
+PDFView(
+  filePath: path,
+  enableSwipe: true,
+  swipeHorizontal: true,
+  autoSpacing: false,
+  pageFling: false,
+  onRender: (_pages) {
+    setState(() {
+      pages = _pages;
+      isReady = true;
+    });
+  },
+  onError: (error) {
+    print(error.toString());
+  },
+  onPageError: (page, error) {
+    print('$page: ${error.toString()}');
+  },
+  onViewCreated: (PDFViewController pdfViewController) {
+    _controller.complete(pdfViewController);
+  },
+  onPageChanged: (int page, int total) {
+    print('page change: $page/$total');
+  },
+),
+```
 
 # Dependencies
 ### Android
