@@ -208,6 +208,7 @@ class PDFViewController {
   PDFView _widget;
 
   Future<bool> _onMethodCall(MethodCall call) async {
+    print([call.method, call.arguments]);
     switch (call.method) {
       case 'onRender':
         if (_widget.onRender != null) {

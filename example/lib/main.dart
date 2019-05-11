@@ -125,8 +125,8 @@ class _PDFScreenState extends State<PDFScreen> {
             filePath: widget.path,
             enableSwipe: true,
             swipeHorizontal: true,
-            autoSpacing: false,
-            pageFling: false,
+            autoSpacing: true,
+            pageFling: true,
             onRender: (_pages) {
               setState(() {
                 pages = _pages;
