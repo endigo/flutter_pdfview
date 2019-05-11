@@ -1,3 +1,7 @@
+## 1.0.0+6
+
+* FIX: onRender not works in iOS
+
 ## 1.0.0+5
 
 * onRender handlers added
