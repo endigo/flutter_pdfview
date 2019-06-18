@@ -218,7 +218,8 @@ class PDFViewController {
         return null;
       case 'onPageChanged':
         if (_widget.onPageChanged != null) {
-          _widget.onPageChanged(call.arguments['page'], call.arguments['total']);
+          _widget.onPageChanged(
+              call.arguments['page'], call.arguments['total']);
         }
 
         return null;
