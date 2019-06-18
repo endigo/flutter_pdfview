@@ -1,3 +1,7 @@
+## 1.0.0+7
+
+* upgrade path_provider version
+
 ## 1.0.0+6
 
 * FIX: onRender not works in iOS
