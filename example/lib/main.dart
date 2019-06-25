@@ -23,7 +23,7 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     fromAsset('assets/demo.pdf').then((f) {
       setState(() {
-        pathPDF = f.path+"ll";
+        pathPDF = f.path;
         print(pathPDF);
       });
     });
