@@ -15,6 +15,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  final _scaffoldKey = new GlobalKey<ScaffoldState>();
   String pathPDF = "";
 
   @override
@@ -22,7 +23,7 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     fromAsset('assets/demo.pdf').then((f) {
       setState(() {
-        pathPDF = f.path;
+        pathPDF = f.path+"ll";
         print(pathPDF);
       });
     });
@@ -62,8 +63,18 @@ class _MyAppState extends State<MyApp> {
     } catch (e) {
       throw Exception('Error parsing asset file!');
     }
-    
+
     return completer.future;
+  }
+
+  void _showSnackBar(String text) {
+    _scaffoldKey.currentState.showSnackBar(new SnackBar(
+      content: new Text(
+        text,
+        textAlign: TextAlign.center,
+      ),
+      backgroundColor: Colors.red,
+    ));
   }
 
   @override
@@ -72,6 +83,7 @@ class _MyAppState extends State<MyApp> {
       title: 'Flutter PDF View',
       debugShowCheckedModeBanner: false,
       home: Scaffold(
+        key: _scaffoldKey,
         appBar: AppBar(title: const Text('Plugin example app')),
         body: Center(child: Builder(
           builder: (BuildContext context) {
@@ -79,11 +91,16 @@ class _MyAppState extends State<MyApp> {
                 child: Text("Open PDF"),
                 onPressed: () {
                   if (pathPDF != null) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => PDFScreen(path: pathPDF)),
-                    );
+                    if (pathPDF.toLowerCase().endsWith('.pdf')) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => PDFScreen(path: pathPDF)),
+                      );
+                    } else {
+                      _showSnackBar(
+                          'The file "$pathPDF" could not be opened.\nIncorrect file type, required ".pdf"');
+                    }
                   }
                 });
           },
