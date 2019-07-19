@@ -257,12 +257,12 @@ class PDFViewController {
     return isSet;
   }
 
-  Future<bool> setNightMode(bool nightMode) async {
-    final bool isSet = await _channel.invokeMethod('setNightMode', <String, dynamic>{
-      'nightMode': nightMode,
-    });
-    return isSet;
-  }
+  // Future<bool> setNightMode(bool nightMode) async {
+  //   final bool isSet = await _channel.invokeMethod('setNightMode', <String, dynamic>{
+  //     'nightMode': nightMode,
+  //   });
+  //   return isSet;
+  // }
 
   Future<void> _updateWidget(PDFView widget) async {
     _widget = widget;
