@@ -62,7 +62,7 @@ class _MyAppState extends State<MyApp> {
     } catch (e) {
       throw Exception('Error parsing asset file!');
     }
-    
+
     return completer.future;
   }
 
@@ -79,6 +79,14 @@ class _MyAppState extends State<MyApp> {
                 child: Text("Open PDF"),
                 onPressed: () {
                   if (pathPDF != null) {
+                    File file = File(pathPDF);
+                    if (!file.existsSync()) {
+                      Scaffold.of(context).showSnackBar(SnackBar(
+                        content: Text("File not found!"),
+                      ));
+                      return;
+                    }
+
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -101,11 +109,21 @@ class PDFScreen extends StatefulWidget {
   _PDFScreenState createState() => _PDFScreenState();
 }
 
-class _PDFScreenState extends State<PDFScreen> {
+class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
   final Completer<PDFViewController> _controller =
       Completer<PDFViewController>();
   int pages = 0;
+  int currentPage = 0;
   bool isReady = false;
+
+  @override
+  void didChangeMetrics() {
+    // setState(() {
+    //   width = window.physicalSize.width;
+    //   height = window.physicalSize.height;
+    // });
+    // window.physicalSize.
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -127,6 +145,7 @@ class _PDFScreenState extends State<PDFScreen> {
             swipeHorizontal: true,
             autoSpacing: true,
             pageFling: true,
+            defaultPage: currentPage,
             onRender: (_pages) {
               setState(() {
                 pages = _pages;
@@ -144,6 +163,9 @@ class _PDFScreenState extends State<PDFScreen> {
             },
             onPageChanged: (int page, int total) {
               print('page change: $page/$total');
+              setState(() {
+                currentPage = page;
+              });
             },
           ),
           !isReady

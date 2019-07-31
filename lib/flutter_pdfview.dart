@@ -28,6 +28,7 @@ class PDFView extends StatefulWidget {
     this.autoSpacing = true,
     this.pageFling = true,
     this.pageSnap = true,
+    this.defaultPage = 0,
   }) : super(key: key);
 
   @override
@@ -61,6 +62,7 @@ class PDFView extends StatefulWidget {
   final bool autoSpacing;
   final bool pageFling;
   final bool pageSnap;
+  final int defaultPage;
 }
 
 class _PDFViewState extends State<PDFView> {
@@ -142,6 +144,7 @@ class _PDFViewSettings {
     this.autoSpacing,
     this.pageFling,
     this.pageSnap,
+    this.defaultPage,
   });
 
   static _PDFViewSettings fromWidget(PDFView widget) {
@@ -163,6 +166,7 @@ class _PDFViewSettings {
   final bool autoSpacing;
   final bool pageFling;
   final bool pageSnap;
+  final int defaultPage;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -173,6 +177,7 @@ class _PDFViewSettings {
       'autoSpacing': autoSpacing,
       'pageFling': pageFling,
       'pageSnap': pageSnap,
+      'defaultPage': defaultPage,
     };
   }
 
@@ -186,6 +191,9 @@ class _PDFViewSettings {
     }
     if (pageSnap != newSettings.pageSnap) {
       updates['pageSnap'] = newSettings.pageSnap;
+    }
+    if (defaultPage != newSettings.defaultPage) {
+      updates['defaultPage'] = newSettings.defaultPage;
     }
 
     return updates;
