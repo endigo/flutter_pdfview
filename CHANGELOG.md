@@ -1,3 +1,7 @@
+## 1.0.0+0
+
+- Avoid Android Native crash when file is not valid
+
 ## 1.0.0+8
 
 - FIX: [#21](https://github.com/endigo/flutter_pdfview/issues/21)
