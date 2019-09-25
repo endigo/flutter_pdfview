@@ -2,8 +2,6 @@
 
 Native PDF View for iOS and Android  
 
-![[Donate with Paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=LAZ8AHXPUQNMG&source=url)
-
 
 # Use this package as a library
 
