@@ -99,6 +99,13 @@ PDFView(
 ),
 ```
 
+# For production usage
+
+If you use proguard, you should include this line.
+```
+-keep class com.shockwave.**
+```
+
 # Dependencies
 
 ### Android
