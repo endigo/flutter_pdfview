@@ -75,7 +75,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "1.0.0+6"
+    version: "1.0.0+9"
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -115,7 +115,7 @@ packages:
       name: path_provider
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.4.1"
+    version: "1.1.0"
   pedantic:
     dependency: transitive
     description:
@@ -123,6 +123,7 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.8.0+1"
+
   petitparser:
     dependency: transitive
     description:

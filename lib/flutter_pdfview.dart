@@ -56,7 +56,7 @@ class PDFView extends StatefulWidget {
 
   final bool enableSwipe;
   final bool swipeHorizontal;
-  final bool password;
+  final String password;
   final bool nightMode;
   final bool autoSpacing;
   final bool pageFling;
@@ -158,7 +158,7 @@ class _PDFViewSettings {
 
   final bool enableSwipe;
   final bool swipeHorizontal;
-  final bool password;
+  final String password;
   final bool nightMode;
   final bool autoSpacing;
   final bool pageFling;
@@ -218,7 +218,8 @@ class PDFViewController {
         return null;
       case 'onPageChanged':
         if (_widget.onPageChanged != null) {
-          _widget.onPageChanged(call.arguments['page'], call.arguments['total']);
+          _widget.onPageChanged(
+              call.arguments['page'], call.arguments['total']);
         }
 
         return null;

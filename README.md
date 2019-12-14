@@ -1,6 +1,7 @@
 # flutter_pdfview
 
-Native PDF View for iOS and Android
+Native PDF View for iOS and Android  
+
 
 # Use this package as a library
 
@@ -10,9 +11,8 @@ Add this to your package's pubspec.yaml file:
 
 ```
 dependencies:
-  flutter_pdfview: ^1.0.0+4
+  flutter_pdfview: ^1.0.0+9
 ```
-
 
 ### 2. Install it
 
@@ -24,14 +24,14 @@ with Flutter:
 $ flutter packages get
 ```
 
-Alternatively, your editor might support pub get or ```flutter packages get```. Check the docs for your editor to learn more.
+Alternatively, your editor might support pub get or `flutter packages get`. Check the docs for your editor to learn more.
 
 ### 3. Setup
 
 #### iOS
+
 Opt-in to the embedded views preview by adding a boolean property to the app's `Info.plist` file
 with the key `io.flutter.embedded_views_preview` and the value `YES`.
-
 
 ### 4. Import it
 
@@ -43,31 +43,31 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 
 ## Options
 
-| Name                    | Android  | iOS  |
-| :---------------------- | :------: | :--: |
-| onViewCreated           |    ✅    |  ✅ |
-| onRender                |    ✅    |  ✅ |
-| onPageChanged           |    ✅    |  ✅ |
-| onError                 |    ✅    |  ❌ |
-| onPageError             |    ✅    |  ❌ |
-| gestureRecognizers      |    ✅    |  ✅ |
-| filePath                |    ✅    |  ✅ |
-| enableSwipe             |    ✅    |  ✅ |
-| swipeHorizontal         |    ✅    |  ✅ |
-| password                |    ✅    |  ✅ |
-| nightMode               |    ✅    |  ❌ |
-| password                |    ✅    |  ✅ |
-| autoSpacing             |    ✅    |  ✅ |
-| pageFling               |    ✅    |  ✅ |
-| pageSnap                |    ✅    |  ❌ |
+| Name               | Android | iOS |
+| :----------------- | :-----: | :-: |
+| onViewCreated      |   ✅    | ✅  |
+| onRender           |   ✅    | ✅  |
+| onPageChanged      |   ✅    | ✅  |
+| onError            |   ✅    | ❌  |
+| onPageError        |   ✅    | ❌  |
+| gestureRecognizers |   ✅    | ✅  |
+| filePath           |   ✅    | ✅  |
+| enableSwipe        |   ✅    | ✅  |
+| swipeHorizontal    |   ✅    | ✅  |
+| password           |   ✅    | ✅  |
+| nightMode          |   ✅    | ❌  |
+| password           |   ✅    | ✅  |
+| autoSpacing        |   ✅    | ✅  |
+| pageFling          |   ✅    | ✅  |
+| pageSnap           |   ✅    | ❌  |
 
 ## Controller Options
 
-| Name                    |    Description       | Parameters | Return         |
-| :---------------------- | :------------------: | :--------: |:-------------: |
-| getPageCount            | Get total page count | -          | `Future<int>`  |
-| getCurrentPage          | Get current page     | -          | `Future<int>`  |
-| setPage                 | Go to/Set page       | `int page` | `Future<bool>` |
+| Name           |     Description      | Parameters |     Return     |
+| :------------- | :------------------: | :--------: | :------------: |
+| getPageCount   | Get total page count |     -      | `Future<int>`  |
+| getCurrentPage |   Get current page   |     -      | `Future<int>`  |
+| setPage        |    Go to/Set page    | `int page` | `Future<bool>` |
 
 ## Example
 
@@ -99,8 +99,19 @@ PDFView(
 ),
 ```
 
+# For production usage
+
+If you use proguard, you should include this line.
+```
+-keep class com.shockwave.**
+```
+
 # Dependencies
+
 ### Android
+
 [AndroidPdfViewer](https://github.com/barteksc/AndroidPdfViewer)
+
 ### iOS (only support> 11.0)
+
 [PDFKit](https://developer.apple.com/documentation/pdfkit)

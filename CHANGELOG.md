@@ -1,29 +1,42 @@
+## 1.0.0+0
+
+- Avoid Android Native crash when file is not valid
+
+## 1.0.0+8
+
+- FIX: [#21](https://github.com/endigo/flutter_pdfview/issues/21)
+
+## 1.0.0+7
+
+- upgrade path_provider version
+
 ## 1.0.0+6
 
-* FIX: onRender not works in iOS
+- FIX: onRender not works in iOS
 
 ## 1.0.0+5
 
-* onRender handlers added
-* onError, onPageError handlers added (Android only)
-* Add example snippet in readme
+- onRender handlers added
+- onError, onPageError handlers added (Android only)
+- Add example snippet in readme
 
 ## 1.0.0+4
 
-* Add controller functions description in document
+- Add controller functions description in document
+
 ## 1.0.0+3
 
-* Support `enableSwipe` in iOS
+- Support `enableSwipe` in iOS
 
 ## 1.0.0+2
 
-* Set correct scale in iOS
+- Set correct scale in iOS
 
 ## 1.0.0+1
 
-* Update pub description
+- Update pub description
 
 ## 1.0.0
 
-* Initial Release
-* Works better
+- Initial Release
+- Works better
