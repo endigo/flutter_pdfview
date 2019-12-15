@@ -34,57 +34,51 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
             Constants.PRELOAD_OFFSET = 3;
 
-            try {
-                pdfView.fromFile(file)
-                       .enableSwipe(getBoolean(params, "enableSwipe"))
-                       .swipeHorizontal(getBoolean(params, "swipeHorizontal"))
-                       .password(getString(params, "password"))
-                       .nightMode(getBoolean(params, "nightMode"))
-                       .autoSpacing(getBoolean(params, "autoSpacing"))
-                       .pageFling(getBoolean(params, "pageFling"))
-                       .pageSnap(getBoolean(params, "pageSnap"))
-                       .onPageChange(new OnPageChangeListener() {
-                           @Override
-                           public void onPageChanged(int page, int total) {
-                               Map<String, Object> args = new HashMap<>();
-                               args.put("page", page);
-                               args.put("total", total);
-                               methodChannel.invokeMethod("onPageChanged", args);
-                           }
-                       })
-                       .onError(new OnErrorListener() {
-                           @Override
-                           public void onError(Throwable t) {
-                               Map<String, Object> args = new HashMap<>();
-                               args.put("error", t);
-                               methodChannel.invokeMethod("onError", args);
-                           }
-                       })
-                       .onPageError(new OnPageErrorListener() {
-                           @Override
-                           public void onPageError(int page, Throwable t) {
-                               Map<String, Object> args = new HashMap<>();
-                               args.put("page", page);
-                               args.put("error", t);
-                               methodChannel.invokeMethod("onPageError", args);
-                           }
-                       })
-                       .onRender(new OnRenderListener() {
-                           @Override
-                           public void onInitiallyRendered(int pages) {
-                               Map<String, Object> args = new HashMap<>();
-                               args.put("pages", pages);
-                               methodChannel.invokeMethod("onRender", args);
-                           }
-                       })
-                       .enableDoubletap(true)
-                       .defaultPage(0)
-                       .load();
-            } catch (Exception ex){
-                Map<String, Object> args = new HashMap<>();
-                args.put("error", ex);
-                methodChannel.invokeMethod("onError", args);
-            }
+            pdfView.fromFile(file)
+                .enableSwipe(getBoolean(params, "enableSwipe"))
+                .swipeHorizontal(getBoolean(params, "swipeHorizontal"))
+                .password(getString(params,"password"))
+                .nightMode(getBoolean(params,"nightMode"))
+                .autoSpacing(getBoolean(params,"autoSpacing"))
+                .pageFling(getBoolean(params,"pageFling"))
+                .pageSnap(getBoolean(params,"pageSnap"))
+                .onPageChange(new OnPageChangeListener() {
+                    @Override
+                    public void onPageChanged(int page, int total) {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("page", page);
+                        args.put("total", total);
+                        methodChannel.invokeMethod("onPageChanged", args);
+                    }
+                })
+                .onError(new OnErrorListener() {
+                    @Override
+                    public void onError(Throwable t) {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("error", t.toString());
+                        methodChannel.invokeMethod("onError", args);
+                    }
+                })
+                .onPageError(new OnPageErrorListener() {
+                    @Override
+                    public void onPageError(int page, Throwable t) {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("page", page);
+                        args.put("error", t.toString());
+                        methodChannel.invokeMethod("onPageError", args);
+                    }
+                })
+                .onRender(new OnRenderListener() {
+                    @Override
+                    public void onInitiallyRendered(int pages) {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("pages", pages);
+                        methodChannel.invokeMethod("onRender", args);
+                    }
+                })
+                .enableDoubletap(true)
+                .defaultPage(0)
+                .load();
         }
     }
 

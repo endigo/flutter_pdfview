@@ -20,7 +20,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    fromAsset('assets/demo.pdf').then((f) {
+    fromAsset('assets/corrupted.pdf').then((f) {
       setState(() {
         pathPDF = f.path;
         print(pathPDF);
