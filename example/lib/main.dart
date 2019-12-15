@@ -16,14 +16,19 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String pathPDF = "";
+  String corruptedPathPDF = "";
 
   @override
   void initState() {
     super.initState();
-    fromAsset('assets/corrupted.pdf').then((f) {
+    fromAsset('assets/corrupted.pdf', 'corrupted.pdf').then((f) {
+      setState(() {
+        corruptedPathPDF = f.path;
+      });
+    });
+    fromAsset('assets/demo.pdf', 'demo.pdf').then((f) {
       setState(() {
         pathPDF = f.path;
-        print(pathPDF);
       });
     });
     // createFileOfPdfUrl().then((f) {
@@ -48,13 +53,13 @@ class _MyAppState extends State<MyApp> {
     return file;
   }
 
-  Future<File> fromAsset(String asset) async {
+  Future<File> fromAsset(String asset, String filename) async {
     // To open from assets, you can copy them to the app storage folder, and the access them "locally"
     Completer<File> completer = Completer();
 
     try {
       var dir = await getApplicationDocumentsDirectory();
-      File file = File("${dir.path}/large.pdf");
+      File file = File("${dir.path}/$filename");
       var data = await rootBundle.load(asset);
       var bytes = data.buffer.asUint8List();
       await file.writeAsBytes(bytes, flush: true);
@@ -62,7 +67,7 @@ class _MyAppState extends State<MyApp> {
     } catch (e) {
       throw Exception('Error parsing asset file!');
     }
-    
+
     return completer.future;
   }
 
@@ -75,17 +80,33 @@ class _MyAppState extends State<MyApp> {
         appBar: AppBar(title: const Text('Plugin example app')),
         body: Center(child: Builder(
           builder: (BuildContext context) {
-            return RaisedButton(
-                child: Text("Open PDF"),
-                onPressed: () {
-                  if (pathPDF != null) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => PDFScreen(path: pathPDF)),
-                    );
-                  }
-                });
+            return Column(
+              children: <Widget>[
+                RaisedButton(
+                    child: Text("Open PDF"),
+                    onPressed: () {
+                      if (pathPDF != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => PDFScreen(path: pathPDF)),
+                        );
+                      }
+                    }),
+                RaisedButton(
+                    child: Text("Open Corrupted PDF"),
+                    onPressed: () {
+                      if (pathPDF != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  PDFScreen(path: corruptedPathPDF)),
+                        );
+                      }
+                    })
+              ],
+            );
           },
         )),
       ),
@@ -106,6 +127,7 @@ class _PDFScreenState extends State<PDFScreen> {
       Completer<PDFViewController>();
   int pages = 0;
   bool isReady = false;
+  String errorMessage = '';
 
   @override
   Widget build(BuildContext context) {
@@ -134,9 +156,15 @@ class _PDFScreenState extends State<PDFScreen> {
               });
             },
             onError: (error) {
+              setState(() {
+                errorMessage = error.toString();
+              });
               print(error.toString());
             },
             onPageError: (page, error) {
+              setState(() {
+                errorMessage = '$page: ${error.toString()}';
+              });
               print('$page: ${error.toString()}');
             },
             onViewCreated: (PDFViewController pdfViewController) {
@@ -146,11 +174,13 @@ class _PDFScreenState extends State<PDFScreen> {
               print('page change: $page/$total');
             },
           ),
-          !isReady
-              ? Center(
-                  child: CircularProgressIndicator(),
-                )
-              : Container()
+          errorMessage.isEmpty
+              ? !isReady
+                  ? Center(
+                      child: CircularProgressIndicator(),
+                    )
+                  : Container()
+              : Center(child: Text(errorMessage))
         ],
       ),
       floatingActionButton: FutureBuilder<PDFViewController>(
