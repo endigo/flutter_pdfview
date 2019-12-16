@@ -1,7 +1,6 @@
 # flutter_pdfview
 
-Native PDF View for iOS and Android  
-
+Native PDF View for iOS and Android
 
 # Use this package as a library
 
@@ -11,7 +10,7 @@ Add this to your package's pubspec.yaml file:
 
 ```
 dependencies:
-  flutter_pdfview: ^1.0.0+9
+  flutter_pdfview: ^1.0.0+10
 ```
 
 ### 2. Install it
@@ -48,7 +47,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | onViewCreated      |   ✅    | ✅  |
 | onRender           |   ✅    | ✅  |
 | onPageChanged      |   ✅    | ✅  |
-| onError            |   ✅    | ❌  |
+| onError            |   ✅    | ✅  |
 | onPageError        |   ✅    | ❌  |
 | gestureRecognizers |   ✅    | ✅  |
 | filePath           |   ✅    | ✅  |
@@ -102,6 +101,7 @@ PDFView(
 # For production usage
 
 If you use proguard, you should include this line.
+
 ```
 -keep class com.shockwave.**
 ```
