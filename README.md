@@ -50,7 +50,8 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | onError            |   ✅    | ✅  |
 | onPageError        |   ✅    | ❌  |
 | gestureRecognizers |   ✅    | ✅  |
-| filePath           |   ✅    | ✅  |
+| filePath           |   ✅    |  ✅
+| fitEachPage        |   ✅     | ✅
 | enableSwipe        |   ✅    | ✅  |
 | swipeHorizontal    |   ✅    | ✅  |
 | password           |   ✅    | ✅  |
@@ -74,6 +75,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 PDFView(
   filePath: path,
   enableSwipe: true,
+  fitEachPage: true, // If set to false, pageFling has to be set to false
   swipeHorizontal: true,
   autoSpacing: false,
   pageFling: false,
