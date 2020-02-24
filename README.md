@@ -49,7 +49,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | onPageChanged      |   ✅    | ✅  |
 | onError            |   ✅    | ✅  |
 | onPageError        |   ✅    | ❌  |
-| gestureRecognizers |   ✅    | ✅  |
+| gestureRecognizers |   ✅    |  ✅
 | filePath           |   ✅    |  ✅
 | fitEachPage        |   ✅     | ✅
 | enableSwipe        |   ✅    | ✅  |
