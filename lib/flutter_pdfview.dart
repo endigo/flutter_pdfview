@@ -21,6 +21,7 @@ class PDFView extends StatefulWidget {
     this.onError,
     this.onPageError,
     this.gestureRecognizers,
+    this.fitEachPage = true,
     this.enableSwipe = true,
     this.swipeHorizontal = false,
     this.password,
@@ -53,7 +54,7 @@ class PDFView extends StatefulWidget {
 
   /// The initial URL to load.
   final String filePath;
-
+  final bool fitEachPage;
   final bool enableSwipe;
   final bool swipeHorizontal;
   final String password;
@@ -136,6 +137,7 @@ class _CreationParams {
 class _PDFViewSettings {
   _PDFViewSettings({
     this.enableSwipe,
+    this.fitEachPage,
     this.swipeHorizontal,
     this.password,
     this.nightMode,
@@ -147,6 +149,7 @@ class _PDFViewSettings {
   static _PDFViewSettings fromWidget(PDFView widget) {
     return _PDFViewSettings(
       enableSwipe: widget.enableSwipe,
+      fitEachPage: widget.fitEachPage,
       swipeHorizontal: widget.swipeHorizontal,
       password: widget.password,
       nightMode: widget.nightMode,
@@ -157,6 +160,7 @@ class _PDFViewSettings {
   }
 
   final bool enableSwipe;
+  final bool fitEachPage;
   final bool swipeHorizontal;
   final String password;
   final bool nightMode;
@@ -167,6 +171,7 @@ class _PDFViewSettings {
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'enableSwipe': enableSwipe,
+      'fitEachPage': fitEachPage,
       'swipeHorizontal': swipeHorizontal,
       'password': password,
       'nightMode': nightMode,
