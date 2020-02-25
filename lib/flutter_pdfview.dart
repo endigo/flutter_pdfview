@@ -156,6 +156,7 @@ class _PDFViewSettings {
       autoSpacing: widget.autoSpacing,
       pageFling: widget.pageFling,
       pageSnap: widget.pageSnap,
+      defaultPage: widget.defaultPage,
     );
   }
 
