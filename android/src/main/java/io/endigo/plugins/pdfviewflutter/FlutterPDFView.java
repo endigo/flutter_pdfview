@@ -42,7 +42,6 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                 .autoSpacing(getBoolean(params,"autoSpacing"))
                 .pageFling(getBoolean(params,"pageFling"))
                 .pageSnap(getBoolean(params,"pageSnap"))
-                .defaultPage(getInt(params, "defaultPage"))
                 .onPageChange(new OnPageChangeListener() {
                     @Override
                     public void onPageChanged(int page, int total) {
@@ -78,7 +77,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     }
                 })
                 .enableDoubletap(true)
-                .defaultPage(0)
+                .defaultPage(getInt(params, "defaultPage"))
                 .load();
         }
     }
@@ -99,10 +98,13 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                 break;
             case "setPage":
                 setPage(methodCall, result);
+                break;
             case "updateSettings":
                 setPage(methodCall, result);
+                break;
             default:
                 result.notImplemented();
+                break;
         }
     }
 
@@ -115,8 +117,11 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     }
 
     void setPage(MethodCall call, Result result) {
-        int page = (int)call.argument("page");
-        pdfView.jumpTo(page);
+        if (call.argument("page") != null) {
+            int page = (int)call.argument("page");
+            pdfView.jumpTo(page);
+        }
+
         result.success(true);
     }
 

@@ -59,7 +59,10 @@
         BOOL autoSpacing = [args[@"autoSpacing"] boolValue];
         BOOL pageFling = [args[@"pageFling"] boolValue];
         BOOL enableSwipe = [args[@"enableSwipe"] boolValue];
+        NSInteger defaultPage = [args[@"defaultPage"] integerValue];
+
         NSString* filePath = args[@"filePath"];
+
         if ([filePath isKindOfClass:[NSString class]]) {
             NSURL * sourcePDFUrl = [NSURL fileURLWithPath:filePath];
             PDFDocument * document = [[PDFDocument alloc] initWithURL: sourcePDFUrl];
@@ -80,7 +83,8 @@
             _pdfView.displayMode = enableSwipe ? kPDFDisplaySinglePageContinuous : kPDFDisplaySinglePage;
             _pdfView.document = document;
             
-            PDFPage* page = [document pageAtIndex:0];
+            PDFPage* page = [document pageAtIndex: defaultPage];
+            [_pdfView goToPage: page];
             
             CGRect pageRect = [page boundsForBox:[_pdfView displayBox]];
             
