@@ -83,6 +83,12 @@
             _pdfView.displayMode = enableSwipe ? kPDFDisplaySinglePageContinuous : kPDFDisplaySinglePage;
             _pdfView.document = document;
             
+            NSUInteger pageCount = [document pageCount];
+            
+            if (pageCount < defaultPage) {
+                defaultPage = pageCount;
+            }
+
             PDFPage* page = [document pageAtIndex: defaultPage];
             [_pdfView goToPage: page];
             
@@ -109,7 +115,7 @@
             _pdfView.maxScaleFactor = 4.0;
             
             dispatch_async(dispatch_get_main_queue(), ^{
-                [weakSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: [document pageCount]]];
+                [weakSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: pageCount]];
             });
         }
         

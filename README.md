@@ -44,10 +44,11 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 
 | Name               | Android | iOS |
 | :----------------- | :-----: | :-: |
+| defaultPage        |   ✅    | ✅  |
 | onViewCreated      |   ✅    | ✅  |
 | onRender           |   ✅    | ✅  |
 | onPageChanged      |   ✅    | ✅  |
-| onError            |   ✅    | ❌  |
+| onError            |   ✅    | ✅  |
 | onPageError        |   ✅    | ❌  |
 | gestureRecognizers |   ✅    | ✅  |
 | filePath           |   ✅    | ✅  |
