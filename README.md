@@ -42,24 +42,25 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 
 ## Options
 
-| Name               | Android | iOS |
-| :----------------- | :-----: | :-: |
-| defaultPage        |   ✅    | ✅  |
-| onViewCreated      |   ✅    | ✅  |
-| onRender           |   ✅    | ✅  |
-| onPageChanged      |   ✅    | ✅  |
-| onError            |   ✅    | ✅  |
-| onPageError        |   ✅    | ❌  |
-| gestureRecognizers |   ✅    | ✅  |
-| filePath           |   ✅    | ✅  |
-| enableSwipe        |   ✅    | ✅  |
-| swipeHorizontal    |   ✅    | ✅  |
-| password           |   ✅    | ✅  |
-| nightMode          |   ✅    | ❌  |
-| password           |   ✅    | ✅  |
-| autoSpacing        |   ✅    | ✅  |
-| pageFling          |   ✅    | ✅  |
-| pageSnap           |   ✅    | ❌  |
+| Name               | Android | iOS |      Default      |
+| :----------------- | :-----: | :-: | :---------------: |
+| defaultPage        |   ✅    | ✅  |        `0`        |
+| onViewCreated      |   ✅    | ✅  |      `null`       |
+| onRender           |   ✅    | ✅  |      `null`       |
+| onPageChanged      |   ✅    | ✅  |      `null`       |
+| onError            |   ✅    | ✅  |      `null`       |
+| onPageError        |   ✅    | ❌  |      `null`       |
+| gestureRecognizers |   ✅    | ✅  |      `null`       |
+| filePath           |   ✅    | ✅  |                   |
+| fitPolicy          |   ✅    | ❌  | `FitPolicy.WIDTH` |
+| enableSwipe        |   ✅    | ✅  |      `true`       |
+| swipeHorizontal    |   ✅    | ✅  |      `false`      |
+| password           |   ✅    | ✅  |      `null`       |
+| nightMode          |   ✅    | ❌  |      `false`      |
+| password           |   ✅    | ✅  |      `null`       |
+| autoSpacing        |   ✅    | ✅  |      `true`       |
+| pageFling          |   ✅    | ✅  |      `true`       |
+| pageSnap           |   ✅    | ❌  |      `true`       |
 
 ## Controller Options
 

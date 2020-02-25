@@ -2,6 +2,7 @@ package io.endigo.plugins.pdfviewflutter;
 
 import android.content.Context;
 import android.view.View;
+import android.net.Uri;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
@@ -15,6 +16,7 @@ import java.util.Map;
 import com.github.barteksc.pdfviewer.PDFView;
 import com.github.barteksc.pdfviewer.listener.*;
 import com.github.barteksc.pdfviewer.util.Constants;
+import com.github.barteksc.pdfviewer.util.FitPolicy;
 
 public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private final PDFView pdfView;
@@ -30,11 +32,9 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         if (params.containsKey("filePath")) {
             String filePath = (String) params.get("filePath");
 
-            File file = new File(filePath);
-
             Constants.PRELOAD_OFFSET = 3;
 
-            pdfView.fromFile(file)
+            pdfView.fromUri(getURI(filePath))
                 .enableSwipe(getBoolean(params, "enableSwipe"))
                 .swipeHorizontal(getBoolean(params, "swipeHorizontal"))
                 .password(getString(params,"password"))
@@ -42,6 +42,8 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                 .autoSpacing(getBoolean(params,"autoSpacing"))
                 .pageFling(getBoolean(params,"pageFling"))
                 .pageSnap(getBoolean(params,"pageSnap"))
+                .pageFitPolicy(getFitPolicy(params))
+//                .fitEachPage(getBoolean(params,"fitEachPage"))
                 .onPageChange(new OnPageChangeListener() {
                     @Override
                     public void onPageChanged(int page, int total) {
@@ -167,5 +169,27 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
     int getInt(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (int) params.get(key): 0;
+    }
+
+    FitPolicy getFitPolicy(Map<String, Object> params) {
+        String fitPolicy = getString(params, "fitPolicy");
+        switch(fitPolicy){
+            case "FitPolicy.WIDTH":
+                return FitPolicy.WIDTH;
+            case "FitPolicy.HEIGHT":
+                return FitPolicy.HEIGHT;
+            case "FitPolicy.BOTH":
+            default:
+                return FitPolicy.BOTH;
+        }
+    }
+
+    private Uri getURI(final String uri) {
+        Uri parsed = Uri.parse(uri);
+
+        if (parsed.getScheme() == null || parsed.getScheme().isEmpty()) {
+            return Uri.fromFile(new File(uri));
+        }
+        return parsed;
     }
 }

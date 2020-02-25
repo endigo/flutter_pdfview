@@ -155,6 +155,7 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
             autoSpacing: true,
             pageFling: true,
             defaultPage: currentPage,
+            fitPolicy: FitPolicy.HEIGHT,
             onRender: (_pages) {
               setState(() {
                 pages = _pages;

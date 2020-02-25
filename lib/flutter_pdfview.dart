@@ -11,6 +11,8 @@ typedef void PageChangedCallback(int page, int total);
 typedef void ErrorCallback(dynamic error);
 typedef void PageErrorCallback(int page, dynamic error);
 
+enum FitPolicy { WIDTH, HEIGHT, BOTH }
+
 class PDFView extends StatefulWidget {
   const PDFView({
     Key key,
@@ -28,7 +30,9 @@ class PDFView extends StatefulWidget {
     this.autoSpacing = true,
     this.pageFling = true,
     this.pageSnap = true,
+    this.fitEachPage = true,
     this.defaultPage = 0,
+    this.fitPolicy = FitPolicy.WIDTH,
   }) : super(key: key);
 
   @override
@@ -63,6 +67,8 @@ class PDFView extends StatefulWidget {
   final bool pageFling;
   final bool pageSnap;
   final int defaultPage;
+  final FitPolicy fitPolicy;
+  final bool fitEachPage;
 }
 
 class _PDFViewState extends State<PDFView> {
@@ -145,6 +151,8 @@ class _PDFViewSettings {
     this.pageFling,
     this.pageSnap,
     this.defaultPage,
+    this.fitPolicy,
+    this.fitEachPage,
   });
 
   static _PDFViewSettings fromWidget(PDFView widget) {
@@ -157,6 +165,7 @@ class _PDFViewSettings {
       pageFling: widget.pageFling,
       pageSnap: widget.pageSnap,
       defaultPage: widget.defaultPage,
+      fitPolicy: widget.fitPolicy,
     );
   }
 
@@ -168,6 +177,8 @@ class _PDFViewSettings {
   final bool pageFling;
   final bool pageSnap;
   final int defaultPage;
+  final FitPolicy fitPolicy;
+  final bool fitEachPage;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -179,6 +190,8 @@ class _PDFViewSettings {
       'pageFling': pageFling,
       'pageSnap': pageSnap,
       'defaultPage': defaultPage,
+      'fitPolicy': fitPolicy.toString(),
+      'fitEachPage': fitEachPage,
     };
   }
 
@@ -192,9 +205,6 @@ class _PDFViewSettings {
     }
     if (pageSnap != newSettings.pageSnap) {
       updates['pageSnap'] = newSettings.pageSnap;
-    }
-    if (defaultPage != newSettings.defaultPage) {
-      updates['defaultPage'] = newSettings.defaultPage;
     }
 
     return updates;
