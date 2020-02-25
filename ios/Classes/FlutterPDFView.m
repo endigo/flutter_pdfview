@@ -85,8 +85,8 @@
             
             NSUInteger pageCount = [document pageCount];
             
-            if (pageCount < defaultPage) {
-                defaultPage = pageCount;
+            if (pageCount <= defaultPage) {
+                defaultPage = pageCount - 1;
             }
 
             PDFPage* page = [document pageAtIndex: defaultPage];

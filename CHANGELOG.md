@@ -1,3 +1,7 @@
+## 1.0.0+9
+
+- add defaultPage option
+
 ## 1.0.0+8
 
 - FIX: [#21](https://github.com/endigo/flutter_pdfview/issues/21)
