@@ -1,3 +1,7 @@
+## 1.0.0+12
+
+- FIX: plugin class name
+
 ## 1.0.0+11
 
 - add defaultPage option
