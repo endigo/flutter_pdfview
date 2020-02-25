@@ -1,3 +1,7 @@
+## 1.0.1
+
+- Add support on FitPolicy on android
+
 ## 1.0.0+12
 
 - FIX: plugin class name
