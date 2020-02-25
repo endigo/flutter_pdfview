@@ -10,7 +10,7 @@ Add this to your package's pubspec.yaml file:
 
 ```
 dependencies:
-  flutter_pdfview: ^1.0.0+8
+  flutter_pdfview: ^1.0.0+10
 ```
 
 ### 2. Install it
@@ -97,6 +97,14 @@ PDFView(
     print('page change: $page/$total');
   },
 ),
+```
+
+# For production usage
+
+If you use proguard, you should include this line.
+
+```
+-keep class com.shockwave.**
 ```
 
 # Dependencies

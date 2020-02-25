@@ -16,14 +16,19 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String pathPDF = "";
+  String corruptedPathPDF = "";
 
   @override
   void initState() {
     super.initState();
-    fromAsset('assets/demo.pdf').then((f) {
+    fromAsset('assets/corrupted.pdf', 'corrupted.pdf').then((f) {
+      setState(() {
+        corruptedPathPDF = f.path;
+      });
+    });
+    fromAsset('assets/demo.pdf', 'demo.pdf').then((f) {
       setState(() {
         pathPDF = f.path;
-        print(pathPDF);
       });
     });
     // createFileOfPdfUrl().then((f) {
@@ -48,13 +53,13 @@ class _MyAppState extends State<MyApp> {
     return file;
   }
 
-  Future<File> fromAsset(String asset) async {
+  Future<File> fromAsset(String asset, String filename) async {
     // To open from assets, you can copy them to the app storage folder, and the access them "locally"
     Completer<File> completer = Completer();
 
     try {
       var dir = await getApplicationDocumentsDirectory();
-      File file = File("${dir.path}/large.pdf");
+      File file = File("${dir.path}/$filename");
       var data = await rootBundle.load(asset);
       var bytes = data.buffer.asUint8List();
       await file.writeAsBytes(bytes, flush: true);
@@ -75,25 +80,37 @@ class _MyAppState extends State<MyApp> {
         appBar: AppBar(title: const Text('Plugin example app')),
         body: Center(child: Builder(
           builder: (BuildContext context) {
-            return RaisedButton(
-                child: Text("Open PDF"),
-                onPressed: () {
-                  if (pathPDF != null) {
-                    File file = File(pathPDF);
-                    if (!file.existsSync()) {
-                      Scaffold.of(context).showSnackBar(SnackBar(
-                        content: Text("File not found!"),
-                      ));
-                      return;
+            return Column(
+              children: <Widget>[
+                RaisedButton(
+                  child: Text("Open PDF"),
+                  onPressed: () {
+                    if (pathPDF != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PDFScreen(path: pathPDF),
+                        ),
+                      );
                     }
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => PDFScreen(path: pathPDF)),
-                    );
-                  }
-                });
+                  },
+                ),
+                RaisedButton(
+                  child: Text("Open Corrupted PDF"),
+                  onPressed: () {
+                    if (pathPDF != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              PDFScreen(path: corruptedPathPDF),
+                        ),
+                      );
+                    }
+                  },
+                )
+              ],
+            );
           },
         )),
       ),
@@ -115,15 +132,7 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
   int pages = 0;
   int currentPage = 0;
   bool isReady = false;
-
-  @override
-  void didChangeMetrics() {
-    // setState(() {
-    //   width = window.physicalSize.width;
-    //   height = window.physicalSize.height;
-    // });
-    // window.physicalSize.
-  }
+  String errorMessage = '';
 
   @override
   Widget build(BuildContext context) {
@@ -153,9 +162,15 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
               });
             },
             onError: (error) {
+              setState(() {
+                errorMessage = error.toString();
+              });
               print(error.toString());
             },
             onPageError: (page, error) {
+              setState(() {
+                errorMessage = '$page: ${error.toString()}';
+              });
               print('$page: ${error.toString()}');
             },
             onViewCreated: (PDFViewController pdfViewController) {
@@ -168,11 +183,15 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
               });
             },
           ),
-          !isReady
-              ? Center(
-                  child: CircularProgressIndicator(),
+          errorMessage.isEmpty
+              ? !isReady
+                  ? Center(
+                      child: CircularProgressIndicator(),
+                    )
+                  : Container()
+              : Center(
+                  child: Text(errorMessage),
                 )
-              : Container()
         ],
       ),
       floatingActionButton: FutureBuilder<PDFViewController>(

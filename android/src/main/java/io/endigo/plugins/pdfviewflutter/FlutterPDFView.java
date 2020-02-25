@@ -55,7 +55,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     @Override
                     public void onError(Throwable t) {
                         Map<String, Object> args = new HashMap<>();
-                        args.put("error", t);
+                        args.put("error", t.toString());
                         methodChannel.invokeMethod("onError", args);
                     }
                 })
@@ -64,7 +64,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     public void onPageError(int page, Throwable t) {
                         Map<String, Object> args = new HashMap<>();
                         args.put("page", page);
-                        args.put("error", t);
+                        args.put("error", t.toString());
                         methodChannel.invokeMethod("onPageError", args);
                     }
                 })
