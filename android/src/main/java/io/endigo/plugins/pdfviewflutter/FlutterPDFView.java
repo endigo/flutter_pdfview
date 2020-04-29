@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.github.barteksc.pdfviewer.PDFView;
+import com.github.barteksc.pdfviewer.PDFView.Configurator;
 import com.github.barteksc.pdfviewer.listener.*;
 import com.github.barteksc.pdfviewer.util.Constants;
 import com.github.barteksc.pdfviewer.util.FitPolicy;
@@ -29,12 +30,20 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         methodChannel = new MethodChannel(messenger, "plugins.endigo.io/pdfview_" + id);
         methodChannel.setMethodCallHandler(this);
 
-        if (params.containsKey("filePath")) {
-            String filePath = (String) params.get("filePath");
+        Constants.PRELOAD_OFFSET = 3;
 
-            Constants.PRELOAD_OFFSET = 3;
+        Configurator config = null;
+        if (params.get("filePath") != null) {
+          String filePath = (String) params.get("filePath");
+          config = pdfView.fromUri(getURI(filePath));
+        }
+        else if (params.get("pdfData") != null) {
+          byte[] data = (byte[]) params.get("pdfData");
+          config = pdfView.fromBytes(data);
+        }
 
-            pdfView.fromUri(getURI(filePath))
+        if (config != null) {
+            config
                 .enableSwipe(getBoolean(params, "enableSwipe"))
                 .swipeHorizontal(getBoolean(params, "swipeHorizontal"))
                 .password(getString(params,"password"))
