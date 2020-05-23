@@ -1,3 +1,7 @@
+## 1.0.2
+
+- pod_target_xcconfig suggested by @zhenpeng0hou
+
 ## 1.0.1
 
 - Add support on FitPolicy on android
