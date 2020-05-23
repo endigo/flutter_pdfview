@@ -3,19 +3,22 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'flutter_pdfview'
-  s.version          = '0.0.1'
-  s.summary          = 'A new flutter plugin project.'
+  s.version          = '1.0.2'
+  s.summary          = 'Flutter plugin that display a pdf using PDFkit.'
   s.description      = <<-DESC
-A new flutter plugin project.
+  A Flutter plugin for display pdf from the library as well as from url
+  Downloaded by pub (not CocoaPods).
                        DESC
   s.homepage         = 'https://github.com/endigo/flutter_pdfview'
-  s.license          = { :file => '../LICENSE' }
+  s.license          = { :type => 'BSD', :file => '../LICENSE' }
   s.author           = { 'endigo' => 'endigo.18@gmail.com' }
-  s.source           = { :path => '.' }
+  s.source           = { :http => 'https://github.com/endigo/flutter_pdfview' }
+  s.documentation_url = 'https://pub.dev/packages/flutter_pdfview'
   s.source_files = 'Classes/**/*'
   s.public_header_files = 'Classes/**/*.h'
   s.dependency 'Flutter'
 
   s.ios.deployment_target = '9.0'
+  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'VALID_ARCHS' => 'armv7 arm64 x86_64' }
 end
 
