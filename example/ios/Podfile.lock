@@ -1,6 +1,6 @@
 PODS:
   - Flutter (1.0.0)
-  - flutter_pdfview (0.0.1):
+  - flutter_pdfview (1.0.2):
     - Flutter
   - path_provider (0.0.1):
     - Flutter
@@ -20,7 +20,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Flutter: 0e3d915762c693b495b44d77113d4970485de6ec
-  flutter_pdfview: bdf86972519a15c6d8f50ad34e5b0429b255cbb4
+  flutter_pdfview: 25f53dd6097661e6395b17de506e6060585946bd
   path_provider: f96fff6166a8867510d2c25fdcc346327cc4b259
 
 PODFILE CHECKSUM: 1b66dae606f75376c5f2135a8290850eeb09ae83

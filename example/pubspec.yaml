@@ -1,4 +1,5 @@
 name: flutter_pdfview_example
+version: 1.0.0
 description: Demonstrates how to use the flutter_pdfview plugin.
 publish_to: "none"
 
