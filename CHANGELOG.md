@@ -1,3 +1,7 @@
+## 1.0.2+1
+
+- Close [#67](https://github.com/endigo/flutter_pdfview/issues/67)
+
 ## 1.0.2
 
 - pod_target_xcconfig suggested by @zhenpeng0hou

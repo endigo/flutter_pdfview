@@ -176,8 +176,8 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
           PDFView(
             filePath: widget.path,
             enableSwipe: true,
-            swipeHorizontal: true,
-            autoSpacing: true,
+            swipeHorizontal: false,
+            autoSpacing: false,
             pageFling: true,
             defaultPage: currentPage,
             fitPolicy: FitPolicy.BOTH,

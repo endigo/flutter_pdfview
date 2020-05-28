@@ -127,8 +127,21 @@
                 }
             }
         }
+        
+        if (@available(iOS 11.0, *)) {
+            UIScrollView *_scrollView;
 
-
+            for (id subview in _pdfView.subviews) {
+                if ([subview isKindOfClass: [UIScrollView class]]) {
+                    _scrollView = subview;
+                }
+            }
+            
+            _scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+            if (@available(iOS 13.0, *)) {
+                _scrollView.automaticallyAdjustsScrollIndicatorInsets = NO;
+            }
+        }
         
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(handlePageChanged:) name:PDFViewPageChangedNotification object:_pdfView];
         
