@@ -1,3 +1,8 @@
+## 1.0.2+2
+
+- Close [#20](https://github.com/endigo/flutter_pdfview/issues/20)
+- Add support tap on link inside the pdf
+
 ## 1.0.2+1
 
 - Close [#67](https://github.com/endigo/flutter_pdfview/issues/67)
