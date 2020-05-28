@@ -18,9 +18,13 @@ import com.github.barteksc.pdfviewer.listener.*;
 import com.github.barteksc.pdfviewer.util.Constants;
 import com.github.barteksc.pdfviewer.util.FitPolicy;
 
+import com.github.barteksc.pdfviewer.link.LinkHandler;
+import com.github.barteksc.pdfviewer.model.LinkTapEvent;
+
 public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private final PDFView pdfView;
     private final MethodChannel methodChannel;
+    LinkHandler linkHandler;
 
     @SuppressWarnings("unchecked")
     FlutterPDFView(Context context, BinaryMessenger messenger, int id, Map<String, Object> params) {
@@ -28,6 +32,8 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
         methodChannel = new MethodChannel(messenger, "plugins.endigo.io/pdfview_" + id);
         methodChannel.setMethodCallHandler(this);
+
+        linkHandler = new MyLinktHandler(context);
 
         if (params.containsKey("filePath")) {
             String filePath = (String) params.get("filePath");
@@ -43,6 +49,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                 .pageFling(getBoolean(params,"pageFling"))
                 .pageSnap(getBoolean(params,"pageSnap"))
                 .pageFitPolicy(getFitPolicy(params))
+                    .linkHandler(linkHandler).enableAntialiasing(false)
 //                .fitEachPage(getBoolean(params,"fitEachPage"))
                 .onPageChange(new OnPageChangeListener() {
                     @Override
