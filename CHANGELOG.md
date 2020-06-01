@@ -1,3 +1,8 @@
+## 1.0.2+3
+
+- Close [#72](https://github.com/endigo/flutter_pdfview/issues/72)
+- Fix internal page links
+
 ## 1.0.2+2
 
 - Close [#20](https://github.com/endigo/flutter_pdfview/issues/20)

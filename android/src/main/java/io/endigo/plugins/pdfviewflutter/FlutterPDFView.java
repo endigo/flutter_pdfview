@@ -32,7 +32,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         methodChannel = new MethodChannel(messenger, "plugins.endigo.io/pdfview_" + id);
         methodChannel.setMethodCallHandler(this);
 
-        linkHandler = new PDFLinkHandler(context);
+        linkHandler = new PDFLinkHandler(context, pdfView);
 
         if (params.containsKey("filePath")) {
             String filePath = (String) params.get("filePath");
@@ -48,7 +48,8 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                 .pageFling(getBoolean(params,"pageFling"))
                 .pageSnap(getBoolean(params,"pageSnap"))
                 .pageFitPolicy(getFitPolicy(params))
-                    .linkHandler(linkHandler).enableAntialiasing(false)
+                .linkHandler(linkHandler)
+                .enableAntialiasing(false)
 //                .fitEachPage(getBoolean(params,"fitEachPage"))
                 .onPageChange(new OnPageChangeListener() {
                     @Override
