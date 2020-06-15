@@ -82,9 +82,9 @@
                 }
 
                 [_pdfView usePageViewController:pageFling withViewOptions:nil];
-                _pdfView.autoScales = autoSpacing;
                 _pdfView.displayMode = enableSwipe ? kPDFDisplaySinglePageContinuous : kPDFDisplaySinglePage;
                 _pdfView.document = document;
+                _pdfView.autoScales = autoSpacing;
 
                 NSUInteger pageCount = [document pageCount];
             
@@ -114,7 +114,7 @@
 
                 _pdfView.scaleFactor = scale;
 
-                _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
+                _pdfView.minScaleFactor = scale;
                 _pdfView.maxScaleFactor = 4.0;
 
                 dispatch_async(dispatch_get_main_queue(), ^{
