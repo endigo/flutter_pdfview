@@ -1,3 +1,7 @@
+## 1.0.2+4
+
+- [#74](https://github.com/endigo/flutter_pdfview/pull/78) fix unlimited zoom out in iOS. @daanporon
+
 ## 1.0.2+3
 
 - Close [#72](https://github.com/endigo/flutter_pdfview/issues/72)
