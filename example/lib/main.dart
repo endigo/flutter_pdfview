@@ -176,11 +176,13 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
           PDFView(
             filePath: widget.path,
             enableSwipe: true,
-            swipeHorizontal: false,
+            swipeHorizontal: true,
             autoSpacing: false,
             pageFling: true,
+            pageSnap: true,
             defaultPage: currentPage,
             fitPolicy: FitPolicy.BOTH,
+            preventLinkNavigation: true, // if set to true the link is handled in flutter
             onRender: (_pages) {
               setState(() {
                 pages = _pages;
@@ -201,6 +203,9 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
             },
             onViewCreated: (PDFViewController pdfViewController) {
               _controller.complete(pdfViewController);
+            },
+            onLinkHandler:(String uri){
+              print('goto uri: $uri');
             },
             onPageChanged: (int page, int total) {
               print('page change: $page/$total');
