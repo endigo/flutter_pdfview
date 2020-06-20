@@ -37,6 +37,7 @@
     FlutterMethodChannel* _channel;
     NSNumber* _pageCount;
     NSNumber* _currentPage;
+    BOOL _preventLinkNavigation;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -50,8 +51,10 @@
         _channel = [FlutterMethodChannel methodChannelWithName:channelName binaryMessenger:messenger];
         
         _pdfView = [[PDFView alloc] initWithFrame:frame];
-        
         __weak __typeof__(self) weakSelf = self;
+        _pdfView.delegate = self;
+        
+        
         [_channel setMethodCallHandler:^(FlutterMethodCall* call, FlutterResult result) {
             [weakSelf onMethodCall:call result:result];
         }];
@@ -59,6 +62,8 @@
         BOOL autoSpacing = [args[@"autoSpacing"] boolValue];
         BOOL pageFling = [args[@"pageFling"] boolValue];
         BOOL enableSwipe = [args[@"enableSwipe"] boolValue];
+        _preventLinkNavigation = [args[@"preventLinkNavigation"] boolValue];
+        
         NSInteger defaultPage = [args[@"defaultPage"] integerValue];
 
         NSString* filePath = args[@"filePath"];
@@ -72,7 +77,7 @@
             } else {
                 _pdfView.autoresizesSubviews = YES;
                 _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-
+                
                 _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
                 BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
                 if (swipeHorizontal) {
@@ -198,5 +203,12 @@
     [_channel invokeMethod:@"onRender" arguments:@{@"pages" : pages}];
 }
 
+- (void)PDFViewWillClickOnLink:(PDFView *)sender
+                       withURL:(NSURL *)url{
+    if (!_preventLinkNavigation){
+        [[UIApplication sharedApplication] openURL:url];
+    }
+    [_channel invokeMethod:@"onLinkHandler" arguments:url.absoluteString];
+}
 
 @end

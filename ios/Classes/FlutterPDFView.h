@@ -8,7 +8,7 @@
 NS_ASSUME_NONNULL_BEGIN
 
 API_AVAILABLE(ios(11.0))
-@interface FLTPDFViewController : NSObject <FlutterPlatformView>
+@interface FLTPDFViewController : NSObject <FlutterPlatformView, PDFViewDelegate> 
 
 - (instancetype)initWithFrame:(CGRect)frame
                viewIdentifier:(int64_t)viewId
