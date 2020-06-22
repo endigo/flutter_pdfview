@@ -10,6 +10,7 @@ typedef void RenderCallback(int pages);
 typedef void PageChangedCallback(int page, int total);
 typedef void ErrorCallback(dynamic error);
 typedef void PageErrorCallback(int page, dynamic error);
+typedef void LinkHandlerCallback(String uri);
 
 enum FitPolicy { WIDTH, HEIGHT, BOTH }
 
@@ -22,6 +23,7 @@ class PDFView extends StatefulWidget {
     this.onPageChanged,
     this.onError,
     this.onPageError,
+    this.onLinkHandler,
     this.gestureRecognizers,
     this.enableSwipe = true,
     this.swipeHorizontal = false,
@@ -33,6 +35,7 @@ class PDFView extends StatefulWidget {
     this.fitEachPage = true,
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
+    this.preventLinkNavigation = false,
   }) : super(key: key);
 
   @override
@@ -44,6 +47,7 @@ class PDFView extends StatefulWidget {
   final PageChangedCallback onPageChanged;
   final ErrorCallback onError;
   final PageErrorCallback onPageError;
+  final LinkHandlerCallback onLinkHandler;
 
   /// Which gestures should be consumed by the pdf view.
   ///
@@ -69,6 +73,7 @@ class PDFView extends StatefulWidget {
   final int defaultPage;
   final FitPolicy fitPolicy;
   final bool fitEachPage;
+  final bool preventLinkNavigation;
 }
 
 class _PDFViewState extends State<PDFView> {
@@ -153,6 +158,7 @@ class _PDFViewSettings {
     this.defaultPage,
     this.fitPolicy,
     this.fitEachPage,
+    this.preventLinkNavigation
   });
 
   static _PDFViewSettings fromWidget(PDFView widget) {
@@ -166,6 +172,7 @@ class _PDFViewSettings {
       pageSnap: widget.pageSnap,
       defaultPage: widget.defaultPage,
       fitPolicy: widget.fitPolicy,
+      preventLinkNavigation:widget.preventLinkNavigation
     );
   }
 
@@ -179,6 +186,7 @@ class _PDFViewSettings {
   final int defaultPage;
   final FitPolicy fitPolicy;
   final bool fitEachPage;
+  final bool preventLinkNavigation;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -192,6 +200,7 @@ class _PDFViewSettings {
       'defaultPage': defaultPage,
       'fitPolicy': fitPolicy.toString(),
       'fitEachPage': fitEachPage,
+      'preventLinkNavigation': preventLinkNavigation
     };
   }
 
@@ -206,7 +215,9 @@ class _PDFViewSettings {
     if (pageSnap != newSettings.pageSnap) {
       updates['pageSnap'] = newSettings.pageSnap;
     }
-
+    if (preventLinkNavigation!=newSettings.preventLinkNavigation){
+      updates['preventLinkNavigation'] = newSettings.preventLinkNavigation;
+    }
     return updates;
   }
 }
@@ -251,6 +262,12 @@ class PDFViewController {
       case 'onPageError':
         if (_widget.onPageError != null) {
           _widget.onPageError(call.arguments['page'], call.arguments['error']);
+        }
+
+        return null;
+      case 'onLinkHandler':
+        if (_widget.onLinkHandler != null) {
+          _widget.onLinkHandler(call.arguments);
         }
 
         return null;

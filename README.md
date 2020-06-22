@@ -59,6 +59,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | onPageChanged      |   ✅    | ✅  |      `null`       |
 | onError            |   ✅    | ✅  |      `null`       |
 | onPageError        |   ✅    | ❌  |      `null`       |
+| onLinkHandle       |   ✅    | ✅  |      `null`       |
 | gestureRecognizers |   ✅    | ✅  |      `null`       |
 | filePath           |   ✅    | ✅  |                   |
 | fitPolicy          |   ✅    | ❌  | `FitPolicy.WIDTH` |
@@ -70,6 +71,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | autoSpacing        |   ✅    | ✅  |      `true`       |
 | pageFling          |   ✅    | ✅  |      `true`       |
 | pageSnap           |   ✅    | ❌  |      `true`       |
+| preventLinkNavigation |   ✅    | ✅  |      `false`       |
 
 ## Controller Options
 
