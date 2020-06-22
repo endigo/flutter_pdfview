@@ -1,6 +1,10 @@
+## 1.0.3
+
+- [#81](https://github.com/endigo/flutter_pdfview/pull/81) add support for handle url navigation on flutter.
+
 ## 1.0.2+4
 
-- [#74](https://github.com/endigo/flutter_pdfview/pull/78) fix unlimited zoom out in iOS. @daanporon
+- [#78](https://github.com/endigo/flutter_pdfview/pull/78) fix unlimited zoom out in iOS. @daanporon
 
 ## 1.0.2+3
 
