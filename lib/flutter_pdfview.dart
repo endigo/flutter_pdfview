@@ -147,33 +147,31 @@ class _CreationParams {
 }
 
 class _PDFViewSettings {
-  _PDFViewSettings({
-    this.enableSwipe,
-    this.swipeHorizontal,
-    this.password,
-    this.nightMode,
-    this.autoSpacing,
-    this.pageFling,
-    this.pageSnap,
-    this.defaultPage,
-    this.fitPolicy,
-    this.fitEachPage,
-    this.preventLinkNavigation
-  });
+  _PDFViewSettings(
+      {this.enableSwipe,
+      this.swipeHorizontal,
+      this.password,
+      this.nightMode,
+      this.autoSpacing,
+      this.pageFling,
+      this.pageSnap,
+      this.defaultPage,
+      this.fitPolicy,
+      this.fitEachPage,
+      this.preventLinkNavigation});
 
   static _PDFViewSettings fromWidget(PDFView widget) {
     return _PDFViewSettings(
-      enableSwipe: widget.enableSwipe,
-      swipeHorizontal: widget.swipeHorizontal,
-      password: widget.password,
-      nightMode: widget.nightMode,
-      autoSpacing: widget.autoSpacing,
-      pageFling: widget.pageFling,
-      pageSnap: widget.pageSnap,
-      defaultPage: widget.defaultPage,
-      fitPolicy: widget.fitPolicy,
-      preventLinkNavigation:widget.preventLinkNavigation
-    );
+        enableSwipe: widget.enableSwipe,
+        swipeHorizontal: widget.swipeHorizontal,
+        password: widget.password,
+        nightMode: widget.nightMode,
+        autoSpacing: widget.autoSpacing,
+        pageFling: widget.pageFling,
+        pageSnap: widget.pageSnap,
+        defaultPage: widget.defaultPage,
+        fitPolicy: widget.fitPolicy,
+        preventLinkNavigation: widget.preventLinkNavigation);
   }
 
   final bool enableSwipe;
@@ -215,7 +213,7 @@ class _PDFViewSettings {
     if (pageSnap != newSettings.pageSnap) {
       updates['pageSnap'] = newSettings.pageSnap;
     }
-    if (preventLinkNavigation!=newSettings.preventLinkNavigation){
+    if (preventLinkNavigation != newSettings.preventLinkNavigation) {
       updates['preventLinkNavigation'] = newSettings.preventLinkNavigation;
     }
     return updates;
