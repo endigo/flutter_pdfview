@@ -99,7 +99,7 @@ class _PDFViewState extends State<PDFView> {
       );
     }
     return Text(
-        '$defaultTargetPlatform is not yet supported by the webview_flutter plugin');
+        '$defaultTargetPlatform is not yet supported by the pdfview_flutter plugin');
   }
 
   void _onPlatformViewCreated(int id) {
