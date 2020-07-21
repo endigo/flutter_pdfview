@@ -1,3 +1,7 @@
+## 1.0.3+1
+
+- Format lib/flutter_pdfview.dart
+
 ## 1.0.3
 
 - [#81](https://github.com/endigo/flutter_pdfview/pull/81) add support for handle url navigation on flutter.

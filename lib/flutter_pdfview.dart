@@ -5,12 +5,12 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-typedef void PDFViewCreatedCallback(PDFViewController controller);
-typedef void RenderCallback(int pages);
-typedef void PageChangedCallback(int page, int total);
-typedef void ErrorCallback(dynamic error);
-typedef void PageErrorCallback(int page, dynamic error);
-typedef void LinkHandlerCallback(String uri);
+typedef PDFViewCreatedCallback = void Function(PDFViewController controller);
+typedef RenderCallback = void Function(int pages);
+typedef PageChangedCallback = void Function(int page, int total);
+typedef ErrorCallback = void Function(dynamic error);
+typedef PageErrorCallback = void Function(int page, dynamic error);
+typedef LinkHandlerCallback = void Function(String uri);
 
 enum FitPolicy { WIDTH, HEIGHT, BOTH }
 
