@@ -32,7 +32,8 @@ Alternatively, your editor might support pub get or `flutter packages get`. Chec
 #### iOS
 
 Opt-in to the embedded views preview by adding a boolean property to the app's `Info.plist` file
-with the key `io.flutter.embedded_views_preview` and the value `YES`.  
+with the key `io.flutter.embedded_views_preview` and the value `YES`.
+
 ```
 # Info.plist
 ...
@@ -51,27 +52,27 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 
 ## Options
 
-| Name               | Android | iOS |      Default      |
-| :----------------- | :-----: | :-: | :---------------: |
-| defaultPage        |   ✅    | ✅  |        `0`        |
-| onViewCreated      |   ✅    | ✅  |      `null`       |
-| onRender           |   ✅    | ✅  |      `null`       |
-| onPageChanged      |   ✅    | ✅  |      `null`       |
-| onError            |   ✅    | ✅  |      `null`       |
-| onPageError        |   ✅    | ❌  |      `null`       |
-| onLinkHandle       |   ✅    | ✅  |      `null`       |
-| gestureRecognizers |   ✅    | ✅  |      `null`       |
-| filePath           |   ✅    | ✅  |                   |
-| fitPolicy          |   ✅    | ❌  | `FitPolicy.WIDTH` |
-| enableSwipe        |   ✅    | ✅  |      `true`       |
-| swipeHorizontal    |   ✅    | ✅  |      `false`      |
-| password           |   ✅    | ✅  |      `null`       |
-| nightMode          |   ✅    | ❌  |      `false`      |
-| password           |   ✅    | ✅  |      `null`       |
-| autoSpacing        |   ✅    | ✅  |      `true`       |
-| pageFling          |   ✅    | ✅  |      `true`       |
-| pageSnap           |   ✅    | ❌  |      `true`       |
-| preventLinkNavigation |   ✅    | ✅  |      `false`       |
+| Name                  | Android | iOS |      Default      |
+| :-------------------- | :-----: | :-: | :---------------: |
+| defaultPage           |   ✅    | ✅  |        `0`        |
+| onViewCreated         |   ✅    | ✅  |      `null`       |
+| onRender              |   ✅    | ✅  |      `null`       |
+| onPageChanged         |   ✅    | ✅  |      `null`       |
+| onError               |   ✅    | ✅  |      `null`       |
+| onPageError           |   ✅    | ❌  |      `null`       |
+| onLinkHandle          |   ✅    | ✅  |      `null`       |
+| gestureRecognizers    |   ✅    | ✅  |      `null`       |
+| filePath              |   ✅    | ✅  |                   |
+| fitPolicy             |   ✅    | ❌  | `FitPolicy.WIDTH` |
+| enableSwipe           |   ✅    | ✅  |      `true`       |
+| swipeHorizontal       |   ✅    | ✅  |      `false`      |
+| password              |   ✅    | ✅  |      `null`       |
+| nightMode             |   ✅    | ❌  |      `false`      |
+| password              |   ✅    | ✅  |      `null`       |
+| autoSpacing           |   ✅    | ✅  |      `true`       |
+| pageFling             |   ✅    | ✅  |      `true`       |
+| pageSnap              |   ✅    | ❌  |      `true`       |
+| preventLinkNavigation |   ✅    | ✅  |      `false`      |
 
 ## Controller Options
 
@@ -129,7 +130,15 @@ If you use proguard, you should include this line.
 
 [PDFKit](https://developer.apple.com/documentation/pdfkit)
 
-# Support
+# Future plans
+
+- Replace barteksc/AndroidPdfViewer with MuPDF or Android Native PDF Renderer.
+- Improve documentation
+- Support other platforms such as MacOS, Windows, Linux and Web
+- Add search functionality
+- Improve performance on zooming, page changing
+- Improve image quality
+- Write more test
 
 # Support
 
@@ -142,7 +151,6 @@ If you use proguard, you should include this line.
    <img height=60 src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" >
     </a>
 </p>
-
 
 ### Developer
 
