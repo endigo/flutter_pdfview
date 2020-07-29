@@ -1,3 +1,8 @@
+## 1.0.3+2
+
+- Add default proguard-rules.
+- Closes [#87](https://github.com/endigo/flutter_pdfview/issues/87)
+
 ## 1.0.3+1
 
 - Format lib/flutter_pdfview.dart
