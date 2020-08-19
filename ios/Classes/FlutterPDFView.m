@@ -90,6 +90,11 @@
                 _pdfView.displayMode = enableSwipe ? kPDFDisplaySinglePageContinuous : kPDFDisplaySinglePage;
                 _pdfView.document = document;
                 _pdfView.autoScales = autoSpacing;
+                
+                NSString* password = args[@"password"];
+                if ([password isKindOfClass:[NSString class]] && [_pdfView.document isEncrypted]) {
+                    [_pdfView.document unlockWithPassword:password];
+                }
 
                 NSUInteger pageCount = [document pageCount];
             
@@ -125,11 +130,6 @@
                 dispatch_async(dispatch_get_main_queue(), ^{
                     [weakSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: [document pageCount]]];
                 });
-
-                NSString* password = args[@"password"];
-                if ([password isKindOfClass:[NSString class]] && [_pdfView.document isEncrypted]) {
-                    [_pdfView.document unlockWithPassword:password];
-                }
             }
         }
         
