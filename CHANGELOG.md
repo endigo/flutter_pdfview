@@ -1,3 +1,8 @@
+## 1.0.3+3
+
+- Remove print statement [#95](https://github.com/endigo/flutter_pdfview/pull/95) @krispypen
+- Close [#94](https://github.com/endigo/flutter_pdfview/issues/94) @macitkaraca
+
 ## 1.0.3+2
 
 - Add default proguard-rules.
