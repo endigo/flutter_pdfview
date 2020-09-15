@@ -51,6 +51,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .pageFling(getBoolean(params, "pageFling"))
                     .pageSnap(getBoolean(params, "pageSnap"))
                     .pageFitPolicy(getFitPolicy(params))
+                    .enableAnnotationRendering(true)
                     .linkHandler(linkHandler).
                     enableAntialiasing(false)
                     // .fitEachPage(getBoolean(params,"fitEachPage"))
