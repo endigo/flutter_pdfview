@@ -1,3 +1,7 @@
+## 1.0.3+4
+
+- Enable annotation on android [#103](https://github.com/endigo/flutter_pdfview/pull/103) @soul
+
 ## 1.0.3+3
 
 - Remove print statement [#95](https://github.com/endigo/flutter_pdfview/pull/95) @krispypen
