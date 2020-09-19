@@ -50,7 +50,7 @@
         NSString* channelName = [NSString stringWithFormat:@"plugins.endigo.io/pdfview_%lld", viewId];
         _channel = [FlutterMethodChannel methodChannelWithName:channelName binaryMessenger:messenger];
         
-        _pdfView = [[PDFView alloc] initWithFrame:frame];
+        _pdfView = [[PDFView alloc] initWithFrame: [[UIScreen mainScreen] bounds]];
         __weak __typeof__(self) weakSelf = self;
         _pdfView.delegate = self;
         
@@ -64,8 +64,6 @@
         BOOL enableSwipe = [args[@"enableSwipe"] boolValue];
         _preventLinkNavigation = [args[@"preventLinkNavigation"] boolValue];
         
-        NSInteger defaultPage = [args[@"defaultPage"] integerValue];
-
         NSString* filePath = args[@"filePath"];
 
         if ([filePath isKindOfClass:[NSString class]]) {
@@ -96,35 +94,7 @@
                     [_pdfView.document unlockWithPassword:password];
                 }
 
-                NSUInteger pageCount = [document pageCount];
-            
-                if (pageCount <= defaultPage) {
-                    defaultPage = pageCount - 1;
-                }
-
-                PDFPage* page = [document pageAtIndex: defaultPage];
-                [_pdfView goToPage: page];
-
-                CGRect pageRect = [page boundsForBox:[_pdfView displayBox]];
-
-                CGRect parentRect = [[UIScreen mainScreen] bounds];
-
-                if (frame.size.width > 0 && frame.size.height > 0) {
-                    parentRect = frame;
-                }
-
-                CGFloat scale = 1.0f;
-                if (parentRect.size.width / parentRect.size.height >= pageRect.size.width / pageRect.size.height) {
-                    scale = parentRect.size.height / pageRect.size.height;
-                } else {
-                    scale = parentRect.size.width / pageRect.size.width;
-                }
-
-                NSLog(@"scale %f", scale);
-
-                _pdfView.scaleFactor = scale;
-
-                _pdfView.minScaleFactor = scale;
+                _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
                 _pdfView.maxScaleFactor = 4.0;
 
                 dispatch_async(dispatch_get_main_queue(), ^{
