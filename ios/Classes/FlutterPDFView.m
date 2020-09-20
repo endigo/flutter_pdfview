@@ -64,6 +64,8 @@
         BOOL enableSwipe = [args[@"enableSwipe"] boolValue];
         _preventLinkNavigation = [args[@"preventLinkNavigation"] boolValue];
         
+        NSInteger defaultPage = [args[@"defaultPage"] integerValue];
+
         NSString* filePath = args[@"filePath"];
 
         if ([filePath isKindOfClass:[NSString class]]) {
@@ -93,6 +95,15 @@
                 if ([password isKindOfClass:[NSString class]] && [_pdfView.document isEncrypted]) {
                     [_pdfView.document unlockWithPassword:password];
                 }
+
+                NSUInteger pageCount = [document pageCount];
+
+                if (pageCount <= defaultPage) {
+                    defaultPage = pageCount - 1;
+                }
+
+                PDFPage* page = [document pageAtIndex: defaultPage];
+                [_pdfView goToPage: page];
 
                 _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
                 _pdfView.maxScaleFactor = 4.0;
