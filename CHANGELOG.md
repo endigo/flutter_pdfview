@@ -1,3 +1,7 @@
+## 1.0.3+5
+
+- iOS proper scaling for PDF with pages on landscape-orientation [#104](https://github.com/endigo/flutter_pdfview/pull/104) @andresath
+
 ## 1.0.3+4
 
 - Enable annotation on android [#103](https://github.com/endigo/flutter_pdfview/pull/103) @soul
