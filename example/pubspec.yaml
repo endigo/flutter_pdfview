@@ -37,6 +37,7 @@ flutter:
     - assets/demo.pdf
     - assets/corrupted.pdf
     - assets/demo-link.pdf
+    - assets/demo-landscape.pdf
   #  - images/a_dot_burr.jpeg
   #  - images/a_dot_ham.jpeg
   # An image asset can refer to one or more resolution-specific "variants", see

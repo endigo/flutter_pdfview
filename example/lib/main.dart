@@ -16,6 +16,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String pathPDF = "";
+  String landscapePathPdf = "";
   String remotePDFpath = "";
   String corruptedPathPDF = "";
 
@@ -30,6 +31,11 @@ class _MyAppState extends State<MyApp> {
     fromAsset('assets/demo-link.pdf', 'demo.pdf').then((f) {
       setState(() {
         pathPDF = f.path;
+      });
+    });
+    fromAsset('assets/demo-landscape.pdf', 'landscape.pdf').then((f) {
+      setState(() {
+        landscapePathPdf = f.path;
       });
     });
 
@@ -102,6 +108,19 @@ class _MyAppState extends State<MyApp> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => PDFScreen(path: pathPDF),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                RaisedButton(
+                  child: Text("Open Landscape PDF"),
+                  onPressed: () {
+                    if (landscapePathPdf != null || landscapePathPdf.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PDFScreen(path: landscapePathPdf),
                         ),
                       );
                     }
