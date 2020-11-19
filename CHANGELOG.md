@@ -1,3 +1,7 @@
+## 1.0.3+6
+
+- Upgrade Android SDK version to 29 [#114](https://github.com/endigo/flutter_pdfview/pull/114) @miguelslemos
+
 ## 1.0.3+5
 
 - iOS proper scaling for PDF with pages on landscape-orientation [#104](https://github.com/endigo/flutter_pdfview/pull/104) @andresath
