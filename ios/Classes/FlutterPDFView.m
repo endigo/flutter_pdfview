@@ -169,7 +169,7 @@
     NSNumber* page = arguments[@"page"];
     
     [_pdfView goToPage: [_pdfView.document pageAtIndex: page.unsignedLongValue ]];
-    result(_currentPage);
+    result(true);
 }
 
 - (void)onUpdateSettings:(FlutterMethodCall*)call result:(FlutterResult)result {
