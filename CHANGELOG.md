@@ -1,3 +1,7 @@
+## 1.0.3+7
+
+- Fixed setPage return value from int to bool on iOS [#118](https://github.com/endigo/flutter_pdfview/pull/118) @daisuke310vvv
+
 ## 1.0.3+6
 
 - Upgrade Android SDK version to 29 [#114](https://github.com/endigo/flutter_pdfview/pull/114) @miguelslemos
