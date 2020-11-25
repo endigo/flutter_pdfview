@@ -1,3 +1,7 @@
+## 1.0.3+8
+
+- Fixed setPage return value from int to bool on iOS [#120](https://github.com/endigo/flutter_pdfview/pull/120) @daisuke310vvv
+
 ## 1.0.3+7
 
 - Fixed setPage return value from int to bool on iOS [#118](https://github.com/endigo/flutter_pdfview/pull/118) @daisuke310vvv
