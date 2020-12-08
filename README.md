@@ -63,6 +63,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | onLinkHandle          |   ✅    | ✅  |      `null`       |
 | gestureRecognizers    |   ✅    | ✅  |      `null`       |
 | filePath              |   ✅    | ✅  |                   |
+| pdfData               |   ✅    | ✅  |                   |
 | fitPolicy             |   ✅    | ❌  | `FitPolicy.WIDTH` |
 | enableSwipe           |   ✅    | ✅  |      `true`       |
 | swipeHorizontal       |   ✅    | ✅  |      `false`      |

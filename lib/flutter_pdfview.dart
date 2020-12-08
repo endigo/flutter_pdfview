@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -17,7 +18,8 @@ enum FitPolicy { WIDTH, HEIGHT, BOTH }
 class PDFView extends StatefulWidget {
   const PDFView({
     Key key,
-    @required this.filePath,
+    this.filePath,
+    this.pdfData,
     this.onViewCreated,
     this.onRender,
     this.onPageChanged,
@@ -36,7 +38,8 @@ class PDFView extends StatefulWidget {
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
-  }) : super(key: key);
+  }) : assert(filePath != null || pdfData != null),
+       super(key: key);
 
   @override
   _PDFViewState createState() => _PDFViewState();
@@ -62,6 +65,7 @@ class PDFView extends StatefulWidget {
 
   /// The initial URL to load.
   final String filePath;
+  final Uint8List pdfData;
 
   final bool enableSwipe;
   final bool swipeHorizontal;
@@ -121,23 +125,27 @@ class _PDFViewState extends State<PDFView> {
 class _CreationParams {
   _CreationParams({
     this.filePath,
+    this.pdfData,
     this.settings,
   });
 
   static _CreationParams fromWidget(PDFView widget) {
     return _CreationParams(
       filePath: widget.filePath,
+      pdfData: widget.pdfData,
       settings: _PDFViewSettings.fromWidget(widget),
     );
   }
 
   final String filePath;
+  final Uint8List pdfData;
 
   final _PDFViewSettings settings;
 
   Map<String, dynamic> toMap() {
     Map<String, dynamic> params = {
       'filePath': filePath,
+      'pdfData': pdfData,
     };
 
     params.addAll(settings.toMap());
