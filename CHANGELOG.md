@@ -1,3 +1,7 @@
+## 1.0.4
+
+- Add support for reading PDF from byte data [#122](https://github.com/endigo/flutter_pdfview/pull/120) @tvh, @deakjahn
+
 ## 1.0.3+8
 
 - Fixed setPage return value from int to bool on iOS [#120](https://github.com/endigo/flutter_pdfview/pull/120) @daisuke310vvv

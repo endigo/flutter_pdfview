@@ -12,7 +12,7 @@ Add this to your package's pubspec.yaml file:
 
 ```
 dependencies:
-  flutter_pdfview: ^1.0.0+10
+  flutter_pdfview: ^1.0.4
 ```
 
 ### 2. Install it
