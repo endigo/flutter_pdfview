@@ -67,51 +67,54 @@
         NSInteger defaultPage = [args[@"defaultPage"] integerValue];
 
         NSString* filePath = args[@"filePath"];
+        FlutterStandardTypedData* pdfData = args[@"pdfData"];
 
+        PDFDocument* document;
         if ([filePath isKindOfClass:[NSString class]]) {
-            NSURL * sourcePDFUrl = [NSURL fileURLWithPath:filePath];
-            PDFDocument * document = [[PDFDocument alloc] initWithURL: sourcePDFUrl];
+            NSURL* sourcePDFUrl = [NSURL fileURLWithPath:filePath];
+            document = [[PDFDocument alloc] initWithURL: sourcePDFUrl];
+        } else if ([pdfData isKindOfClass:[FlutterStandardTypedData class]]) {
+            NSData* sourcePDFdata = [pdfData data];
+            document = [[PDFDocument alloc] initWithData: sourcePDFdata];
+        }
 
-            if (document == nil) {
-                [_channel invokeMethod:@"onError" arguments:@{@"error" : @"cannot create document: File not in PDF format or corrupted."}];
+        if (document == nil) {
+            [_channel invokeMethod:@"onError" arguments:@{@"error" : @"cannot create document: File not in PDF format or corrupted."}];
+        } else {
+            _pdfView.autoresizesSubviews = YES;
+            _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+            _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+            BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
+            if (swipeHorizontal) {
+                _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
             } else {
-                _pdfView.autoresizesSubviews = YES;
-                _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-                
-                _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
-                BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
-                if (swipeHorizontal) {
-                    _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
-                } else {
-                    _pdfView.displayDirection = kPDFDisplayDirectionVertical;
-                }
-
-                [_pdfView usePageViewController:pageFling withViewOptions:nil];
-                _pdfView.displayMode = enableSwipe ? kPDFDisplaySinglePageContinuous : kPDFDisplaySinglePage;
-                _pdfView.document = document;
-                _pdfView.autoScales = autoSpacing;
-                
-                NSString* password = args[@"password"];
-                if ([password isKindOfClass:[NSString class]] && [_pdfView.document isEncrypted]) {
-                    [_pdfView.document unlockWithPassword:password];
-                }
-
-                NSUInteger pageCount = [document pageCount];
-
-                if (pageCount <= defaultPage) {
-                    defaultPage = pageCount - 1;
-                }
-
-                PDFPage* page = [document pageAtIndex: defaultPage];
-                [_pdfView goToPage: page];
-
-                _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
-                _pdfView.maxScaleFactor = 4.0;
-
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    [weakSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: [document pageCount]]];
-                });
+                _pdfView.displayDirection = kPDFDisplayDirectionVertical;
             }
+
+            [_pdfView usePageViewController:pageFling withViewOptions:nil];
+            _pdfView.displayMode = enableSwipe ? kPDFDisplaySinglePageContinuous : kPDFDisplaySinglePage;
+            _pdfView.document = document;
+            _pdfView.autoScales = autoSpacing;
+            NSString* password = args[@"password"];
+            if ([password isKindOfClass:[NSString class]] && [_pdfView.document isEncrypted]) {
+                [_pdfView.document unlockWithPassword:password];
+            }
+
+            NSUInteger pageCount = [document pageCount];
+
+            if (pageCount <= defaultPage) {
+                defaultPage = pageCount - 1;
+            }
+
+        PDFPage* page = [document pageAtIndex: defaultPage];
+        [_pdfView goToPage: page];
+
+            _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
+            _pdfView.maxScaleFactor = 4.0;
+
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [weakSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: [document pageCount]]];
+            });
         }
         
         if (@available(iOS 11.0, *)) {
