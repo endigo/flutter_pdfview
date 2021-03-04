@@ -1,3 +1,7 @@
+## 1.1.0
+
+- Migrate to nullsafety, add compatible to Flutter 2.0 [#130](https://github.com/endigo/flutter_pdfview/pull/130) @stijnie2210
+
 ## 1.0.4
 
 - Add support for reading PDF from byte data [#122](https://github.com/endigo/flutter_pdfview/pull/120) @tvh, @deakjahn
