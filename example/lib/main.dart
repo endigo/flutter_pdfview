@@ -163,9 +163,9 @@ class _MyAppState extends State<MyApp> {
 }
 
 class PDFScreen extends StatefulWidget {
-  final String path;
+  final String? path;
 
-  PDFScreen({Key key, this.path}) : super(key: key);
+  PDFScreen({Key? key, this.path}) : super(key: key);
 
   _PDFScreenState createState() => _PDFScreenState();
 }
@@ -173,8 +173,8 @@ class PDFScreen extends StatefulWidget {
 class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
   final Completer<PDFViewController> _controller =
       Completer<PDFViewController>();
-  int pages = 0;
-  int currentPage = 0;
+  int? pages = 0;
+  int? currentPage = 0;
   bool isReady = false;
   String errorMessage = '';
 
@@ -199,7 +199,7 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
             autoSpacing: false,
             pageFling: true,
             pageSnap: true,
-            defaultPage: currentPage,
+            defaultPage: currentPage!,
             fitPolicy: FitPolicy.BOTH,
             preventLinkNavigation:
                 false, // if set to true the link is handled in flutter
@@ -224,10 +224,10 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
             onViewCreated: (PDFViewController pdfViewController) {
               _controller.complete(pdfViewController);
             },
-            onLinkHandler: (String uri) {
+            onLinkHandler: (String? uri) {
               print('goto uri: $uri');
             },
-            onPageChanged: (int page, int total) {
+            onPageChanged: (int? page, int? total) {
               print('page change: $page/$total');
               setState(() {
                 currentPage = page;
@@ -250,9 +250,9 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
         builder: (context, AsyncSnapshot<PDFViewController> snapshot) {
           if (snapshot.hasData) {
             return FloatingActionButton.extended(
-              label: Text("Go to ${pages ~/ 2}"),
+              label: Text("Go to ${pages! ~/ 2}"),
               onPressed: () async {
-                await snapshot.data.setPage(pages ~/ 2);
+                await snapshot.data!.setPage(pages! ~/ 2);
               },
             );
           }
