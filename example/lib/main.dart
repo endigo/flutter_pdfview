@@ -100,10 +100,10 @@ class _MyAppState extends State<MyApp> {
           builder: (BuildContext context) {
             return Column(
               children: <Widget>[
-                RaisedButton(
+                TextButton(
                   child: Text("Open PDF"),
                   onPressed: () {
-                    if (pathPDF != null || pathPDF.isNotEmpty) {
+                    if (pathPDF.isNotEmpty) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -113,23 +113,24 @@ class _MyAppState extends State<MyApp> {
                     }
                   },
                 ),
-                RaisedButton(
+                TextButton(
                   child: Text("Open Landscape PDF"),
                   onPressed: () {
-                    if (landscapePathPdf != null || landscapePathPdf.isNotEmpty) {
+                    if (landscapePathPdf.isNotEmpty) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => PDFScreen(path: landscapePathPdf),
+                          builder: (context) =>
+                              PDFScreen(path: landscapePathPdf),
                         ),
                       );
                     }
                   },
                 ),
-                RaisedButton(
+                TextButton(
                   child: Text("Remote PDF"),
                   onPressed: () {
-                    if (remotePDFpath != null || remotePDFpath.isNotEmpty) {
+                    if (remotePDFpath.isNotEmpty) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -139,10 +140,10 @@ class _MyAppState extends State<MyApp> {
                     }
                   },
                 ),
-                RaisedButton(
+                TextButton(
                   child: Text("Open Corrupted PDF"),
                   onPressed: () {
-                    if (pathPDF != null) {
+                    if (pathPDF.isNotEmpty) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(

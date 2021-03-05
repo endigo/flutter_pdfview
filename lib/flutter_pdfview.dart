@@ -38,8 +38,8 @@ class PDFView extends StatefulWidget {
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
-  }) : assert(filePath != null || pdfData != null),
-       super(key: key);
+  })  : assert(filePath != null || pdfData != null),
+        super(key: key);
 
   @override
   _PDFViewState createState() => _PDFViewState();
@@ -292,7 +292,8 @@ class PDFViewController {
   }
 
   Future<bool?> setPage(int page) async {
-    final bool? isSet = await _channel.invokeMethod('setPage', <String, dynamic>{
+    final bool? isSet =
+        await _channel.invokeMethod('setPage', <String, dynamic>{
       'page': page,
     });
     return isSet;
@@ -305,7 +306,7 @@ class PDFViewController {
 
   Future<void> _updateSettings(_PDFViewSettings setting) async {
     final Map<String, dynamic> updateMap = _settings.updatesMap(setting);
-    if (updateMap == null || updateMap.isEmpty) {
+    if (updateMap.isEmpty) {
       return null;
     }
     _settings = setting;
