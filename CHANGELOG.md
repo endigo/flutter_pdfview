@@ -1,3 +1,7 @@
+## 1.2.0
+
+- Migration Android V2 Embedding & jCenter to mavenCentral [#147](https://github.com/endigo/flutter_pdfview/pull/147) @PcolBP
+
 ## 1.1.0
 
 - Migrate to nullsafety, add compatible to Flutter 2.0 [#130](https://github.com/endigo/flutter_pdfview/pull/130) @stijnie2210
