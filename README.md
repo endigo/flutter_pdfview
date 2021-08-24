@@ -15,7 +15,7 @@ Add this to your package's pubspec.yaml file:
 
 ```
 dependencies:
-  flutter_pdfview: ^1.0.4
+  flutter_pdfview: ^1.2.0
 ```
 
 ### 2. Install it
@@ -30,22 +30,7 @@ $ flutter packages get
 
 Alternatively, your editor might support pub get or `flutter packages get`. Check the docs for your editor to learn more.
 
-### 3. Setup
-
-#### iOS
-
-Opt-in to the embedded views preview by adding a boolean property to the app's `Info.plist` file
-with the key `io.flutter.embedded_views_preview` and the value `YES`.
-
-```
-# Info.plist
-...
-<key>io.flutter.embedded_views_preview</key>
-<true/>
-...
-```
-
-### 4. Import it
+### 3. Import it
 
 Now in your Dart code, you can use:
 
@@ -114,14 +99,6 @@ PDFView(
     print('page change: $page/$total');
   },
 ),
-```
-
-# For production usage
-
-If you use proguard, you should include this line.
-
-```
--keep class com.shockwave.**
 ```
 
 # Dependencies
