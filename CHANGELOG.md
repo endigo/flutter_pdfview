@@ -1,3 +1,10 @@
+## 1.2.1
+
+- Updated dependencies to be newest with latest flutter version.
+- Update minimal version of flutter to 2.2.0
+- Updated compileSdkVersion in Android gradle to 30 because in future new apps on Google Play will have to set at least compile version to 30
+- Updated README [#148](https://github.com/endigo/flutter_pdfview/pull/148) @PcolBP
+
 ## 1.2.0
 
 - Migration Android V2 Embedding & jCenter to mavenCentral [#147](https://github.com/endigo/flutter_pdfview/pull/147) @PcolBP
