@@ -81,6 +81,10 @@
         if (document == nil) {
             [_channel invokeMethod:@"onError" arguments:@{@"error" : @"cannot create document: File not in PDF format or corrupted."}];
         } else {
+            _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit * 0.1;
+            _pdfView.maxScaleFactor = 4.0;
+            _pdfView.scaleFactor = _pdfView.scaleFactorForSizeToFit;
+
             _pdfView.autoresizesSubviews = YES;
             _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
             _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
@@ -111,11 +115,8 @@
                 defaultPage = pageCount - 1;
             }
 
-        PDFPage* page = [document pageAtIndex: defaultPage];
-        [_pdfView goToPage: page];
-
-            _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
-            _pdfView.maxScaleFactor = 4.0;
+             PDFPage* page = [document pageAtIndex: defaultPage];
+             [_pdfView goToPage: page];
 
             dispatch_async(dispatch_get_main_queue(), ^{
                 [weakSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: [document pageCount]]];
