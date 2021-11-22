@@ -100,6 +100,11 @@
                 [_pdfView.document unlockWithPassword:password];
             }
 
+            UITapGestureRecognizer *tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onDoubleTap:)];
+            tapGestureRecognizer.numberOfTapsRequired = 2;
+            tapGestureRecognizer.numberOfTouchesRequired = 1;
+            [_pdfView addGestureRecognizer:tapGestureRecognizer];
+
             NSUInteger pageCount = [document pageCount];
 
             if (pageCount <= defaultPage) {
@@ -193,6 +198,26 @@
         [[UIApplication sharedApplication] openURL:url];
     }
     [_channel invokeMethod:@"onLinkHandler" arguments:url.absoluteString];
+}
+
+- (void) onDoubleTap: (UITapGestureRecognizer *)recognizer {
+    if (recognizer.state == UIGestureRecognizerStateEnded) {
+        if ([_pdfView scaleFactor] == _pdfView.scaleFactorForSizeToFit) {
+            CGPoint point = [recognizer locationInView:_pdfView];
+            PDFPage* page = [_pdfView pageForPoint:point nearest:YES];
+            PDFPoint pdfPoint = [_pdfView convertPoint:point toPage:page];
+            PDFRect rect = [page boundsForBox:kPDFDisplayBoxMediaBox];
+            PDFDestination* destination = [[PDFDestination alloc] initWithPage:page atPoint:CGPointMake(pdfPoint.x - (rect.size.width / 4),pdfPoint.y + (rect.size.height / 4))];
+            [UIView animateWithDuration:0.2 animations:^{
+                self-> _pdfView.scaleFactor = self->_pdfView.scaleFactorForSizeToFit *2;
+                [self->_pdfView goToDestination:destination];
+            }];
+        } else {
+          [UIView animateWithDuration:0.2 animations:^{
+            self->_pdfView.scaleFactor = self->_pdfView.scaleFactorForSizeToFit;
+          }];
+        }
+    }
 }
 
 @end
