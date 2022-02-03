@@ -299,6 +299,15 @@ class PDFViewController {
     return isSet;
   }
 
+  Future<String?> getStringAt(int page) async {
+    final String? res = (defaultTargetPlatform == TargetPlatform.iOS) ?
+    await _channel.invokeMethod('getStringAt', <String, dynamic>{
+      'page': page,
+    })
+      :'';
+    return res;
+  }
+
   Future<void> _updateWidget(PDFView widget) async {
     _widget = widget;
     await _updateSettings(_PDFViewSettings.fromWidget(widget));
