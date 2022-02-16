@@ -4,29 +4,35 @@ version '1.0-SNAPSHOT'
 buildscript {
     repositories {
         google()
+        //gradlePluginPortal()
         mavenCentral()
+        //jcenter()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.2.1'
+        classpath 'com.android.tools.build:gradle:7.3.0-alpha03' //3.2.1
     }
 }
 
 rootProject.allprojects {
     repositories {
         google()
+        //gradlePluginPortal()
+        mavenCentral()
+        //jcenter()
     }
 }
 
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 30
+    compileSdkVersion 29
 
     defaultConfig {
-        minSdkVersion 16
+        minSdkVersion 16 //21
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         consumerProguardFiles 'proguard-rules.pro'
+        multiDexEnabled true
     }
     lintOptions {
         disable 'InvalidPackage'
@@ -34,6 +40,10 @@ android {
 }
 
 dependencies {
+    // comment next line to run the app
+    // implementation files('C://flutter/bin/cache/artifacts/engine/android-x64/flutter.jar')
+    // implementation 'com.github.pires:obd-java-api:1.0'
     implementation 'com.github.barteksc:android-pdf-viewer:3.2.0-beta.1'
+    // implementation 'com.android.support:multidex:2.0.1'
 }
 

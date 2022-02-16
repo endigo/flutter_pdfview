@@ -1,8 +1,21 @@
 package io.endigo.plugins.pdfviewflutter;
 
 import android.content.Context;
-import android.view.View;
 import android.net.Uri;
+import android.view.View;
+
+import com.github.barteksc.pdfviewer.PDFView;
+import com.github.barteksc.pdfviewer.PDFView.Configurator;
+import com.github.barteksc.pdfviewer.link.LinkHandler;
+import com.github.barteksc.pdfviewer.listener.OnErrorListener;
+import com.github.barteksc.pdfviewer.listener.OnPageChangeListener;
+import com.github.barteksc.pdfviewer.listener.OnPageErrorListener;
+import com.github.barteksc.pdfviewer.listener.OnRenderListener;
+import com.github.barteksc.pdfviewer.util.FitPolicy;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
@@ -10,18 +23,6 @@ import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.platform.PlatformView;
-
-import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
-
-import com.github.barteksc.pdfviewer.PDFView;
-import com.github.barteksc.pdfviewer.PDFView.Configurator;
-import com.github.barteksc.pdfviewer.listener.*;
-import com.github.barteksc.pdfviewer.util.Constants;
-import com.github.barteksc.pdfviewer.util.FitPolicy;
-
-import com.github.barteksc.pdfviewer.link.LinkHandler;
 
 public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private final PDFView pdfView;
@@ -31,6 +32,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     @SuppressWarnings("unchecked")
     FlutterPDFView(Context context, BinaryMessenger messenger, int id, Map<String, Object> params) {
         pdfView = new PDFView(context, null);
+
         final boolean preventLinkNavigation = getBoolean(params, "preventLinkNavigation");
 
         methodChannel = new MethodChannel(messenger, "plugins.endigo.io/pdfview_" + id);
@@ -59,9 +61,13 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .pageSnap(getBoolean(params, "pageSnap"))
                     .pageFitPolicy(getFitPolicy(params))
                     .enableAnnotationRendering(true)
-                    .linkHandler(linkHandler).
-                    enableAntialiasing(false)
+                    //.linkHandler(linkHandler)
+
+                    .enableAntialiasing(false)
                     // .fitEachPage(getBoolean(params,"fitEachPage"))
+                    .enableDoubletap(true)
+                    .defaultPage(getInt(params, "defaultPage"))
+                    .spacing(10)
                     .onPageChange(new OnPageChangeListener() {
                         @Override
                         public void onPageChanged(int page, int total) {
@@ -70,14 +76,16 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                             args.put("total", total);
                             methodChannel.invokeMethod("onPageChanged", args);
                         }
-                    }).onError(new OnErrorListener() {
+                    })
+                    .onError(new OnErrorListener() {
                 @Override
                 public void onError(Throwable t) {
                     Map<String, Object> args = new HashMap<>();
                     args.put("error", t.toString());
                     methodChannel.invokeMethod("onError", args);
                 }
-            }).onPageError(new OnPageErrorListener() {
+            })
+                    .onPageError(new OnPageErrorListener() {
                 @Override
                 public void onPageError(int page, Throwable t) {
                     Map<String, Object> args = new HashMap<>();
@@ -85,14 +93,15 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     args.put("error", t.toString());
                     methodChannel.invokeMethod("onPageError", args);
                 }
-            }).onRender(new OnRenderListener() {
+            })
+                    .onRender(new OnRenderListener() {
                 @Override
                 public void onInitiallyRendered(int pages) {
                     Map<String, Object> args = new HashMap<>();
                     args.put("pages", pages);
                     methodChannel.invokeMethod("onRender", args);
                 }
-            }).enableDoubletap(true).defaultPage(getInt(params, "defaultPage")).load();
+            }).load();
         }
     }
 
