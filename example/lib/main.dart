@@ -192,7 +192,10 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
         ],
       ),
       body: GestureDetector(
-        onTap: () => print('tap'),
+        onTap: () => print('onTap'),
+        onTapCancel: () => print('onTapCancel'),
+        onTapDown: (_) => print('onTapDown'),
+        onTapUp: (_) => print('onTapUp'),
         child: PDFView(
           filePath: widget.path,
           enableSwipe: true,
