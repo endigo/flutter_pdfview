@@ -197,6 +197,7 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
         onTapDown: (_) => print('onTapDown'),
         onTapUp: (_) => print('onTapUp'),
         child: PDFView(
+          // TODO: add zoom options
           filePath: widget.path,
           enableSwipe: true,
           // swipeHorizontal: true,
