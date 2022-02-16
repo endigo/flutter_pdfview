@@ -203,10 +203,16 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
           autoSpacing: false,
           pageFling: false,
           pageSnap: false,
+          spacing: 10,
           defaultPage: currentPage!,
           fitPolicy: FitPolicy.BOTH,
+          enableDoubletap: true,
+          setBackgroundColor: Colors.grey,
           preventLinkNavigation:
               false, // if set to true the link is handled in flutter
+          onTap: () {
+            print('onTap callback');
+          },
           onRender: (_pages) {
             setState(() {
               pages = _pages;

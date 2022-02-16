@@ -1,7 +1,9 @@
 package io.endigo.plugins.pdfviewflutter;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.net.Uri;
+import android.view.MotionEvent;
 import android.view.View;
 
 import com.github.barteksc.pdfviewer.PDFView;
@@ -11,6 +13,7 @@ import com.github.barteksc.pdfviewer.listener.OnErrorListener;
 import com.github.barteksc.pdfviewer.listener.OnPageChangeListener;
 import com.github.barteksc.pdfviewer.listener.OnPageErrorListener;
 import com.github.barteksc.pdfviewer.listener.OnRenderListener;
+import com.github.barteksc.pdfviewer.listener.OnTapListener;
 import com.github.barteksc.pdfviewer.util.FitPolicy;
 
 import java.io.File;
@@ -29,9 +32,14 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private final MethodChannel methodChannel;
     private final LinkHandler linkHandler;
 
+
+
     @SuppressWarnings("unchecked")
     FlutterPDFView(Context context, BinaryMessenger messenger, int id, Map<String, Object> params) {
         pdfView = new PDFView(context, null);
+
+        String setBackgroundColor = getString(params, "setBackgroundColor");
+        pdfView.setBackgroundColor(Color.parseColor('#'+setBackgroundColor)); //"#BB29BB"
 
         final boolean preventLinkNavigation = getBoolean(params, "preventLinkNavigation");
 
@@ -61,13 +69,20 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .pageSnap(getBoolean(params, "pageSnap"))
                     .pageFitPolicy(getFitPolicy(params))
                     .enableAnnotationRendering(true)
-                    //.linkHandler(linkHandler)
+                    .linkHandler(linkHandler)
 
                     .enableAntialiasing(false)
-                    // .fitEachPage(getBoolean(params,"fitEachPage"))
-                    .enableDoubletap(true)
+                    .fitEachPage(getBoolean(params,"fitEachPage"))
+                    .enableDoubletap(getBoolean(params,"enableDoubletap"))
                     .defaultPage(getInt(params, "defaultPage"))
-                    .spacing(10)
+                    .spacing(getInt(params,"spacing"))
+                    .onTap(new OnTapListener() {
+                        @Override
+                        public boolean onTap(MotionEvent e) {
+                            methodChannel.invokeMethod("onTap",null);
+                            return false;
+                        }
+                    })
                     .onPageChange(new OnPageChangeListener() {
                         @Override
                         public void onPageChanged(int page, int total) {

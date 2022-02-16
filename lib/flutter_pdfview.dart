@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/src/material/colors.dart';
 import 'package:flutter/widgets.dart';
 
 typedef PDFViewCreatedCallback = void Function(PDFViewController controller);
@@ -38,6 +39,10 @@ class PDFView extends StatefulWidget {
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
+    this.onTap,
+    this.spacing = 0,
+    this.enableDoubletap = true,
+    this.setBackgroundColor = Colors.white,
   })  : assert(filePath != null || pdfData != null),
         super(key: key);
 
@@ -51,6 +56,7 @@ class PDFView extends StatefulWidget {
   final ErrorCallback? onError;
   final PageErrorCallback? onPageError;
   final LinkHandlerCallback? onLinkHandler;
+  final VoidCallback? onTap;
 
   /// Which gestures should be consumed by the pdf view.
   ///
@@ -72,12 +78,28 @@ class PDFView extends StatefulWidget {
   final String? password;
   final bool nightMode;
   final bool autoSpacing;
+
+  /// minimum swipe to change the page
   final bool pageFling;
+
+  /// if [true] automatic center the page
+  ///
+  /// if [false] you can stop betwen two pages
   final bool pageSnap;
+
+  /// initial page to show
   final int defaultPage;
   final FitPolicy fitPolicy;
   final bool fitEachPage;
   final bool preventLinkNavigation;
+
+  /// space betwen the pages (arround each page)
+  final int spacing;
+
+  /// for zoom-in-out
+  final bool enableDoubletap;
+
+  final Color setBackgroundColor;
 }
 
 class _PDFViewState extends State<PDFView> {
@@ -155,44 +177,56 @@ class _CreationParams {
 }
 
 class _PDFViewSettings {
-  _PDFViewSettings(
-      {this.enableSwipe,
-      this.swipeHorizontal,
-      this.password,
-      this.nightMode,
-      this.autoSpacing,
-      this.pageFling,
-      this.pageSnap,
-      this.defaultPage,
-      this.fitPolicy,
-      this.fitEachPage,
-      this.preventLinkNavigation});
+  _PDFViewSettings({
+    required this.enableSwipe,
+    required this.swipeHorizontal,
+    this.password,
+    required this.nightMode,
+    required this.autoSpacing,
+    required this.pageFling,
+    required this.pageSnap,
+    required this.defaultPage,
+    required this.fitPolicy,
+    required this.fitEachPage,
+    required this.preventLinkNavigation,
+    required this.spacing,
+    required this.enableDoubletap,
+    required this.setBackgroundColor,
+  });
 
   static _PDFViewSettings fromWidget(PDFView widget) {
     return _PDFViewSettings(
-        enableSwipe: widget.enableSwipe,
-        swipeHorizontal: widget.swipeHorizontal,
-        password: widget.password,
-        nightMode: widget.nightMode,
-        autoSpacing: widget.autoSpacing,
-        pageFling: widget.pageFling,
-        pageSnap: widget.pageSnap,
-        defaultPage: widget.defaultPage,
-        fitPolicy: widget.fitPolicy,
-        preventLinkNavigation: widget.preventLinkNavigation);
+      enableSwipe: widget.enableSwipe,
+      swipeHorizontal: widget.swipeHorizontal,
+      password: widget.password,
+      nightMode: widget.nightMode,
+      autoSpacing: widget.autoSpacing,
+      pageFling: widget.pageFling,
+      pageSnap: widget.pageSnap,
+      defaultPage: widget.defaultPage,
+      fitPolicy: widget.fitPolicy,
+      fitEachPage: widget.fitEachPage,
+      preventLinkNavigation: widget.preventLinkNavigation,
+      spacing: widget.spacing,
+      enableDoubletap: widget.enableDoubletap,
+      setBackgroundColor: widget.setBackgroundColor,
+    );
   }
 
-  final bool? enableSwipe;
-  final bool? swipeHorizontal;
+  final bool enableSwipe;
+  final bool swipeHorizontal;
   final String? password;
-  final bool? nightMode;
-  final bool? autoSpacing;
-  final bool? pageFling;
-  final bool? pageSnap;
-  final int? defaultPage;
-  final FitPolicy? fitPolicy;
-  final bool? fitEachPage;
-  final bool? preventLinkNavigation;
+  final bool nightMode;
+  final bool autoSpacing;
+  final bool pageFling;
+  final bool pageSnap;
+  final int defaultPage;
+  final FitPolicy fitPolicy;
+  final bool fitEachPage;
+  final bool preventLinkNavigation;
+  final int spacing;
+  final bool enableDoubletap;
+  final Color setBackgroundColor;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -206,7 +240,11 @@ class _PDFViewSettings {
       'defaultPage': defaultPage,
       'fitPolicy': fitPolicy.toString(),
       'fitEachPage': fitEachPage,
-      'preventLinkNavigation': preventLinkNavigation
+      'preventLinkNavigation': preventLinkNavigation,
+      'spacing': spacing,
+      'enableDoubletap': enableDoubletap,
+      // convert Color to hex string
+      'setBackgroundColor': setBackgroundColor.value.toRadixString(16),
     };
   }
 
@@ -273,6 +311,13 @@ class PDFViewController {
       case 'onLinkHandler':
         if (_widget.onLinkHandler != null) {
           _widget.onLinkHandler!(call.arguments);
+        }
+
+        return null;
+
+      case 'onTap':
+        if (_widget.onTap != null) {
+          _widget.onTap!();
         }
 
         return null;

@@ -1,11 +1,13 @@
 package io.endigo.plugins.pdfviewflutter;
 
 import android.content.Context;
+
+import java.util.Map;
+
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.StandardMessageCodec;
 import io.flutter.plugin.platform.PlatformView;
 import io.flutter.plugin.platform.PlatformViewFactory;
-import java.util.Map;
 
 public class PDFViewFactory extends PlatformViewFactory {
     private final BinaryMessenger messenger;
@@ -14,6 +16,7 @@ public class PDFViewFactory extends PlatformViewFactory {
         super(StandardMessageCodec.INSTANCE);
         this.messenger = messenger;
     }
+
 
     @SuppressWarnings("unchecked")
     @Override
