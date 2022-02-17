@@ -83,7 +83,6 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .onTap(new OnTapListener() {
                         @Override
                         public boolean onTap(MotionEvent e) {
-                            //pdfView.refreshDrawableState();
                             methodChannel.invokeMethod("onTap",null);
                             return false;
                         }
