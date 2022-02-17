@@ -178,16 +178,20 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
   int? currentPage = 0;
   bool isReady = false;
   String errorMessage = '';
+  String title = "Document";
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Document"),
+        title: Text(title),
         actions: <Widget>[
           IconButton(
-            icon: Icon(Icons.share),
-            onPressed: () {},
+            icon: Icon(Icons.refresh_rounded),
+            onPressed: () async {
+              PDFViewController controller = await _controller.future;
+              // await controller.refreshDrawableState();
+            },
           ),
         ],
       ),
@@ -213,6 +217,9 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
           preventLinkNavigation:
               false, // if set to true the link is handled in flutter
           onTap: () {
+            setState(() {
+              title = 'Pdf Doc';
+            });
             print('onTap callback');
           },
           onRender: (_pages) {
