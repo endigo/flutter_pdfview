@@ -3,9 +3,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/src/material/colors.dart';
-import 'package:flutter/widgets.dart';
 
 typedef PDFViewCreatedCallback = void Function(PDFViewController controller);
 typedef RenderCallback = void Function(int? pages);
@@ -43,6 +42,9 @@ class PDFView extends StatefulWidget {
     this.spacing = 0,
     this.enableDoubletap = true,
     this.setBackgroundColor = Colors.white,
+    this.setMaxZoom = 3.0,
+    this.setMidZoom = 1.75,
+    this.setMinZoom = 1.0,
   })  : assert(filePath != null || pdfData != null),
         super(key: key);
 
@@ -51,11 +53,19 @@ class PDFView extends StatefulWidget {
 
   /// If not null invoked once the web view is created.
   final PDFViewCreatedCallback? onViewCreated;
+
   final RenderCallback? onRender;
+
   final PageChangedCallback? onPageChanged;
+
   final ErrorCallback? onError;
+
+  /// Works on [Android]
   final PageErrorCallback? onPageError;
+
   final LinkHandlerCallback? onLinkHandler;
+
+  /// Works on [Android]
   final VoidCallback? onTap;
 
   /// Which gestures should be consumed by the pdf view.
@@ -76,12 +86,16 @@ class PDFView extends StatefulWidget {
   final bool enableSwipe;
   final bool swipeHorizontal;
   final String? password;
+
+  /// Works on [Android]
   final bool nightMode;
   final bool autoSpacing;
 
   /// minimum swipe to change the page
   final bool pageFling;
 
+  /// Works on [Android]
+  ///
   /// if [true] automatic center the page
   ///
   /// if [false] you can stop betwen two pages
@@ -89,17 +103,35 @@ class PDFView extends StatefulWidget {
 
   /// initial page to show
   final int defaultPage;
+
+  /// Works on [Android]
   final FitPolicy fitPolicy;
   final bool fitEachPage;
   final bool preventLinkNavigation;
 
+  /// Works on [Android]
+  ///
   /// space betwen the pages (arround each page)
   final int spacing;
 
+  /// Works on [Android]
+  ///
   /// for zoom-in-out
   final bool enableDoubletap;
 
+  /// Works on [Android]
   final Color setBackgroundColor;
+
+  /// Works on [Android]
+  final double setMaxZoom;
+
+  /// Works on [Android]
+  ///
+  /// for double tap (middle step)
+  final double setMidZoom;
+
+  /// Works on [Android]
+  final double setMinZoom;
 }
 
 class _PDFViewState extends State<PDFView> {
@@ -192,6 +224,9 @@ class _PDFViewSettings {
     required this.spacing,
     required this.enableDoubletap,
     required this.setBackgroundColor,
+    required this.setMaxZoom,
+    required this.setMidZoom,
+    required this.setMinZoom,
   });
 
   static _PDFViewSettings fromWidget(PDFView widget) {
@@ -210,6 +245,9 @@ class _PDFViewSettings {
       spacing: widget.spacing,
       enableDoubletap: widget.enableDoubletap,
       setBackgroundColor: widget.setBackgroundColor,
+      setMaxZoom: widget.setMaxZoom,
+      setMidZoom: widget.setMidZoom,
+      setMinZoom: widget.setMinZoom,
     );
   }
 
@@ -227,6 +265,9 @@ class _PDFViewSettings {
   final int spacing;
   final bool enableDoubletap;
   final Color setBackgroundColor;
+  final double setMaxZoom;
+  final double setMidZoom;
+  final double setMinZoom;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -245,6 +286,9 @@ class _PDFViewSettings {
       'enableDoubletap': enableDoubletap,
       // convert Color to hex string
       'setBackgroundColor': setBackgroundColor.value.toRadixString(16),
+      'setMaxZoom': setMaxZoom,
+      'setMidZoom': setMidZoom,
+      'setMinZoom': setMinZoom,
     };
   }
 

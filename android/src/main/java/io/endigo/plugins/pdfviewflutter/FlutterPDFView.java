@@ -59,6 +59,10 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         }
 
         if (config != null) {
+            pdfView.setMaxZoom(getFloat(params,"setMaxZoom")); // default 3.0f
+            pdfView.setMidZoom(getFloat(params,"setMidZoom")); // default 1.75f
+            pdfView.setMinZoom(getFloat(params,"setMinZoom")); // default 1.0f
+
             config
                     .enableSwipe(getBoolean(params, "enableSwipe"))
                     .swipeHorizontal(getBoolean(params, "swipeHorizontal"))
@@ -79,6 +83,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .onTap(new OnTapListener() {
                         @Override
                         public boolean onTap(MotionEvent e) {
+                            //pdfView.refreshDrawableState();
                             methodChannel.invokeMethod("onTap",null);
                             return false;
                         }
@@ -119,6 +124,8 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
             }).load();
         }
     }
+
+
 
     @Override
     public View getView() {
@@ -199,16 +206,20 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         methodChannel.setMethodCallHandler(null);
     }
 
-    boolean getBoolean(Map<String, Object> params, String key) {
+    private boolean getBoolean(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (boolean) params.get(key) : false;
     }
 
-    String getString(Map<String, Object> params, String key) {
+    private String getString(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (String) params.get(key) : "";
     }
 
-    int getInt(Map<String, Object> params, String key) {
+    private int getInt(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (int) params.get(key) : 0;
+    }
+    private float getFloat(Map<String, Object> params, String key) {
+        double d = (double)params.get(key);
+        return params.containsKey(key) ? (float)d : 0.0f;
     }
 
     FitPolicy getFitPolicy(Map<String, Object> params) {
