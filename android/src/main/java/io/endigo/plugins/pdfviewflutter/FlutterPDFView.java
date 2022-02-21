@@ -40,6 +40,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
         String setBackgroundColor = getString(params, "setBackgroundColor");
         pdfView.setBackgroundColor(Color.parseColor('#'+setBackgroundColor)); //"#BB29BB"
+//        pdfView.setBackgroundColor(Color.TRANSPARENT);
 
         final boolean preventLinkNavigation = getBoolean(params, "preventLinkNavigation");
 
