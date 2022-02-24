@@ -78,10 +78,12 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
                     .enableAntialiasing(false)
                     .fitEachPage(getBoolean(params,"fitEachPage"))
-                    .enableDoubletap(getBoolean(params,"enableDoubletap"))
+                    .enableDoubletap(getBoolean(params,"enableDoubleTap"))
                     .defaultPage(getInt(params, "defaultPage"))
                     .spacing(getInt(params,"spacing"))
                     .onTap(new OnTapListener() {
+//                        Log.i('onTap-native','onTap');
+
                         @Override
                         public boolean onTap(MotionEvent e) {
                             methodChannel.invokeMethod("onTap",null);
