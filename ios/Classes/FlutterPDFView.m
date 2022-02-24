@@ -211,8 +211,7 @@
     }
     [_channel invokeMethod:@"onLinkHandler" arguments:url.absoluteString];
 }
-- (void) handleTap: (UITapGestureRecognizer *)recognizer
-{
+- (void) handleTap: (UITapGestureRecognizer *)recognizer {
     [_channel invokeMethod:@"onTap"];
 }
 
