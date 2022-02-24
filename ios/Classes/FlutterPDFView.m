@@ -109,8 +109,10 @@
         PDFPage* page = [document pageAtIndex: defaultPage];
         [_pdfView goToPage: page];
 
-            _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
-            _pdfView.maxScaleFactor = 4.0;
+            _pdfView.minScaleFactor = [args[@"setMinZoom"] doubleValue];
+            _pdfView.maxScaleFactor = [args[@"setMaxZoom"] doubleValue];
+            // _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
+            // _pdfView.maxScaleFactor = 4.0;
 
             dispatch_async(dispatch_get_main_queue(), ^{
                 [weakSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: [document pageCount]]];
