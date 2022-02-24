@@ -83,7 +83,18 @@
         } else {
             _pdfView.autoresizesSubviews = YES;
             _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+            
+            // TODO: change this to args value
             _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+            
+            // this is to enable double tap to zoom
+            _pdfView.enableDataDetectors = [args[@"enableDoubleTap"] boolValue];
+            
+            UITapGestureRecognizer *recognizer =
+                    [[UITapGestureRecognizer alloc] initWithTarget:self
+                                                            action:@selector(handleTap:)];
+            [_pdfView addGestureRecognizer: recognizer];
+
             BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
             if (swipeHorizontal) {
                 _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
@@ -109,10 +120,14 @@
         PDFPage* page = [document pageAtIndex: defaultPage];
         [_pdfView goToPage: page];
 
-            _pdfView.minScaleFactor = [args[@"setMinZoom"] doubleValue];
+            // _pdfView.minScaleFactor = [args[@"setMinZoom"] doubleValue];
+            _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
             _pdfView.maxScaleFactor = [args[@"setMaxZoom"] doubleValue];
-            // _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
             // _pdfView.maxScaleFactor = 4.0;
+            // TODO: descomentar siguiente linea
+            _pdfView.scaleFactor = _pdfView.minScaleFactor;
+            // TODO: this can work?
+            // _pdfView.contentScaleFactor = [args[@"setMidZoom"] doubleValue];;
 
             dispatch_async(dispatch_get_main_queue(), ^{
                 [weakSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: [document pageCount]]];
@@ -195,6 +210,10 @@
         [[UIApplication sharedApplication] openURL:url];
     }
     [_channel invokeMethod:@"onLinkHandler" arguments:url.absoluteString];
+}
+- (void) handleTap: (UITapGestureRecognizer *)recognizer
+{
+    [_channel invokeMethod:@"onTap"];
 }
 
 @end
