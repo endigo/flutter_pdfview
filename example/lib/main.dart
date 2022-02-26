@@ -178,74 +178,92 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
   int? currentPage = 0;
   bool isReady = false;
   String errorMessage = '';
+  String title = "Document";
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Document"),
+        title: Text(title),
         actions: <Widget>[
           IconButton(
-            icon: Icon(Icons.share),
-            onPressed: () {},
+            icon: Icon(Icons.refresh_rounded),
+            onPressed: () async {
+              PDFViewController controller = await _controller.future;
+              // await controller.refreshDrawableState();
+            },
           ),
         ],
       ),
-      body: Stack(
-        children: <Widget>[
-          PDFView(
-            filePath: widget.path,
-            enableSwipe: true,
-            swipeHorizontal: true,
-            autoSpacing: false,
-            pageFling: true,
-            pageSnap: true,
-            defaultPage: currentPage!,
-            fitPolicy: FitPolicy.BOTH,
-            preventLinkNavigation:
-                false, // if set to true the link is handled in flutter
-            onRender: (_pages) {
-              setState(() {
-                pages = _pages;
-                isReady = true;
-              });
-            },
-            onError: (error) {
-              setState(() {
-                errorMessage = error.toString();
-              });
-              print(error.toString());
-            },
-            onPageError: (page, error) {
-              setState(() {
-                errorMessage = '$page: ${error.toString()}';
-              });
-              print('$page: ${error.toString()}');
-            },
-            onViewCreated: (PDFViewController pdfViewController) {
-              _controller.complete(pdfViewController);
-            },
-            onLinkHandler: (String? uri) {
-              print('goto uri: $uri');
-            },
-            onPageChanged: (int? page, int? total) {
-              print('page change: $page/$total');
-              setState(() {
-                currentPage = page;
-              });
-            },
-          ),
-          errorMessage.isEmpty
-              ? !isReady
-                  ? Center(
-                      child: CircularProgressIndicator(),
-                    )
-                  : Container()
-              : Center(
-                  child: Text(errorMessage),
-                )
-        ],
+      body: GestureDetector(
+        onTap: () => print('onTap'),
+        onTapCancel: () => print('onTapCancel'),
+        onTapDown: (_) => print('onTapDown'),
+        onTapUp: (_) => print('onTapUp'),
+        child: PDFView(
+          filePath: widget.path,
+          // setMaxZoom: 5,
+          // setMinZoom: 0.8,
+          enableSwipe: true,
+          // swipeHorizontal: true,
+          autoSpacing: false,
+          pageFling: false,
+          pageSnap: false,
+          spacing: 10,
+          defaultPage: currentPage!,
+          fitPolicy: FitPolicy.BOTH,
+          enableDoubleTap: true,
+          setBackgroundColor: Colors.grey,
+          preventLinkNavigation:
+              false, // if set to true the link is handled in flutter
+          onTap: () {
+            setState(() {
+              title = 'Pdf Doc';
+            });
+            print('onTap callback');
+          },
+          onRender: (_pages) {
+            setState(() {
+              pages = _pages;
+              isReady = true;
+            });
+          },
+          onError: (error) {
+            setState(() {
+              errorMessage = error.toString();
+            });
+            print(error.toString());
+          },
+          onPageError: (page, error) {
+            setState(() {
+              errorMessage = '$page: ${error.toString()}';
+            });
+            print('$page: ${error.toString()}');
+          },
+          onViewCreated: (PDFViewController pdfViewController) {
+            _controller.complete(pdfViewController);
+          },
+          onLinkHandler: (String? uri) {
+            print('goto uri: $uri');
+          },
+          onPageChanged: (int? page, int? total) {
+            print('page change: $page/$total');
+            setState(() {
+              currentPage = page;
+            });
+          },
+        ),
       ),
+      // errorMessage.isEmpty
+      //     ? !isReady
+      //         ? Center(
+      //             child: CircularProgressIndicator(),
+      //           )
+      //         : Container()
+      //     : Center(
+      //         child: Text(errorMessage),
+      //       )
+
       floatingActionButton: FutureBuilder<PDFViewController>(
         future: _controller.future,
         builder: (context, AsyncSnapshot<PDFViewController> snapshot) {

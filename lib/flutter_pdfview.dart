@@ -3,8 +3,9 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+// import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 
 typedef PDFViewCreatedCallback = void Function(PDFViewController controller);
 typedef RenderCallback = void Function(int? pages);
@@ -38,6 +39,13 @@ class PDFView extends StatefulWidget {
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
+    this.onTap,
+    this.spacing = 0,
+    this.enableDoubleTap = true,
+    this.setBackgroundColor = Colors.white,
+    this.setMaxZoom = 3.0,
+    this.setMidZoom = 1.75,
+    this.setMinZoom = 1.0,
   })  : assert(filePath != null || pdfData != null),
         super(key: key);
 
@@ -46,11 +54,20 @@ class PDFView extends StatefulWidget {
 
   /// If not null invoked once the web view is created.
   final PDFViewCreatedCallback? onViewCreated;
+
   final RenderCallback? onRender;
+
   final PageChangedCallback? onPageChanged;
+
   final ErrorCallback? onError;
+
+  /// Works on [Android]
   final PageErrorCallback? onPageError;
+
   final LinkHandlerCallback? onLinkHandler;
+
+  /// Works on [Android]
+  final VoidCallback? onTap;
 
   /// Which gestures should be consumed by the pdf view.
   ///
@@ -70,14 +87,52 @@ class PDFView extends StatefulWidget {
   final bool enableSwipe;
   final bool swipeHorizontal;
   final String? password;
+
+  /// Works on [Android]
   final bool nightMode;
   final bool autoSpacing;
+
+  /// minimum swipe to change the page
   final bool pageFling;
+
+  /// Works on [Android]
+  ///
+  /// if [true] automatic center the page
+  ///
+  /// if [false] you can stop betwen two pages
   final bool pageSnap;
+
+  /// initial page to show
   final int defaultPage;
+
+  /// Works on [Android]
   final FitPolicy fitPolicy;
   final bool fitEachPage;
   final bool preventLinkNavigation;
+
+  /// Works on [Android]
+  ///
+  /// space betwen the pages (arround each page)
+  final int spacing;
+
+  /// Works on [Android]
+  ///
+  /// for zoom-in-out
+  final bool enableDoubleTap;
+
+  /// Works on [Android]
+  final Color setBackgroundColor;
+
+  /// Works on [Android]
+  final double setMaxZoom;
+
+  /// Works on [Android]
+  ///
+  /// for double tap (middle step)
+  final double setMidZoom;
+
+  /// Works on [Android]
+  final double setMinZoom;
 }
 
 class _PDFViewState extends State<PDFView> {
@@ -86,6 +141,40 @@ class _PDFViewState extends State<PDFView> {
   @override
   Widget build(BuildContext context) {
     if (defaultTargetPlatform == TargetPlatform.android) {
+      // // aded by lcyper
+
+      // return PlatformViewLink(
+      //   surfaceFactory: (context, controller) {
+      //     return AndroidViewSurface(
+      //       controller: controller as AndroidViewController,
+      //       gestureRecognizers: widget.gestureRecognizers ??
+      //           <Factory<OneSequenceGestureRecognizer>>{},
+      //       hitTestBehavior: PlatformViewHitTestBehavior.opaque,
+      //     );
+      //   },
+      //   viewType: 'plugins.endigo.io/pdfview',
+      //   onCreatePlatformView: (PlatformViewCreationParams params) {
+      //     // final PDFViewController controller = PDFViewController._(id, widget);
+      //     // _controller.complete(controller);
+      //     // if (widget.onViewCreated != null) {
+      //     //   widget.onViewCreated!(controller);
+      //     // }
+      //     return PlatformViewsService.initSurfaceAndroidView(
+      //       id: params.id,
+      //       viewType: 'plugins.endigo.io/pdfview',
+      //       layoutDirection: TextDirection.ltr,
+      //       creationParams: _CreationParams.fromWidget(widget).toMap(),
+      //       creationParamsCodec: const StandardMessageCodec(),
+      //       onFocus: () {
+      //         params.onFocusChanged(true);
+      //       },
+      //     )
+      //       ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
+      //       ..create();
+      //   },
+      // );
+      // // until here
+
       return AndroidView(
         viewType: 'plugins.endigo.io/pdfview',
         onPlatformViewCreated: _onPlatformViewCreated,
@@ -155,44 +244,65 @@ class _CreationParams {
 }
 
 class _PDFViewSettings {
-  _PDFViewSettings(
-      {this.enableSwipe,
-      this.swipeHorizontal,
-      this.password,
-      this.nightMode,
-      this.autoSpacing,
-      this.pageFling,
-      this.pageSnap,
-      this.defaultPage,
-      this.fitPolicy,
-      this.fitEachPage,
-      this.preventLinkNavigation});
+  _PDFViewSettings({
+    required this.enableSwipe,
+    required this.swipeHorizontal,
+    this.password,
+    required this.nightMode,
+    required this.autoSpacing,
+    required this.pageFling,
+    required this.pageSnap,
+    required this.defaultPage,
+    required this.fitPolicy,
+    required this.fitEachPage,
+    required this.preventLinkNavigation,
+    required this.spacing,
+    required this.enableDoubleTap,
+    required this.setBackgroundColor,
+    required this.setMaxZoom,
+    required this.setMidZoom,
+    required this.setMinZoom,
+  });
 
   static _PDFViewSettings fromWidget(PDFView widget) {
     return _PDFViewSettings(
-        enableSwipe: widget.enableSwipe,
-        swipeHorizontal: widget.swipeHorizontal,
-        password: widget.password,
-        nightMode: widget.nightMode,
-        autoSpacing: widget.autoSpacing,
-        pageFling: widget.pageFling,
-        pageSnap: widget.pageSnap,
-        defaultPage: widget.defaultPage,
-        fitPolicy: widget.fitPolicy,
-        preventLinkNavigation: widget.preventLinkNavigation);
+      enableSwipe: widget.enableSwipe,
+      swipeHorizontal: widget.swipeHorizontal,
+      password: widget.password,
+      nightMode: widget.nightMode,
+      autoSpacing: widget.autoSpacing,
+      pageFling: widget.pageFling,
+      pageSnap: widget.pageSnap,
+      defaultPage: widget.defaultPage,
+      fitPolicy: widget.fitPolicy,
+      fitEachPage: widget.fitEachPage,
+      preventLinkNavigation: widget.preventLinkNavigation,
+      spacing: widget.spacing,
+      enableDoubleTap: widget.enableDoubleTap,
+      setBackgroundColor: widget.setBackgroundColor,
+      setMaxZoom: widget.setMaxZoom,
+      setMidZoom: widget.setMidZoom,
+      setMinZoom: widget.setMinZoom,
+    );
   }
 
-  final bool? enableSwipe;
-  final bool? swipeHorizontal;
+  final bool enableSwipe;
+  final bool swipeHorizontal;
   final String? password;
-  final bool? nightMode;
-  final bool? autoSpacing;
-  final bool? pageFling;
-  final bool? pageSnap;
-  final int? defaultPage;
-  final FitPolicy? fitPolicy;
-  final bool? fitEachPage;
-  final bool? preventLinkNavigation;
+  final bool nightMode;
+  final bool autoSpacing;
+  final bool pageFling;
+  final bool pageSnap;
+  final int defaultPage;
+  final FitPolicy fitPolicy;
+  final bool fitEachPage;
+  final bool preventLinkNavigation;
+  final int spacing;
+  final bool enableDoubleTap;
+  final Color setBackgroundColor;
+  final double setMaxZoom;
+  final double setMidZoom;
+  final double setMinZoom;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -206,7 +316,14 @@ class _PDFViewSettings {
       'defaultPage': defaultPage,
       'fitPolicy': fitPolicy.toString(),
       'fitEachPage': fitEachPage,
-      'preventLinkNavigation': preventLinkNavigation
+      'preventLinkNavigation': preventLinkNavigation,
+      'spacing': spacing,
+      'enableDoubleTap': enableDoubleTap,
+      // convert Color to hex string
+      'setBackgroundColor': setBackgroundColor.value.toRadixString(16),
+      'setMaxZoom': setMaxZoom,
+      'setMidZoom': setMidZoom,
+      'setMinZoom': setMinZoom,
     };
   }
 
@@ -273,6 +390,13 @@ class PDFViewController {
       case 'onLinkHandler':
         if (_widget.onLinkHandler != null) {
           _widget.onLinkHandler!(call.arguments);
+        }
+
+        return null;
+
+      case 'onTap':
+        if (_widget.onTap != null) {
+          _widget.onTap!();
         }
 
         return null;

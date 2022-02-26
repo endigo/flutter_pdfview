@@ -1,8 +1,24 @@
 package io.endigo.plugins.pdfviewflutter;
 
 import android.content.Context;
-import android.view.View;
+import android.graphics.Color;
 import android.net.Uri;
+import android.view.MotionEvent;
+import android.view.View;
+
+import com.github.barteksc.pdfviewer.PDFView;
+import com.github.barteksc.pdfviewer.PDFView.Configurator;
+import com.github.barteksc.pdfviewer.link.LinkHandler;
+import com.github.barteksc.pdfviewer.listener.OnErrorListener;
+import com.github.barteksc.pdfviewer.listener.OnPageChangeListener;
+import com.github.barteksc.pdfviewer.listener.OnPageErrorListener;
+import com.github.barteksc.pdfviewer.listener.OnRenderListener;
+import com.github.barteksc.pdfviewer.listener.OnTapListener;
+import com.github.barteksc.pdfviewer.util.FitPolicy;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
@@ -11,26 +27,21 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.platform.PlatformView;
 
-import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
-
-import com.github.barteksc.pdfviewer.PDFView;
-import com.github.barteksc.pdfviewer.PDFView.Configurator;
-import com.github.barteksc.pdfviewer.listener.*;
-import com.github.barteksc.pdfviewer.util.Constants;
-import com.github.barteksc.pdfviewer.util.FitPolicy;
-
-import com.github.barteksc.pdfviewer.link.LinkHandler;
-
 public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private final PDFView pdfView;
     private final MethodChannel methodChannel;
     private final LinkHandler linkHandler;
 
+
+
     @SuppressWarnings("unchecked")
     FlutterPDFView(Context context, BinaryMessenger messenger, int id, Map<String, Object> params) {
         pdfView = new PDFView(context, null);
+
+        String setBackgroundColor = getString(params, "setBackgroundColor");
+        pdfView.setBackgroundColor(Color.parseColor('#'+setBackgroundColor)); //"#BB29BB"
+//        pdfView.setBackgroundColor(Color.TRANSPARENT);
+
         final boolean preventLinkNavigation = getBoolean(params, "preventLinkNavigation");
 
         methodChannel = new MethodChannel(messenger, "plugins.endigo.io/pdfview_" + id);
@@ -49,6 +60,10 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         }
 
         if (config != null) {
+            pdfView.setMaxZoom(getFloat(params,"setMaxZoom")); // default 3.0f
+            pdfView.setMidZoom(getFloat(params,"setMidZoom")); // default 1.75f
+            pdfView.setMinZoom(getFloat(params,"setMinZoom")); // default 1.0f
+
             config
                     .enableSwipe(getBoolean(params, "enableSwipe"))
                     .swipeHorizontal(getBoolean(params, "swipeHorizontal"))
@@ -59,9 +74,22 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .pageSnap(getBoolean(params, "pageSnap"))
                     .pageFitPolicy(getFitPolicy(params))
                     .enableAnnotationRendering(true)
-                    .linkHandler(linkHandler).
-                    enableAntialiasing(false)
-                    // .fitEachPage(getBoolean(params,"fitEachPage"))
+                    .linkHandler(linkHandler)
+
+                    .enableAntialiasing(false)
+                    .fitEachPage(getBoolean(params,"fitEachPage"))
+                    .enableDoubletap(getBoolean(params,"enableDoubleTap"))
+                    .defaultPage(getInt(params, "defaultPage"))
+                    .spacing(getInt(params,"spacing"))
+                    .onTap(new OnTapListener() {
+//                        Log.i('onTap-native','onTap');
+
+                        @Override
+                        public boolean onTap(MotionEvent e) {
+                            methodChannel.invokeMethod("onTap",null);
+                            return false;
+                        }
+                    })
                     .onPageChange(new OnPageChangeListener() {
                         @Override
                         public void onPageChanged(int page, int total) {
@@ -70,14 +98,16 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                             args.put("total", total);
                             methodChannel.invokeMethod("onPageChanged", args);
                         }
-                    }).onError(new OnErrorListener() {
+                    })
+                    .onError(new OnErrorListener() {
                 @Override
                 public void onError(Throwable t) {
                     Map<String, Object> args = new HashMap<>();
                     args.put("error", t.toString());
                     methodChannel.invokeMethod("onError", args);
                 }
-            }).onPageError(new OnPageErrorListener() {
+            })
+                    .onPageError(new OnPageErrorListener() {
                 @Override
                 public void onPageError(int page, Throwable t) {
                     Map<String, Object> args = new HashMap<>();
@@ -85,16 +115,19 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     args.put("error", t.toString());
                     methodChannel.invokeMethod("onPageError", args);
                 }
-            }).onRender(new OnRenderListener() {
+            })
+                    .onRender(new OnRenderListener() {
                 @Override
                 public void onInitiallyRendered(int pages) {
                     Map<String, Object> args = new HashMap<>();
                     args.put("pages", pages);
                     methodChannel.invokeMethod("onRender", args);
                 }
-            }).enableDoubletap(true).defaultPage(getInt(params, "defaultPage")).load();
+            }).load();
         }
     }
+
+
 
     @Override
     public View getView() {
@@ -175,16 +208,20 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         methodChannel.setMethodCallHandler(null);
     }
 
-    boolean getBoolean(Map<String, Object> params, String key) {
+    private boolean getBoolean(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (boolean) params.get(key) : false;
     }
 
-    String getString(Map<String, Object> params, String key) {
+    private String getString(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (String) params.get(key) : "";
     }
 
-    int getInt(Map<String, Object> params, String key) {
+    private int getInt(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (int) params.get(key) : 0;
+    }
+    private float getFloat(Map<String, Object> params, String key) {
+        double d = (double)params.get(key);
+        return params.containsKey(key) ? (float)d : 0.0f;
     }
 
     FitPolicy getFitPolicy(Map<String, Object> params) {
