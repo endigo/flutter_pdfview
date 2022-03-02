@@ -91,8 +91,9 @@
             _pdfView.enableDataDetectors = [args[@"enableDoubleTap"] boolValue];
             
             UITapGestureRecognizer *recognizer =
-                    [[UITapGestureRecognizer alloc] initWithTarget:self
-                                                            action:@selector(handleTap:)];
+                    [[UITapGestureRecognizer alloc] initWithTarget:self         action:@selector(handleTap:)];
+            [recognizer setNumberOfTapsRequired:1];
+            
             [_pdfView addGestureRecognizer: recognizer];
 
             BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
@@ -122,9 +123,9 @@
 
             // _pdfView.minScaleFactor = [args[@"setMinZoom"] doubleValue];
             _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
-            _pdfView.maxScaleFactor = [args[@"setMaxZoom"] doubleValue];
-            // _pdfView.maxScaleFactor = 4.0;
-            // TODO: descomentar siguiente linea
+            _pdfView.maxScaleFactor = [args[@"setMaxZoom"] doubleValue]; // 4.0;
+
+            // set the initial scale to minimum that is fit to screen.
             _pdfView.scaleFactor = _pdfView.minScaleFactor;
             // TODO: this can work?
             // _pdfView.contentScaleFactor = [args[@"setMidZoom"] doubleValue];;
@@ -212,7 +213,7 @@
     [_channel invokeMethod:@"onLinkHandler" arguments:url.absoluteString];
 }
 - (void) handleTap: (UITapGestureRecognizer *)recognizer {
-    [_channel invokeMethod:@"onTap"];
+    [_channel invokeMethod:@"onTap" arguments:nil];
 }
 
 @end
