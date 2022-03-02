@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+// import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 typedef PDFViewCreatedCallback = void Function(PDFViewController controller);
@@ -40,7 +41,7 @@ class PDFView extends StatefulWidget {
     this.preventLinkNavigation = false,
     this.onTap,
     this.spacing = 0,
-    this.enableDoubletap = true,
+    this.enableDoubleTap = true,
     this.setBackgroundColor = Colors.white,
     this.setMaxZoom = 3.0,
     this.setMidZoom = 1.75,
@@ -117,7 +118,7 @@ class PDFView extends StatefulWidget {
   /// Works on [Android]
   ///
   /// for zoom-in-out
-  final bool enableDoubletap;
+  final bool enableDoubleTap;
 
   /// Works on [Android]
   final Color setBackgroundColor;
@@ -140,6 +141,40 @@ class _PDFViewState extends State<PDFView> {
   @override
   Widget build(BuildContext context) {
     if (defaultTargetPlatform == TargetPlatform.android) {
+      // // aded by lcyper
+
+      // return PlatformViewLink(
+      //   surfaceFactory: (context, controller) {
+      //     return AndroidViewSurface(
+      //       controller: controller as AndroidViewController,
+      //       gestureRecognizers: widget.gestureRecognizers ??
+      //           <Factory<OneSequenceGestureRecognizer>>{},
+      //       hitTestBehavior: PlatformViewHitTestBehavior.opaque,
+      //     );
+      //   },
+      //   viewType: 'plugins.endigo.io/pdfview',
+      //   onCreatePlatformView: (PlatformViewCreationParams params) {
+      //     // final PDFViewController controller = PDFViewController._(id, widget);
+      //     // _controller.complete(controller);
+      //     // if (widget.onViewCreated != null) {
+      //     //   widget.onViewCreated!(controller);
+      //     // }
+      //     return PlatformViewsService.initSurfaceAndroidView(
+      //       id: params.id,
+      //       viewType: 'plugins.endigo.io/pdfview',
+      //       layoutDirection: TextDirection.ltr,
+      //       creationParams: _CreationParams.fromWidget(widget).toMap(),
+      //       creationParamsCodec: const StandardMessageCodec(),
+      //       onFocus: () {
+      //         params.onFocusChanged(true);
+      //       },
+      //     )
+      //       ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
+      //       ..create();
+      //   },
+      // );
+      // // until here
+
       return AndroidView(
         viewType: 'plugins.endigo.io/pdfview',
         onPlatformViewCreated: _onPlatformViewCreated,
@@ -222,7 +257,7 @@ class _PDFViewSettings {
     required this.fitEachPage,
     required this.preventLinkNavigation,
     required this.spacing,
-    required this.enableDoubletap,
+    required this.enableDoubleTap,
     required this.setBackgroundColor,
     required this.setMaxZoom,
     required this.setMidZoom,
@@ -243,7 +278,7 @@ class _PDFViewSettings {
       fitEachPage: widget.fitEachPage,
       preventLinkNavigation: widget.preventLinkNavigation,
       spacing: widget.spacing,
-      enableDoubletap: widget.enableDoubletap,
+      enableDoubleTap: widget.enableDoubleTap,
       setBackgroundColor: widget.setBackgroundColor,
       setMaxZoom: widget.setMaxZoom,
       setMidZoom: widget.setMidZoom,
@@ -263,7 +298,7 @@ class _PDFViewSettings {
   final bool fitEachPage;
   final bool preventLinkNavigation;
   final int spacing;
-  final bool enableDoubletap;
+  final bool enableDoubleTap;
   final Color setBackgroundColor;
   final double setMaxZoom;
   final double setMidZoom;
@@ -283,7 +318,7 @@ class _PDFViewSettings {
       'fitEachPage': fitEachPage,
       'preventLinkNavigation': preventLinkNavigation,
       'spacing': spacing,
-      'enableDoubletap': enableDoubletap,
+      'enableDoubleTap': enableDoubleTap,
       // convert Color to hex string
       'setBackgroundColor': setBackgroundColor.value.toRadixString(16),
       'setMaxZoom': setMaxZoom,

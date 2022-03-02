@@ -212,7 +212,7 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
           spacing: 10,
           defaultPage: currentPage!,
           fitPolicy: FitPolicy.BOTH,
-          enableDoubletap: true,
+          enableDoubleTap: true,
           setBackgroundColor: Colors.grey,
           preventLinkNavigation:
               false, // if set to true the link is handled in flutter
