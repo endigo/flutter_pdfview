@@ -1,3 +1,7 @@
+## 1.2.2
+
+- Updated onDoubleTap on ios [#174](https://github.com/endigo/flutter_pdfview/pull/174) @The-Redhat
+
 ## 1.2.1
 
 - Updated dependencies to be newest with latest flutter version.
