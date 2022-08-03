@@ -49,7 +49,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         }
 
         if (config != null) {
-            console.log(params);
+           
             config
                     .enableSwipe(getBoolean(params, "enableSwipe"))
                     .swipeHorizontal(getBoolean(params, "swipeHorizontal"))
