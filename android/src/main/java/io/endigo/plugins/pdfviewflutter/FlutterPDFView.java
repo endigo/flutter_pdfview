@@ -49,6 +49,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         }
 
         if (config != null) {
+            console.log(params);
             config
                     .enableSwipe(getBoolean(params, "enableSwipe"))
                     .swipeHorizontal(getBoolean(params, "swipeHorizontal"))
@@ -57,6 +58,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .autoSpacing(getBoolean(params, "autoSpacing"))
                     .pageFling(getBoolean(params, "pageFling"))
                     .pageSnap(getBoolean(params, "pageSnap"))
+                    .spacing(params,'spacingPx')
                     .pageFitPolicy(getFitPolicy(params))
                     .enableAnnotationRendering(true)
                     .linkHandler(linkHandler).
