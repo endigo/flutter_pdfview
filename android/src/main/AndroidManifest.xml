@@ -1,3 +1,4 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
   package="io.endigo.plugins.pdfviewflutter">
+  <!-- <io.endigo.plugins.pdfviewflutter android:id="@+id/pdfView" android:layout_width="0dp" android:layout_height="0dp" android:background="@color/gray_2"/> -->
 </manifest>

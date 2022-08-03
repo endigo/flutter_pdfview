@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart' hide Widget;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/rendering.dart';
@@ -17,7 +18,7 @@ typedef LinkHandlerCallback = void Function(String? uri);
 enum FitPolicy { WIDTH, HEIGHT, BOTH }
 
 class PDFView extends StatefulWidget {
-  const PDFView({
+  PDFView({
     Key? key,
     this.filePath,
     this.pdfData,
@@ -38,9 +39,14 @@ class PDFView extends StatefulWidget {
     this.fitEachPage = true,
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
-    this.spacingPx: 0,
+    this.pageSpacing = 8.0,
     this.preventLinkNavigation = false,
+    this.backgroundColor = Colors.grey,
   })  : assert(filePath != null || pdfData != null),
+        assert(
+          autoSpacing != false || pageSpacing != 0,
+          'Either use custom spacing or auto spacing',
+        ),
         super(key: key);
 
   @override
@@ -80,7 +86,8 @@ class PDFView extends StatefulWidget {
   final FitPolicy fitPolicy;
   final bool fitEachPage;
   final bool preventLinkNavigation;
-  final num spacingPx;
+  final num pageSpacing;
+  final Color backgroundColor;
 }
 
 class _PDFViewState extends State<PDFView> {
@@ -180,19 +187,21 @@ class _CreationParams {
 }
 
 class _PDFViewSettings {
-  _PDFViewSettings(
-      {this.enableSwipe,
-      this.swipeHorizontal,
-      this.password,
-      this.spacingPx = 0,
-      this.nightMode,
-      this.autoSpacing,
-      this.pageFling,
-      this.pageSnap,
-      this.defaultPage,
-      this.fitPolicy,
-      this.fitEachPage,
-      this.preventLinkNavigation});
+  _PDFViewSettings({
+    this.enableSwipe,
+    this.swipeHorizontal,
+    this.password,
+    required this.pageSpacing,
+    this.nightMode,
+    this.autoSpacing,
+    this.pageFling,
+    this.pageSnap,
+    this.defaultPage,
+    this.fitPolicy,
+    this.fitEachPage,
+    this.backgroundColor,
+    this.preventLinkNavigation,
+  });
 
   static _PDFViewSettings fromWidget(PDFView widget) {
     return _PDFViewSettings(
@@ -204,6 +213,9 @@ class _PDFViewSettings {
         pageFling: widget.pageFling,
         pageSnap: widget.pageSnap,
         defaultPage: widget.defaultPage,
+        pageSpacing: widget.pageSpacing,
+        backgroundColor: widget.backgroundColor,
+        fitEachPage: widget.fitEachPage,
         fitPolicy: widget.fitPolicy,
         preventLinkNavigation: widget.preventLinkNavigation);
   }
@@ -219,7 +231,8 @@ class _PDFViewSettings {
   final FitPolicy? fitPolicy;
   final bool? fitEachPage;
   final bool? preventLinkNavigation;
-  final num spacingPx;
+  final num pageSpacing;
+  final Color? backgroundColor;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -228,12 +241,14 @@ class _PDFViewSettings {
       'password': password,
       'nightMode': nightMode,
       'autoSpacing': autoSpacing,
-      'spacingPx': spacingPx,
+      'spacingPx': pageSpacing.toInt(),
       'pageFling': pageFling,
       'pageSnap': pageSnap,
       'defaultPage': defaultPage,
       'fitPolicy': fitPolicy.toString(),
       'fitEachPage': fitEachPage,
+      'backgroundColor':
+          '#${backgroundColor?.value.toRadixString(16).substring(2)}',
       'preventLinkNavigation': preventLinkNavigation
     };
   }

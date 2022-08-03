@@ -3,7 +3,7 @@ package io.endigo.plugins.pdfviewflutter;
 import android.content.Context;
 import android.view.View;
 import android.net.Uri;
-
+import android.graphics.Color;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
@@ -30,9 +30,12 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
     @SuppressWarnings("unchecked")
     FlutterPDFView(Context context, BinaryMessenger messenger, int id, Map<String, Object> params) {
+        System.out.println(params);
+        System.out.println("Hello, World!");
+
         pdfView = new PDFView(context, null);
         final boolean preventLinkNavigation = getBoolean(params, "preventLinkNavigation");
-
+        pdfView.setBackgroundColor(Color.parseColor(getString(params, "backgroundColor")));
         methodChannel = new MethodChannel(messenger, "plugins.endigo.io/pdfview_" + id);
         methodChannel.setMethodCallHandler(this);
 
@@ -58,7 +61,10 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .autoSpacing(getBoolean(params, "autoSpacing"))
                     .pageFling(getBoolean(params, "pageFling"))
                     .pageSnap(getBoolean(params, "pageSnap"))
-                    .spacing(params,'spacingPx')
+                    .spacing(getInt(params,"spacingPx"))
+                    // .setBackground(Color.valueOf(0xffff0000))
+                    .enableAntialiasing(true)
+                    // .onDraw(this)
                     .pageFitPolicy(getFitPolicy(params))
                     .enableAnnotationRendering(true)
                     .linkHandler(linkHandler).
@@ -102,7 +108,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     public View getView() {
         return pdfView;
     }
-
+  
     @Override
     public void onMethodCall(MethodCall methodCall, Result result) {
         switch (methodCall.method) {
