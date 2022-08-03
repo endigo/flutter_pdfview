@@ -38,9 +38,9 @@ class PDFView extends StatefulWidget {
     this.fitEachPage = true,
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
+    this.spacingPx: 0,
     this.preventLinkNavigation = false,
-  })
-      : assert(filePath != null || pdfData != null),
+  })  : assert(filePath != null || pdfData != null),
         super(key: key);
 
   @override
@@ -80,19 +80,22 @@ class PDFView extends StatefulWidget {
   final FitPolicy fitPolicy;
   final bool fitEachPage;
   final bool preventLinkNavigation;
+  final num spacingPx;
 }
 
 class _PDFViewState extends State<PDFView> {
   final Completer<PDFViewController> _controller =
-  Completer<PDFViewController>();
+      Completer<PDFViewController>();
 
   @override
   Widget build(BuildContext context) {
     if (defaultTargetPlatform == TargetPlatform.android) {
       return PlatformViewLink(
         viewType: 'plugins.endigo.io/pdfview',
-        surfaceFactory: (BuildContext context,
-            PlatformViewController controller,) {
+        surfaceFactory: (
+          BuildContext context,
+          PlatformViewController controller,
+        ) {
           return AndroidViewSurface(
             controller: controller as AndroidViewController,
             gestureRecognizers: widget.gestureRecognizers ??
@@ -108,9 +111,8 @@ class _PDFViewState extends State<PDFView> {
             creationParams: _CreationParams.fromWidget(widget).toMap(),
             creationParamsCodec: const StandardMessageCodec(),
           )
-            ..addOnPlatformViewCreatedListener(params
-                .onPlatformViewCreated)..addOnPlatformViewCreatedListener((
-                int id) {
+            ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
+            ..addOnPlatformViewCreatedListener((int id) {
               _onPlatformViewCreated(id);
             })
             ..create();
@@ -141,7 +143,7 @@ class _PDFViewState extends State<PDFView> {
   void didUpdateWidget(PDFView oldWidget) {
     super.didUpdateWidget(oldWidget);
     _controller.future.then(
-            (PDFViewController controller) => controller._updateWidget(widget));
+        (PDFViewController controller) => controller._updateWidget(widget));
   }
 }
 
@@ -178,17 +180,19 @@ class _CreationParams {
 }
 
 class _PDFViewSettings {
-  _PDFViewSettings({this.enableSwipe,
-    this.swipeHorizontal,
-    this.password,
-    this.nightMode,
-    this.autoSpacing,
-    this.pageFling,
-    this.pageSnap,
-    this.defaultPage,
-    this.fitPolicy,
-    this.fitEachPage,
-    this.preventLinkNavigation});
+  _PDFViewSettings(
+      {this.enableSwipe,
+      this.swipeHorizontal,
+      this.password,
+      this.spacingPx = 0,
+      this.nightMode,
+      this.autoSpacing,
+      this.pageFling,
+      this.pageSnap,
+      this.defaultPage,
+      this.fitPolicy,
+      this.fitEachPage,
+      this.preventLinkNavigation});
 
   static _PDFViewSettings fromWidget(PDFView widget) {
     return _PDFViewSettings(
@@ -215,6 +219,7 @@ class _PDFViewSettings {
   final FitPolicy? fitPolicy;
   final bool? fitEachPage;
   final bool? preventLinkNavigation;
+  final num spacingPx;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -223,6 +228,7 @@ class _PDFViewSettings {
       'password': password,
       'nightMode': nightMode,
       'autoSpacing': autoSpacing,
+      'spacingPx': spacingPx,
       'pageFling': pageFling,
       'pageSnap': pageSnap,
       'defaultPage': defaultPage,
@@ -251,9 +257,10 @@ class _PDFViewSettings {
 }
 
 class PDFViewController {
-  PDFViewController._(int id,
-      this._widget,)
-      : _channel = MethodChannel('plugins.endigo.io/pdfview_$id') {
+  PDFViewController._(
+    int id,
+    this._widget,
+  ) : _channel = MethodChannel('plugins.endigo.io/pdfview_$id') {
     _settings = _PDFViewSettings.fromWidget(_widget);
     _channel.setMethodCallHandler(_onMethodCall);
   }
@@ -314,7 +321,7 @@ class PDFViewController {
 
   Future<bool?> setPage(int page) async {
     final bool? isSet =
-    await _channel.invokeMethod('setPage', <String, dynamic>{
+        await _channel.invokeMethod('setPage', <String, dynamic>{
       'page': page,
     });
     return isSet;
