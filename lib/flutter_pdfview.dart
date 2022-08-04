@@ -320,10 +320,11 @@ class PDFViewController {
     return currentPage;
   }
 
-  Future<bool?> setPage(int page) async {
+  Future<bool?> setPage(int page, {bool animation = false}) async {
     final bool? isSet =
         await _channel.invokeMethod('setPage', <String, dynamic>{
       'page': page,
+      'animation': animation,
     });
     return isSet;
   }
