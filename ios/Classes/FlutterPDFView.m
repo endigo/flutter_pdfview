@@ -78,16 +78,14 @@
             document = [[PDFDocument alloc] initWithData: sourcePDFdata];
         }
 
+
         if (document == nil) {
             [_channel invokeMethod:@"onError" arguments:@{@"error" : @"cannot create document: File not in PDF format or corrupted."}];
         } else {
-            _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit * 0.1;
-            _pdfView.maxScaleFactor = 4.0;
-            _pdfView.scaleFactor = _pdfView.scaleFactorForSizeToFit;
-
-            _pdfView.autoresizesSubviews = YES;
+            _pdfView.autoresizesSubviews = true;
             _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
             _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+
             BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
             if (swipeHorizontal) {
                 _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
@@ -95,10 +93,15 @@
                 _pdfView.displayDirection = kPDFDisplayDirectionVertical;
             }
 
+            _pdfView.autoScales = autoSpacing;
+  
             [_pdfView usePageViewController:pageFling withViewOptions:nil];
             _pdfView.displayMode = enableSwipe ? kPDFDisplaySinglePageContinuous : kPDFDisplaySinglePage;
             _pdfView.document = document;
-            _pdfView.autoScales = autoSpacing;
+
+            _pdfView.maxScaleFactor = 4.0;
+            _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
+               
             NSString* password = args[@"password"];
             if ([password isKindOfClass:[NSString class]] && [_pdfView.document isEncrypted]) {
                 [_pdfView.document unlockWithPassword:password];
