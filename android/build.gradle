@@ -1,6 +1,14 @@
 group 'io.endigo.plugings.pdfview'
 version '1.0-SNAPSHOT'
 
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        jcenter()
+    }
+}
+
 buildscript {
     repositories {
         google()
