@@ -157,6 +157,8 @@
         [self getPageCount:call result:result];
     } else if ([[call method] isEqualToString:@"currentPage"]) {
         [self getCurrentPage:call result:result];
+    } else if ([[call method] isEqualToString:@"getStringAt"]) {
+        [self getStringAt:call result:result];
     } else if ([[call method] isEqualToString:@"setPage"]) {
         [self setPage:call result:result];
     } else if ([[call method] isEqualToString:@"updateSettings"]) {
@@ -174,6 +176,14 @@
 - (void)getCurrentPage:(FlutterMethodCall*)call result:(FlutterResult)result {
     _currentPage = [NSNumber numberWithUnsignedLong: [_pdfView.document indexForPage: _pdfView.currentPage]];
     result(_currentPage);
+}
+
+- (void)getStringAt:(FlutterMethodCall*)call result:(FlutterResult)result {
+    NSDictionary<NSString*, NSNumber*>* arguments = [call arguments];
+    NSNumber* page = arguments[@"page"];
+
+    NSString* res = [NSString stringWithFormat:@"%1$@", [_pdfView.document pageAtIndex: page.unsignedLongValue ].string];
+    result(res);
 }
 
 - (void)setPage:(FlutterMethodCall*)call result:(FlutterResult)result {
