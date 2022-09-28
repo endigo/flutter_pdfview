@@ -1,3 +1,6 @@
+## 1.2.5
+
+- Fixed invalid frame of PDFView on IOS [#201](https://github.com/endigo/flutter_pdfview/pull/201) @wmatusiak
 ## 1.2.4
 
 - Change dependency for AndroidPdfViewer [#202](https://github.com/endigo/flutter_pdfview/pull/202) @oorfalimak
