@@ -1,3 +1,6 @@
+## 1.2.4
+
+- Change dependency for AndroidPdfViewer [#202](https://github.com/endigo/flutter_pdfview/pull/202) @oorfalimak
 ## 1.2.3
 
 - Fixed the Initial Zoom bug in IOS [#192](https://github.com/endigo/flutter_pdfview/pull/192) @moazelsawaf
