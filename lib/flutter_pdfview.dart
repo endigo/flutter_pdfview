@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart' hide Widget;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/rendering.dart';
@@ -17,7 +18,7 @@ typedef LinkHandlerCallback = void Function(String? uri);
 enum FitPolicy { WIDTH, HEIGHT, BOTH }
 
 class PDFView extends StatefulWidget {
-  const PDFView({
+  PDFView({
     Key? key,
     this.filePath,
     this.pdfData,
@@ -38,9 +39,14 @@ class PDFView extends StatefulWidget {
     this.fitEachPage = true,
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
+    this.pageSpacing = 8.0,
     this.preventLinkNavigation = false,
-  })
-      : assert(filePath != null || pdfData != null),
+    this.backgroundColor = Colors.grey,
+  })  : assert(filePath != null || pdfData != null),
+        assert(
+          autoSpacing != false || pageSpacing != 0,
+          'Either use custom spacing or auto spacing',
+        ),
         super(key: key);
 
   @override
@@ -80,19 +86,23 @@ class PDFView extends StatefulWidget {
   final FitPolicy fitPolicy;
   final bool fitEachPage;
   final bool preventLinkNavigation;
+  final num pageSpacing;
+  final Color backgroundColor;
 }
 
 class _PDFViewState extends State<PDFView> {
   final Completer<PDFViewController> _controller =
-  Completer<PDFViewController>();
+      Completer<PDFViewController>();
 
   @override
   Widget build(BuildContext context) {
     if (defaultTargetPlatform == TargetPlatform.android) {
       return PlatformViewLink(
         viewType: 'plugins.endigo.io/pdfview',
-        surfaceFactory: (BuildContext context,
-            PlatformViewController controller,) {
+        surfaceFactory: (
+          BuildContext context,
+          PlatformViewController controller,
+        ) {
           return AndroidViewSurface(
             controller: controller as AndroidViewController,
             gestureRecognizers: widget.gestureRecognizers ??
@@ -108,9 +118,8 @@ class _PDFViewState extends State<PDFView> {
             creationParams: _CreationParams.fromWidget(widget).toMap(),
             creationParamsCodec: const StandardMessageCodec(),
           )
-            ..addOnPlatformViewCreatedListener(params
-                .onPlatformViewCreated)..addOnPlatformViewCreatedListener((
-                int id) {
+            ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
+            ..addOnPlatformViewCreatedListener((int id) {
               _onPlatformViewCreated(id);
             })
             ..create();
@@ -141,7 +150,7 @@ class _PDFViewState extends State<PDFView> {
   void didUpdateWidget(PDFView oldWidget) {
     super.didUpdateWidget(oldWidget);
     _controller.future.then(
-            (PDFViewController controller) => controller._updateWidget(widget));
+        (PDFViewController controller) => controller._updateWidget(widget));
   }
 }
 
@@ -178,9 +187,11 @@ class _CreationParams {
 }
 
 class _PDFViewSettings {
-  _PDFViewSettings({this.enableSwipe,
+  _PDFViewSettings({
+    this.enableSwipe,
     this.swipeHorizontal,
     this.password,
+    required this.pageSpacing,
     this.nightMode,
     this.autoSpacing,
     this.pageFling,
@@ -188,7 +199,9 @@ class _PDFViewSettings {
     this.defaultPage,
     this.fitPolicy,
     this.fitEachPage,
-    this.preventLinkNavigation});
+    this.backgroundColor,
+    this.preventLinkNavigation,
+  });
 
   static _PDFViewSettings fromWidget(PDFView widget) {
     return _PDFViewSettings(
@@ -200,6 +213,9 @@ class _PDFViewSettings {
         pageFling: widget.pageFling,
         pageSnap: widget.pageSnap,
         defaultPage: widget.defaultPage,
+        pageSpacing: widget.pageSpacing,
+        backgroundColor: widget.backgroundColor,
+        fitEachPage: widget.fitEachPage,
         fitPolicy: widget.fitPolicy,
         preventLinkNavigation: widget.preventLinkNavigation);
   }
@@ -215,6 +231,8 @@ class _PDFViewSettings {
   final FitPolicy? fitPolicy;
   final bool? fitEachPage;
   final bool? preventLinkNavigation;
+  final num pageSpacing;
+  final Color? backgroundColor;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -223,11 +241,14 @@ class _PDFViewSettings {
       'password': password,
       'nightMode': nightMode,
       'autoSpacing': autoSpacing,
+      'spacingPx': pageSpacing.toInt(),
       'pageFling': pageFling,
       'pageSnap': pageSnap,
       'defaultPage': defaultPage,
       'fitPolicy': fitPolicy.toString(),
       'fitEachPage': fitEachPage,
+      'backgroundColor':
+          '#${backgroundColor?.value.toRadixString(16).substring(2)}',
       'preventLinkNavigation': preventLinkNavigation
     };
   }
@@ -251,9 +272,10 @@ class _PDFViewSettings {
 }
 
 class PDFViewController {
-  PDFViewController._(int id,
-      this._widget,)
-      : _channel = MethodChannel('plugins.endigo.io/pdfview_$id') {
+  PDFViewController._(
+    int id,
+    this._widget,
+  ) : _channel = MethodChannel('plugins.endigo.io/pdfview_$id') {
     _settings = _PDFViewSettings.fromWidget(_widget);
     _channel.setMethodCallHandler(_onMethodCall);
   }
@@ -314,7 +336,7 @@ class PDFViewController {
 
   Future<bool?> setPage(int page) async {
     final bool? isSet =
-    await _channel.invokeMethod('setPage', <String, dynamic>{
+        await _channel.invokeMethod('setPage', <String, dynamic>{
       'page': page,
     });
     return isSet;
