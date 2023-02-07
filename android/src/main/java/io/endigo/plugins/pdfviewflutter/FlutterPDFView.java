@@ -4,6 +4,7 @@ import android.content.Context;
 import android.view.View;
 import android.net.Uri;
 
+import androidx.annotation.NonNull;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
@@ -18,10 +19,10 @@ import java.util.Map;
 import com.github.barteksc.pdfviewer.PDFView;
 import com.github.barteksc.pdfviewer.PDFView.Configurator;
 import com.github.barteksc.pdfviewer.listener.*;
-import com.github.barteksc.pdfviewer.util.Constants;
 import com.github.barteksc.pdfviewer.util.FitPolicy;
 
 import com.github.barteksc.pdfviewer.link.LinkHandler;
+import com.shockwave.pdfium.util.SizeF;
 
 public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private final PDFView pdfView;
@@ -102,10 +103,19 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     }
 
     @Override
-    public void onMethodCall(MethodCall methodCall, Result result) {
+    public void onMethodCall(MethodCall methodCall, @NonNull Result result) {
         switch (methodCall.method) {
             case "pageCount":
                 getPageCount(result);
+                break;
+            case "currentPageSize":
+                getCurrentPageSize(result);
+                break;
+            case "viewSize":
+                getViewSize(result);
+                break;
+            case "currentViewportPosition":
+                getCurrentViewportPosition(result);
                 break;
             case "currentPage":
                 getCurrentPage(result);
@@ -124,6 +134,28 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
     void getPageCount(Result result) {
         result.success(pdfView.getPageCount());
+    }
+
+    void getCurrentPageSize(Result result) {
+        SizeF size = pdfView.getPageSize(pdfView.getCurrentPage());
+
+        result.success(new float[]{size.getWidth(), size.getHeight()});
+    }
+
+    void getViewSize(Result result) {
+        int width = pdfView.getWidth();
+        int height = pdfView.getHeight();
+
+        result.success(new float[]{width, height});
+    }
+
+    void getCurrentViewportPosition(Result result) {
+        pdfView.getWidth();
+        float xOffset = pdfView.getCurrentXOffset();
+        float yOffset = pdfView.getCurrentYOffset();
+        float zoom = pdfView.getZoom();
+
+        result.success(new float[]{xOffset, yOffset, zoom});
     }
 
     void getCurrentPage(Result result) {
