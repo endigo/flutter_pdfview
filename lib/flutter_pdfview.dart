@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 typedef PDFViewCreatedCallback = void Function(PDFViewController controller);
-typedef RenderCallback = void Function(int? pages, double? pageWidth, double? pageHeight);
+typedef RenderCallback = void Function(int? pages);
 typedef PageChangedCallback = void Function(int? page, int? total);
 typedef ErrorCallback = void Function(dynamic error);
 typedef PageErrorCallback = void Function(int? page, dynamic error);
@@ -302,7 +302,7 @@ class PDFViewController {
     switch (call.method) {
       case 'onRender':
         if (_widget.onRender != null) {
-          _widget.onRender!(call.arguments['pages'], call.arguments['pageWidth'], call.arguments['pageHeight']);
+          _widget.onRender!(call.arguments['pages']);
         }
 
         return null;
@@ -337,6 +337,24 @@ class PDFViewController {
   Future<int?> getPageCount() async {
     final int? pageCount = await _channel.invokeMethod('pageCount');
     return pageCount;
+  }
+
+  Future<Float32List> getCurrentPageSize() async {
+    print('plugin get current page size');
+    final Float32List pageSize = await _channel.invokeMethod('currentPageSize');
+    return pageSize;
+  }
+
+  Future<Float32List> getViewSize() async {
+    print('plugin get view size');
+    final Float32List viewSize = await _channel.invokeMethod('viewSize');
+    return viewSize;
+  }
+
+  Future<Float32List> getCurrentViewportPosition() async {
+    print('plugin get current viewport position');
+    final Float32List position = await _channel.invokeMethod('currentViewportPosition');
+    return position;
   }
 
   Future<int?> getCurrentPage() async {
