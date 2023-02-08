@@ -340,21 +340,27 @@ class PDFViewController {
   }
 
   Future<Float32List> getCurrentPageSize() async {
-    print('plugin get current page size');
     final Float32List pageSize = await _channel.invokeMethod('currentPageSize');
     return pageSize;
   }
 
   Future<Float32List> getViewSize() async {
-    print('plugin get view size');
     final Float32List viewSize = await _channel.invokeMethod('viewSize');
     return viewSize;
   }
 
   Future<Float32List> getCurrentViewportPosition() async {
-    print('plugin get current viewport position');
     final Float32List position = await _channel.invokeMethod('currentViewportPosition');
     return position;
+  }
+
+  Future<bool> setScaleAndPosition(double scale, double xOffset, double yOffset) async {
+    final bool isSet = await _channel.invokeMethod('setScaleAndPosition', <String, dynamic>{
+      'scale': scale,
+      'xPos': xOffset,
+      'yPos': yOffset,
+    });
+    return isSet;
   }
 
   Future<int?> getCurrentPage() async {

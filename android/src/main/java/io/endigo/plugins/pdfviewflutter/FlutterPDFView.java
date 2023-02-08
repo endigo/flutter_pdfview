@@ -1,6 +1,8 @@
 package io.endigo.plugins.pdfviewflutter;
 
 import android.content.Context;
+import android.graphics.PointF;
+import android.util.Log;
 import android.view.View;
 import android.net.Uri;
 
@@ -28,6 +30,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private final PDFView pdfView;
     private final MethodChannel methodChannel;
     private final LinkHandler linkHandler;
+    public static final String TAG = "FlutterPDFView";
 
     @SuppressWarnings("unchecked")
     FlutterPDFView(Context context, BinaryMessenger messenger, int id, Map<String, Object> params) {
@@ -117,6 +120,9 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
             case "currentViewportPosition":
                 getCurrentViewportPosition(result);
                 break;
+            case "setScaleAndPosition":
+                setScaleAndPosition(methodCall, result);
+                break;
             case "currentPage":
                 getCurrentPage(result);
                 break;
@@ -156,6 +162,19 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         float zoom = pdfView.getZoom();
 
         result.success(new float[]{xOffset, yOffset, zoom});
+    }
+
+    void setScaleAndPosition(MethodCall call, Result result) {
+        double zoom = call.argument("scale");
+        double xOffset = call.argument("xPos");
+        double yOffset = call.argument("yPos");
+        PointF pivot = new PointF((float) xOffset, (float) yOffset);
+        Log.d(TAG, "setScaleAndPosition: in yoffset " + yOffset);
+
+        pdfView.zoomCenteredTo((float) zoom, pivot);
+        Log.d(TAG, "setScaleAndPosition: out yoffset " + pdfView.getCurrentYOffset());
+
+        result.success(true);
     }
 
     void getCurrentPage(Result result) {
