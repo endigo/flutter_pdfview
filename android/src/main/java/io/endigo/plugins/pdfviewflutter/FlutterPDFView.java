@@ -44,12 +44,11 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
         Configurator config = null;
         if (params.get("filePath") != null) {
-          String filePath = (String) params.get("filePath");
-          config = pdfView.fromUri(getURI(filePath));
-        }
-        else if (params.get("pdfData") != null) {
-          byte[] data = (byte[]) params.get("pdfData");
-          config = pdfView.fromBytes(data);
+            String filePath = (String) params.get("filePath");
+            config = pdfView.fromUri(getURI(filePath));
+        } else if (params.get("pdfData") != null) {
+            byte[] data = (byte[]) params.get("pdfData");
+            config = pdfView.fromBytes(data);
         }
 
         if (config != null) {
@@ -75,28 +74,28 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                             methodChannel.invokeMethod("onPageChanged", args);
                         }
                     }).onError(new OnErrorListener() {
-                @Override
-                public void onError(Throwable t) {
-                    Map<String, Object> args = new HashMap<>();
-                    args.put("error", t.toString());
-                    methodChannel.invokeMethod("onError", args);
-                }
-            }).onPageError(new OnPageErrorListener() {
-                @Override
-                public void onPageError(int page, Throwable t) {
-                    Map<String, Object> args = new HashMap<>();
-                    args.put("page", page);
-                    args.put("error", t.toString());
-                    methodChannel.invokeMethod("onPageError", args);
-                }
-            }).onRender(new OnRenderListener() {
-                @Override
-                public void onInitiallyRendered(int pages) {
-                    Map<String, Object> args = new HashMap<>();
-                    args.put("pages", pages);
-                    methodChannel.invokeMethod("onRender", args);
-                }
-            }).enableDoubletap(true).defaultPage(getInt(params, "defaultPage")).load();
+                        @Override
+                        public void onError(Throwable t) {
+                            Map<String, Object> args = new HashMap<>();
+                            args.put("error", t.toString());
+                            methodChannel.invokeMethod("onError", args);
+                        }
+                    }).onPageError(new OnPageErrorListener() {
+                        @Override
+                        public void onPageError(int page, Throwable t) {
+                            Map<String, Object> args = new HashMap<>();
+                            args.put("page", page);
+                            args.put("error", t.toString());
+                            methodChannel.invokeMethod("onPageError", args);
+                        }
+                    }).onRender(new OnRenderListener() {
+                        @Override
+                        public void onInitiallyRendered(int pages) {
+                            Map<String, Object> args = new HashMap<>();
+                            args.put("pages", pages);
+                            methodChannel.invokeMethod("onRender", args);
+                        }
+                    }).enableDoubletap(true).defaultPage(getInt(params, "defaultPage")).load();
         }
     }
 
@@ -168,11 +167,11 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         double zoom = call.argument("scale");
         double xOffset = call.argument("xPos");
         double yOffset = call.argument("yPos");
-        PointF pivot = new PointF((float) xOffset, (float) yOffset);
-        Log.d(TAG, "setScaleAndPosition: in yoffset " + yOffset);
 
-        pdfView.zoomCenteredTo((float) zoom, pivot);
-        Log.d(TAG, "setScaleAndPosition: out yoffset " + pdfView.getCurrentYOffset());
+        if (zoom != 1.0) {
+            pdfView.zoomTo((float) zoom);
+        }
+        pdfView.moveTo((float) xOffset, (float) yOffset);
 
         result.success(true);
     }
