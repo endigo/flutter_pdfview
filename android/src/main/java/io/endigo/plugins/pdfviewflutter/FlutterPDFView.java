@@ -1,10 +1,28 @@
 package io.endigo.plugins.pdfviewflutter;
 
 import android.content.Context;
-import android.graphics.PointF;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.net.Uri;
 import android.util.Log;
 import android.view.View;
-import android.net.Uri;
+
+import com.github.barteksc.pdfviewer.PDFView;
+import com.github.barteksc.pdfviewer.PDFView.Configurator;
+import com.github.barteksc.pdfviewer.link.LinkHandler;
+import com.github.barteksc.pdfviewer.listener.OnErrorListener;
+import com.github.barteksc.pdfviewer.listener.OnLoadCompleteListener;
+import com.github.barteksc.pdfviewer.listener.OnPageChangeListener;
+import com.github.barteksc.pdfviewer.listener.OnPageErrorListener;
+import com.github.barteksc.pdfviewer.listener.OnRenderListener;
+import com.github.barteksc.pdfviewer.util.FitPolicy;
+import com.shockwave.pdfium.util.SizeF;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 import androidx.annotation.NonNull;
 import io.flutter.plugin.common.BinaryMessenger;
@@ -13,18 +31,6 @@ import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.platform.PlatformView;
-
-import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
-
-import com.github.barteksc.pdfviewer.PDFView;
-import com.github.barteksc.pdfviewer.PDFView.Configurator;
-import com.github.barteksc.pdfviewer.listener.*;
-import com.github.barteksc.pdfviewer.util.FitPolicy;
-
-import com.github.barteksc.pdfviewer.link.LinkHandler;
-import com.shockwave.pdfium.util.SizeF;
 
 public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private final PDFView pdfView;
@@ -95,6 +101,13 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                             args.put("pages", pages);
                             methodChannel.invokeMethod("onRender", args);
                         }
+                    }).onLoad(new OnLoadCompleteListener() {
+                        @Override
+                        public void loadComplete(int nbPages) {
+                            Map<String, Object> args = new HashMap<>();
+                            args.put("pages", nbPages);
+                            methodChannel.invokeMethod("onLoadComplete", args);
+                        }
                     }).enableDoubletap(true).defaultPage(getInt(params, "defaultPage")).load();
         }
     }
@@ -121,6 +134,9 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                 break;
             case "setScaleAndPosition":
                 setScaleAndPosition(methodCall, result);
+                break;
+            case "getScreenshot":
+                getScreenshot(methodCall, result);
                 break;
             case "currentPage":
                 getCurrentPage(result);
@@ -172,8 +188,37 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
             pdfView.zoomTo((float) zoom);
         }
         pdfView.moveTo((float) xOffset, (float) yOffset);
-
+        pdfView.refreshDrawableState();
         result.success(true);
+    }
+
+    void getScreenshot(MethodCall call, Result result) {
+        String pdfFileName = call.argument("fileName");
+        try {
+            assert pdfFileName != null;
+            String imageFileName = pdfFileName.substring(0, pdfFileName.lastIndexOf("/")) + "/image.png";
+            Bitmap bmp = loadBitmapFromPDFView();
+            FileOutputStream fileOut = new FileOutputStream(imageFileName, false);
+            bmp.compress(Bitmap.CompressFormat.PNG, 100, fileOut);
+            fileOut.close();
+            if (!Objects.equals(imageFileName, "")) {
+                Log.d(TAG, "getScreenshot: generate image success ");
+                result.success(imageFileName);
+            } else {
+                result.error("FAIL", "Failed to generate image", null);
+            }
+        } catch (Exception e) {
+            result.error("FAIL", "Failed to generate image", e.getMessage());
+        }
+    }
+
+    Bitmap loadBitmapFromPDFView() {
+        Bitmap bitmap = Bitmap.createBitmap(
+                pdfView.getWidth(), pdfView.getHeight(), Bitmap.Config.ARGB_8888
+        );
+        Canvas canvas = new Canvas(bitmap);
+        pdfView.draw(canvas);
+        return bitmap;
     }
 
     void getCurrentPage(Result result) {

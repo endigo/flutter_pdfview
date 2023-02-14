@@ -12,6 +12,7 @@ typedef PageChangedCallback = void Function(int? page, int? total);
 typedef ErrorCallback = void Function(dynamic error);
 typedef PageErrorCallback = void Function(int? page, dynamic error);
 typedef LinkHandlerCallback = void Function(String? uri);
+typedef LoadCompleteCallback = void Function(int? pages);
 
 enum FitPolicy { WIDTH, HEIGHT, BOTH }
 
@@ -26,6 +27,7 @@ class PDFView extends StatefulWidget {
     this.onError,
     this.onPageError,
     this.onLinkHandler,
+    this.onLoadComplete,
     this.gestureRecognizers,
     this.enableSwipe = true,
     this.swipeHorizontal = false,
@@ -61,6 +63,7 @@ class PDFView extends StatefulWidget {
 
   /// Used with preventLinkNavigation=true. It's helpful to customize link navigation
   final LinkHandlerCallback? onLinkHandler;
+  final LoadCompleteCallback? onLoadComplete;
 
   /// Which gestures should be consumed by the pdf view.
   ///
@@ -330,6 +333,12 @@ class PDFViewController {
         }
 
         return null;
+      case 'onLoadComplete':
+        if (_widget.onLoadComplete != null) {
+          _widget.onLoadComplete!(call.arguments['pages']);
+        }
+
+        return null;
     }
     throw MissingPluginException('${call.method} was invoked but has no handler');
   }
@@ -361,6 +370,13 @@ class PDFViewController {
       'yPos': yOffset,
     });
     return isSet;
+  }
+
+  Future<String> getScreenshot(String fileName) async {
+    final String imageFileName = await _channel.invokeMethod('getScreenshot', <String, dynamic>{
+      'fileName': fileName,
+    });
+    return imageFileName;
   }
 
   Future<int?> getCurrentPage() async {
