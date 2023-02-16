@@ -20,7 +20,7 @@ import com.github.barteksc.pdfviewer.PDFView.Configurator;
 import com.github.barteksc.pdfviewer.listener.*;
 import com.github.barteksc.pdfviewer.util.Constants;
 import com.github.barteksc.pdfviewer.util.FitPolicy;
-
+import android.graphics.Color;
 import com.github.barteksc.pdfviewer.link.LinkHandler;
 
 public class FlutterPDFView implements PlatformView, MethodCallHandler {
@@ -35,7 +35,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
         methodChannel = new MethodChannel(messenger, "plugins.endigo.io/pdfview_" + id);
         methodChannel.setMethodCallHandler(this);
-
+        pdfView.setBackgroundColor(Color.LTGRAY);
         linkHandler = new PDFLinkHandler(context, pdfView, methodChannel, preventLinkNavigation);
 
         Configurator config = null;
@@ -59,8 +59,10 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .pageSnap(getBoolean(params, "pageSnap"))
                     .pageFitPolicy(getFitPolicy(params))
                     .enableAnnotationRendering(true)
-                    .linkHandler(linkHandler).
-                    enableAntialiasing(false)
+                    .linkHandler(linkHandler)
+                    .spacing(10)
+                    .enableAntialiasing(false)
+
                     // .fitEachPage(getBoolean(params,"fitEachPage"))
                     .onPageChange(new OnPageChangeListener() {
                         @Override
