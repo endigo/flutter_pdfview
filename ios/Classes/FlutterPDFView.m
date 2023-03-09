@@ -87,6 +87,8 @@
     PDFDestination* _currentDestination;
     BOOL _preventLinkNavigation;
     BOOL _autoSpacing;
+    PDFPage* _defaultPage;
+    BOOL _defaultPageSet;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -157,9 +159,7 @@
                 defaultPage = pageCount - 1;
             }
 
-             PDFPage* page = [document pageAtIndex: defaultPage];
-             [_pdfView goToPage: page];
-
+            _defaultPage = [document pageAtIndex: defaultPage];
             __weak __typeof__(self) weakSelf = self;
             dispatch_async(dispatch_get_main_queue(), ^{
                 [weakSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: [document pageCount]]];
@@ -195,6 +195,11 @@
     _pdfView.maxScaleFactor = 4.0;
     if (_autoSpacing) {
         _pdfView.scaleFactor = _pdfView.scaleFactorForSizeToFit;
+    }
+    
+    if (!_defaultPageSet && _defaultPage != nil) {
+        [_pdfView goToPage: _defaultPage];
+        _defaultPageSet = true;
     }
 }
 
