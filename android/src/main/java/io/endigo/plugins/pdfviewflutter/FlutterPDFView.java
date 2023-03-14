@@ -92,6 +92,14 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     args.put("pages", pages);
                     methodChannel.invokeMethod("onRender", args);
                 }
+            }).onPageScroll(new OnPageScrollListener() {
+                        @Override
+                        public void onPageScrolled(int page, float positionOffset) {
+                            Map<String, Object> args = new HashMap<>();
+                            args.put("page", page);
+                            args.put("positionOffset", positionOffset);
+                            methodChannel.invokeMethod("onPageScrolled", args);
+                        }
             }).enableDoubletap(true).defaultPage(getInt(params, "defaultPage")).load();
         }
     }

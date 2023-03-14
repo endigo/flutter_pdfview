@@ -12,6 +12,7 @@ typedef PageChangedCallback = void Function(int? page, int? total);
 typedef ErrorCallback = void Function(dynamic error);
 typedef PageErrorCallback = void Function(int? page, dynamic error);
 typedef LinkHandlerCallback = void Function(String? uri);
+typedef PageScrolledCallback = void Function(int? page, double? positionOffset);
 
 enum FitPolicy { WIDTH, HEIGHT, BOTH }
 
@@ -23,6 +24,7 @@ class PDFView extends StatefulWidget {
     this.onViewCreated,
     this.onRender,
     this.onPageChanged,
+    this.onPageScrolled,
     this.onError,
     this.onPageError,
     this.onLinkHandler,
@@ -51,6 +53,7 @@ class PDFView extends StatefulWidget {
   final ErrorCallback? onError;
   final PageErrorCallback? onPageError;
   final LinkHandlerCallback? onLinkHandler;
+  final PageScrolledCallback? onPageScrolled;
 
   /// Which gestures should be consumed by the pdf view.
   ///
@@ -295,6 +298,13 @@ class PDFViewController {
       case 'onLinkHandler':
         if (_widget.onLinkHandler != null) {
           _widget.onLinkHandler!(call.arguments);
+        }
+
+        return null;
+      case 'onPageScrolled':
+        if (_widget.onPageScrolled != null) {
+          _widget.onPageScrolled!(
+              call.arguments['page'], call.arguments['positionOffset']);
         }
 
         return null;
