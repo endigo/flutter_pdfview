@@ -62,6 +62,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | pageFling             |   ✅    | ✅  |      `true`       |
 | pageSnap              |   ✅    | ❌  |      `true`       |
 | preventLinkNavigation |   ✅    | ✅  |      `false`      |
+| scrollHandle          |   ✅    | ❌  |      `true`       |
 
 ## Controller Options
 

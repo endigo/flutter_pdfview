@@ -39,8 +39,8 @@ class PDFView extends StatefulWidget {
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
-  })
-      : assert(filePath != null || pdfData != null),
+    this.scrollHandle = true,
+  })  : assert(filePath != null || pdfData != null),
         super(key: key);
 
   @override
@@ -80,19 +80,22 @@ class PDFView extends StatefulWidget {
   final FitPolicy fitPolicy;
   final bool fitEachPage;
   final bool preventLinkNavigation;
+  final bool scrollHandle;
 }
 
 class _PDFViewState extends State<PDFView> {
   final Completer<PDFViewController> _controller =
-  Completer<PDFViewController>();
+      Completer<PDFViewController>();
 
   @override
   Widget build(BuildContext context) {
     if (defaultTargetPlatform == TargetPlatform.android) {
       return PlatformViewLink(
         viewType: 'plugins.endigo.io/pdfview',
-        surfaceFactory: (BuildContext context,
-            PlatformViewController controller,) {
+        surfaceFactory: (
+          BuildContext context,
+          PlatformViewController controller,
+        ) {
           return AndroidViewSurface(
             controller: controller as AndroidViewController,
             gestureRecognizers: widget.gestureRecognizers ??
@@ -108,9 +111,8 @@ class _PDFViewState extends State<PDFView> {
             creationParams: _CreationParams.fromWidget(widget).toMap(),
             creationParamsCodec: const StandardMessageCodec(),
           )
-            ..addOnPlatformViewCreatedListener(params
-                .onPlatformViewCreated)..addOnPlatformViewCreatedListener((
-                int id) {
+            ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
+            ..addOnPlatformViewCreatedListener((int id) {
               _onPlatformViewCreated(id);
             })
             ..create();
@@ -141,7 +143,7 @@ class _PDFViewState extends State<PDFView> {
   void didUpdateWidget(PDFView oldWidget) {
     super.didUpdateWidget(oldWidget);
     _controller.future.then(
-            (PDFViewController controller) => controller._updateWidget(widget));
+        (PDFViewController controller) => controller._updateWidget(widget));
   }
 }
 
@@ -178,17 +180,19 @@ class _CreationParams {
 }
 
 class _PDFViewSettings {
-  _PDFViewSettings({this.enableSwipe,
-    this.swipeHorizontal,
-    this.password,
-    this.nightMode,
-    this.autoSpacing,
-    this.pageFling,
-    this.pageSnap,
-    this.defaultPage,
-    this.fitPolicy,
-    this.fitEachPage,
-    this.preventLinkNavigation});
+  _PDFViewSettings(
+      {this.enableSwipe,
+      this.swipeHorizontal,
+      this.password,
+      this.nightMode,
+      this.autoSpacing,
+      this.pageFling,
+      this.pageSnap,
+      this.defaultPage,
+      this.fitPolicy,
+      this.fitEachPage,
+      this.preventLinkNavigation,
+      this.scrollHandle});
 
   static _PDFViewSettings fromWidget(PDFView widget) {
     return _PDFViewSettings(
@@ -201,7 +205,8 @@ class _PDFViewSettings {
         pageSnap: widget.pageSnap,
         defaultPage: widget.defaultPage,
         fitPolicy: widget.fitPolicy,
-        preventLinkNavigation: widget.preventLinkNavigation);
+        preventLinkNavigation: widget.preventLinkNavigation,
+        scrollHandle: widget.scrollHandle);
   }
 
   final bool? enableSwipe;
@@ -215,6 +220,7 @@ class _PDFViewSettings {
   final FitPolicy? fitPolicy;
   final bool? fitEachPage;
   final bool? preventLinkNavigation;
+  final bool? scrollHandle;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -228,7 +234,8 @@ class _PDFViewSettings {
       'defaultPage': defaultPage,
       'fitPolicy': fitPolicy.toString(),
       'fitEachPage': fitEachPage,
-      'preventLinkNavigation': preventLinkNavigation
+      'preventLinkNavigation': preventLinkNavigation,
+      'scrollHandle': scrollHandle,
     };
   }
 
@@ -251,9 +258,10 @@ class _PDFViewSettings {
 }
 
 class PDFViewController {
-  PDFViewController._(int id,
-      this._widget,)
-      : _channel = MethodChannel('plugins.endigo.io/pdfview_$id') {
+  PDFViewController._(
+    int id,
+    this._widget,
+  ) : _channel = MethodChannel('plugins.endigo.io/pdfview_$id') {
     _settings = _PDFViewSettings.fromWidget(_widget);
     _channel.setMethodCallHandler(_onMethodCall);
   }
@@ -312,10 +320,11 @@ class PDFViewController {
     return currentPage;
   }
 
-  Future<bool?> setPage(int page) async {
+  Future<bool?> setPage(int page, {bool animation = false}) async {
     final bool? isSet =
-    await _channel.invokeMethod('setPage', <String, dynamic>{
+        await _channel.invokeMethod('setPage', <String, dynamic>{
       'page': page,
+      'animation': animation,
     });
     return isSet;
   }
