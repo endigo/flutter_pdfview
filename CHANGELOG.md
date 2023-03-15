@@ -1,3 +1,8 @@
+## 1.2.7
+
+- Downgrade android-pdf-viewer from beta.3 to beta.2
+- Upgrade Gradle to 7.3.0
+
 ## 1.2.6
 
 - Fixed defaultPage not working on iOS [#227](https://github.com/endigo/flutter_pdfview/pull/227) @wmatusiak
