@@ -34,7 +34,7 @@ class PDFView extends StatefulWidget {
     this.autoSpacing = true,
     this.pageFling = true,
     this.pageSnap = true,
-    // this.fitEachPage = true,
+    this.fitEachPage = true,
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
@@ -104,11 +104,14 @@ class PDFView extends StatefulWidget {
   final int defaultPage;
 
   /// FitPolicy that determines how the PDF pages are fit to the screen. The FitPolicy enum can take on the following values:
-  /// FitPolicy.WIDTH: The PDF pages are scaled to fit the width of the screen.
-  /// FitPolicy.HEIGHT: The PDF pages are scaled to fit the height of the screen.
-  /// FitPolicy.BOTH: The PDF pages are scaled to fit both the width and height of the screen.
+  /// - FitPolicy.WIDTH: The PDF pages are scaled to fit the width of the screen.
+  /// - FitPolicy.HEIGHT: The PDF pages are scaled to fit the height of the screen.
+  /// - FitPolicy.BOTH: The PDF pages are scaled to fit both the width and height of the screen.
   final FitPolicy fitPolicy;
-  // final bool fitEachPage;
+
+  /// fitEachPage
+  @Deprecated("will be removed next version")
+  final bool fitEachPage;
 
   /// Indicates whether or not clicking on links in the PDF document will open the link in a new page. If set to true, link navigation is prevented.
   final bool preventLinkNavigation;

@@ -1,3 +1,7 @@
+## 1.2.9
+
+- Deprecate `fitEachPage`
+
 ## 1.2.8
 
 - Add documentation on properties
