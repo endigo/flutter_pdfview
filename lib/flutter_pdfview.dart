@@ -187,7 +187,7 @@ class _PDFViewSettings {
       this.pageSnap,
       this.defaultPage,
       this.fitPolicy,
-      this.fitEachPage,
+      // this.fitEachPage,
       this.preventLinkNavigation});
 
   static _PDFViewSettings fromWidget(PDFView widget) {
@@ -213,7 +213,7 @@ class _PDFViewSettings {
   final bool? pageSnap;
   final int? defaultPage;
   final FitPolicy? fitPolicy;
-  final bool? fitEachPage;
+  // final bool? fitEachPage;
   final bool? preventLinkNavigation;
 
   Map<String, dynamic> toMap() {
@@ -227,7 +227,7 @@ class _PDFViewSettings {
       'pageSnap': pageSnap,
       'defaultPage': defaultPage,
       'fitPolicy': fitPolicy.toString(),
-      'fitEachPage': fitEachPage,
+      // 'fitEachPage': fitEachPage,
       'preventLinkNavigation': preventLinkNavigation
     };
   }
