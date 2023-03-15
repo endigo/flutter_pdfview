@@ -1,3 +1,7 @@
+## 1.2.8
+
+- Add documentation on properties
+
 ## 1.2.7
 
 - Downgrade android-pdf-viewer from beta.3 to beta.2
