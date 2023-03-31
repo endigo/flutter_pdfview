@@ -1,3 +1,7 @@
+## 1.2.7
+
+- Upgrade android-pdf-viewer to beta.3
+
 ## 1.2.9
 
 - Deprecate `fitEachPage`
