@@ -5,6 +5,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/rendering.dart';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
 
 typedef PDFViewCreatedCallback = void Function(PDFViewController controller);
 typedef RenderCallback = void Function(int? pages);
