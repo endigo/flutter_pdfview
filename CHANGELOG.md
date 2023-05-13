@@ -1,4 +1,9 @@
-## 1.2.7
+## 1.3.1
+
+- Upgrade compileSdkVersion to 33
+- Upgrade sdk
+
+## 1.3.0
 
 - Upgrade android-pdf-viewer to beta.3
 
