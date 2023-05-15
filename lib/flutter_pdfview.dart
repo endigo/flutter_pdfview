@@ -13,6 +13,7 @@ typedef ErrorCallback = void Function(dynamic error);
 typedef PageErrorCallback = void Function(int? page, dynamic error);
 typedef LinkHandlerCallback = void Function(String? uri);
 typedef LoadCompleteCallback = void Function(int? pages);
+typedef DrawCallback = void Function(double? zoom, double pageWidth, double pageHeight);
 
 enum FitPolicy { WIDTH, HEIGHT, BOTH }
 
@@ -28,6 +29,7 @@ class PDFView extends StatefulWidget {
     this.onPageError,
     this.onLinkHandler,
     this.onLoadComplete,
+    this.onDraw,
     this.gestureRecognizers,
     this.enableSwipe = true,
     this.swipeHorizontal = false,
@@ -54,6 +56,7 @@ class PDFView extends StatefulWidget {
   final PageErrorCallback? onPageError;
   final LinkHandlerCallback? onLinkHandler;
   final LoadCompleteCallback? onLoadComplete;
+  final DrawCallback? onDraw;
 
   /// Which gestures should be consumed by the pdf view.
   ///
@@ -302,6 +305,12 @@ class PDFViewController {
         }
 
         return null;
+      case 'onDraw':
+        if (_widget.onDraw != null) {
+          _widget.onDraw!(call.arguments['zoom'], call.arguments['pageWidth'], call.arguments['pageHeight']);
+        }
+
+        return null;
     }
     throw MissingPluginException('${call.method} was invoked but has no handler');
   }
@@ -311,26 +320,25 @@ class PDFViewController {
     return pageCount;
   }
 
-  Future<Float32List> getCurrentPageSize() async {
-    final Float32List pageSize = await _channel.invokeMethod('currentPageSize');
-    return pageSize;
+  Future<Map<String, double>> getCurrentPageSize() async {
+    return _channel
+        .invokeMethod('currentPageSize')
+        .then((pageSize) => <String, double>{'width': pageSize[0] ?? 0, 'height': pageSize[1] ?? 0});
   }
 
-  Future<Float32List> getViewSize() async {
-    final Float32List viewSize = await _channel.invokeMethod('viewSize');
-    return viewSize;
+  Future<Map<String, double>> getVpPositionAndScale() async {
+    return _channel.invokeMethod('getPositionAndScale').then((posAndScale) => <String, double>{
+          'xPos': posAndScale[0] ?? 0,
+          'yPos': posAndScale[1] ?? 0,
+          'scale': posAndScale[2] ?? 1,
+        });
   }
 
-  Future<Float32List> getCurrentViewportPosition() async {
-    final Float32List position = await _channel.invokeMethod('currentViewportPosition');
-    return position;
-  }
-
-  Future<bool> setScaleAndPosition(double scale, double xOffset, double yOffset) async {
-    final bool isSet = await _channel.invokeMethod('setScaleAndPosition', <String, dynamic>{
+  Future<bool> setVpPositionAndScale(Offset position, double scale) async {
+    final bool isSet = await _channel.invokeMethod('setPositionAndScale', <String, dynamic>{
+      'xPos': position.dx,
+      'yPos': position.dy,
       'scale': scale,
-      'xPos': xOffset,
-      'yPos': yOffset,
     });
     return isSet;
   }
@@ -340,6 +348,11 @@ class PDFViewController {
       'fileName': fileName,
     });
     return imageFileName;
+  }
+
+  Future<bool> reload() async {
+    final bool result = await _channel.invokeMethod('reload');
+    return result;
   }
 
   Future<int?> getCurrentPage() async {

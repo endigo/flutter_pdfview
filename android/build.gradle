@@ -31,6 +31,7 @@ android {
     lintOptions {
         disable 'InvalidPackage'
     }
+    namespace 'io.endigo.plugings.pdfview'
 }
 
 dependencies {
