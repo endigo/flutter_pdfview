@@ -38,7 +38,7 @@ class PDFView extends StatefulWidget {
     this.autoSpacing = true,
     this.pageFling = true,
     this.pageSnap = true,
-    this.fitEachPage = true,
+    //this.fitEachPage = true,
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
@@ -116,8 +116,8 @@ class PDFView extends StatefulWidget {
   final FitPolicy fitPolicy;
 
   /// fitEachPage
-  @Deprecated("will be removed next version")
-  final bool fitEachPage;
+  //@Deprecated("will be removed next version")
+  //final bool fitEachPage;
 
   /// Indicates whether or not clicking on links in the PDF document will open the link in a new page. If set to true, link navigation is prevented.
   final bool preventLinkNavigation;
