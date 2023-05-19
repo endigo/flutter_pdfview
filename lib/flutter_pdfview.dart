@@ -114,9 +114,6 @@ class PDFView extends StatefulWidget {
   /// - FitPolicy.HEIGHT: The PDF pages are scaled to fit the height of the screen.
   /// - FitPolicy.BOTH: The PDF pages are scaled to fit both the width and height of the screen.
   final FitPolicy fitPolicy;
-
-  /// fitEachPage
-  //@Deprecated("will be removed next version")
   //final bool fitEachPage;
 
   /// Indicates whether or not clicking on links in the PDF document will open the link in a new page. If set to true, link navigation is prevented.
