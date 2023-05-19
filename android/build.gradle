@@ -8,20 +8,21 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.2.1'
+        classpath 'com.android.tools.build:gradle:7.3.1'
     }
 }
 
 rootProject.allprojects {
     repositories {
         google()
+        mavenCentral()
     }
 }
 
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 30
+    compileSdkVersion 33
 
     defaultConfig {
         minSdkVersion 16
@@ -35,6 +36,6 @@ android {
 }
 
 dependencies {
-    implementation 'com.github.mhiew:android-pdf-viewer:3.2.0-beta.1'
+    implementation 'com.github.mhiew:android-pdf-viewer:3.2.0-beta.3'
 }
 

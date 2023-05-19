@@ -38,7 +38,7 @@ class PDFView extends StatefulWidget {
     this.autoSpacing = true,
     this.pageFling = true,
     this.pageSnap = true,
-    this.fitEachPage = true,
+    //this.fitEachPage = true,
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
@@ -48,12 +48,22 @@ class PDFView extends StatefulWidget {
   @override
   _PDFViewState createState() => _PDFViewState();
 
-  /// If not null invoked once the web view is created.
+  /// If not null invoked once the PDFView is created.
   final PDFViewCreatedCallback? onViewCreated;
+
+  /// Return PDF page count as a parameter
   final RenderCallback? onRender;
+
+  /// Return current page and page count as a parameter
   final PageChangedCallback? onPageChanged;
+
+  /// Invokes on error that handled on native code
   final ErrorCallback? onError;
+
+  /// Invokes on page cannot be rendered or something happens
   final PageErrorCallback? onPageError;
+
+  /// Used with preventLinkNavigation=true. It's helpful to customize link navigation
   final LinkHandlerCallback? onLinkHandler;
   final LoadCompleteCallback? onLoadComplete;
   final DrawCallback? onDraw;
@@ -71,18 +81,42 @@ class PDFView extends StatefulWidget {
 
   /// The initial URL to load.
   final String? filePath;
+
+  /// The binary data of a PDF document
   final Uint8List? pdfData;
 
+  /// Indicates whether or not the user can swipe to change pages in the PDF document. If set to true, swiping is enabled.
   final bool enableSwipe;
+
+  /// Indicates whether or not the user can swipe horizontally to change pages in the PDF document. If set to true, horizontal swiping is enabled.
   final bool swipeHorizontal;
+
+  /// Represents the password for a password-protected PDF document. It can be nullable
   final String? password;
+
+  /// Indicates whether or not the PDF viewer is in night mode. If set to true, the viewer is in night mode
   final bool nightMode;
+
+  /// Indicates whether or not the PDF viewer automatically adds spacing between pages. If set to true, spacing is added.
   final bool autoSpacing;
+
+  /// Indicates whether or not the user can "fling" pages in the PDF document. If set to true, page flinging is enabled.
   final bool pageFling;
+
+  /// Indicates whether or not the viewer snaps to a page after the user has scrolled to it. If set to true, snapping is enabled.
   final bool pageSnap;
+
+  /// Represents the default page to display when the PDF document is loaded.
   final int defaultPage;
+
+  /// FitPolicy that determines how the PDF pages are fit to the screen. The FitPolicy enum can take on the following values:
+  /// - FitPolicy.WIDTH: The PDF pages are scaled to fit the width of the screen.
+  /// - FitPolicy.HEIGHT: The PDF pages are scaled to fit the height of the screen.
+  /// - FitPolicy.BOTH: The PDF pages are scaled to fit both the width and height of the screen.
   final FitPolicy fitPolicy;
-  final bool fitEachPage;
+  //final bool fitEachPage;
+
+  /// Indicates whether or not clicking on links in the PDF document will open the link in a new page. If set to true, link navigation is prevented.
   final bool preventLinkNavigation;
 }
 
@@ -189,7 +223,7 @@ class _PDFViewSettings {
       this.pageSnap,
       this.defaultPage,
       this.fitPolicy,
-      this.fitEachPage,
+      //this.fitEachPage,
       this.preventLinkNavigation});
 
   static _PDFViewSettings fromWidget(PDFView widget) {
@@ -215,7 +249,7 @@ class _PDFViewSettings {
   final bool? pageSnap;
   final int? defaultPage;
   final FitPolicy? fitPolicy;
-  final bool? fitEachPage;
+  //final bool? fitEachPage;
   final bool? preventLinkNavigation;
 
   Map<String, dynamic> toMap() {
@@ -229,7 +263,7 @@ class _PDFViewSettings {
       'pageSnap': pageSnap,
       'defaultPage': defaultPage,
       'fitPolicy': fitPolicy.toString(),
-      'fitEachPage': fitEachPage,
+      //'fitEachPage': fitEachPage,
       'preventLinkNavigation': preventLinkNavigation
     };
   }
