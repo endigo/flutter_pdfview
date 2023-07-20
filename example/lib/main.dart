@@ -253,7 +253,10 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
             return FloatingActionButton.extended(
               label: Text("Go to ${pages! ~/ 2}"),
               onPressed: () async {
-                await snapshot.data!.setPage(pages! ~/ 2);
+                await snapshot.data!.setPage(
+                  pages! ~/ 2,
+                  withAnimation: true,
+                );
               },
             );
           }

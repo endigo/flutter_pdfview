@@ -69,7 +69,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | :------------- | :------------------: | :--------: | :------------: |
 | getPageCount   | Get total page count |     -      | `Future<int>`  |
 | getCurrentPage |   Get current page   |     -      | `Future<int>`  |
-| setPage        |    Go to/Set page    | `int page` | `Future<bool>` |
+| setPage        |    Go to/Set page    | `int page`<br>`withAnimation` (**Optional**, only works for **Android**, defaults to `false`) | `Future<bool>` |
 
 ## Example
 

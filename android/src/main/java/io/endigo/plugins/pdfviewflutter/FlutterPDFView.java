@@ -133,7 +133,9 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     void setPage(MethodCall call, Result result) {
         if (call.argument("page") != null) {
             int page = (int) call.argument("page");
-            pdfView.jumpTo(page);
+            boolean withAnimation = call.argument("withAnimation");
+
+            pdfView.jumpTo(page, withAnimation);
         }
 
         result.success(true);
