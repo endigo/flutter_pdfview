@@ -168,13 +168,22 @@
         
         if (@available(iOS 11.0, *)) {
             UIScrollView *_scrollView;
-
-            for (id subview in _pdfView.subviews) {
+             for (id subview in _pdfView.subviews) {
                 if ([subview isKindOfClass: [UIScrollView class]]) {
                     _scrollView = subview;
-                }
+                } else {
+                        for (UIView *subsubview in [subview subviews]) {
+                            if ([subsubview isKindOfClass:[UIScrollView class]]) {
+                            _scrollView = (UIScrollView *)subsubview;
+                            }
+                        }
+                    }
             }
-            
+            if (_scrollView != NULL) {
+            _scrollView.showsVerticalScrollIndicator = false;
+            _scrollView.showsHorizontalScrollIndicator = false;
+            }
+
             _scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
             if (@available(iOS 13.0, *)) {
                 _scrollView.automaticallyAdjustsScrollIndicatorInsets = NO;

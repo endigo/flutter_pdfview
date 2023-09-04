@@ -10,6 +10,7 @@ import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.platform.PlatformView;
+import android.graphics.Color;
 
 import java.io.File;
 import java.util.HashMap;
@@ -35,7 +36,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
         methodChannel = new MethodChannel(messenger, "plugins.endigo.io/pdfview_" + id);
         methodChannel.setMethodCallHandler(this);
-
+        pdfView.setBackgroundColor(Color.LTGRAY);
         linkHandler = new PDFLinkHandler(context, pdfView, methodChannel, preventLinkNavigation);
 
         Configurator config = null;
@@ -59,8 +60,10 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .pageSnap(getBoolean(params, "pageSnap"))
                     .pageFitPolicy(getFitPolicy(params))
                     .enableAnnotationRendering(true)
-                    .linkHandler(linkHandler).
-                    enableAntialiasing(false)
+                    .linkHandler(linkHandler)
+                    .linkHandler(linkHandler)
+                    .spacing(10)
+                    .enableAntialiasing(false)
                     // .fitEachPage(getBoolean(params,"fitEachPage"))
                     .onPageChange(new OnPageChangeListener() {
                         @Override
