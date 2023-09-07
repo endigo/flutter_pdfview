@@ -475,7 +475,6 @@ class PDFViewController {
     return pageSize;
   }
 
-
   //get width page index
   Future<double?> getPageWidth(int pageIndex) async {
     final double? width =
@@ -485,7 +484,6 @@ class PDFViewController {
     return width;
   }
 
-  //TODO: CREATE METHOD ... AQUI VAMOS
   //get height page index
   Future<double?> getPageHeight(int pageIndex) async {
     final double? height =
