@@ -37,7 +37,9 @@ android {
 }
 
 dependencies {
-    implementation("com.github.93cgutierrez:AndroidPdfViewer:3.3.0-beta.1")
+    implementation("com.github.93cgutierrez:AndroidPdfViewer:3.3.0-beta.3")
     api("com.github.mhiew:pdfium-android:1.9.2")
+    //gson
+    implementation 'com.google.code.gson:gson:2.10.1'
 }
 
