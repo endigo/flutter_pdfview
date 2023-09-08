@@ -496,8 +496,8 @@ class PDFViewController {
   }
 
   //get spacing between pages, in  pixels
-  Future<double?> getSpacingPx() async {
-    final double? spacing = await _channel.invokeMethod('getSpacingPx');
+  Future<int?> getSpacingPx() async {
+    final int? spacing = await _channel.invokeMethod('getSpacingPx');
     return spacing;
   }
 
