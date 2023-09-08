@@ -235,7 +235,9 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
             if (zoomDouble != null) {
                 zoomFloat = zoomDouble.floatValue();
             }
-            result.success(pdfView.getSecondaryPageOffset(page, zoomFloat).doubleValue());
+            Float secondaryPageOffset = pdfView.getSecondaryPageOffset(page, zoomFloat);
+
+            result.success(secondaryPageOffset == null ? null : secondaryPageOffset.doubleValue());
         }
     }
 
@@ -247,8 +249,9 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
             if (zoomDouble != null) {
                 zoomFloat = zoomDouble.floatValue();
             }
+            Float pageOffset = pdfView.getPageOffset(page, zoomFloat);
 
-            result.success(pdfView.getPageOffset(page, zoomFloat).doubleValue());
+            result.success(pageOffset == null ? null : pageOffset.doubleValue());
         }
     }
 
@@ -260,8 +263,9 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
             if (zoomDouble != null) {
                 zoomFloat = zoomDouble.floatValue();
             }
+            Float pageSpacing = pdfView.getPageSpacing(page, zoomFloat);
 
-            result.success(pdfView.getPageSpacing(page, zoomFloat).doubleValue());
+            result.success(pageSpacing == null ? null : pdfView.getPageSpacing(page, zoomFloat).doubleValue());
         }
     }
 
@@ -273,14 +277,18 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
             if (zoomDouble != null) {
                 zoomFloat = zoomDouble.floatValue();
             }
-            result.success(pdfView.getPageLength(page, zoomFloat).doubleValue());
+            Float pageLength = pdfView.getPageLength(page, zoomFloat);
+
+            result.success(pageLength == null ? null : pageLength.doubleValue());
         }
     }
 
     private void getPageSpacing(MethodCall methodCall, Result result) {
         if (methodCall.argument("pageIndex") != null) {
             int page = (int) methodCall.argument("pageIndex");
-            result.success(pdfView.getPageSpacing(page).doubleValue());
+            Float pageSpacing = pdfView.getPageSpacing(page);
+
+            result.success(pageSpacing == null ? null : pageSpacing.doubleValue());
         }
     }
 
