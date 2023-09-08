@@ -4,6 +4,8 @@ import android.content.Context;
 import android.view.View;
 import android.net.Uri;
 
+import androidx.annotation.NonNull;
+
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
@@ -136,8 +138,9 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         return pdfView;
     }
 
+    //CAHNGE FLOAT IN AND OUT FOR DOUBLE
     @Override
-    public void onMethodCall(MethodCall methodCall, Result result) {
+    public void onMethodCall(MethodCall methodCall, @NonNull Result result) {
         switch (methodCall.method) {
             case "pageCount":
                 getPageCount(result);
@@ -207,57 +210,88 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
     private void getPageAtOffset(MethodCall methodCall, Result result) {
         if (methodCall.argument("offset") != null && methodCall.argument("zoom") != null) {
-            float offset = (float) methodCall.argument("offset");
-            float zoom = (float) methodCall.argument("zoom");
-            result.success(pdfView.getPageAtOffset(offset, zoom));
+
+            Double offsetDouble = (Double) methodCall.argument("offset");
+            float offsetFloat = 0;
+            if (offsetDouble != null) {
+                offsetFloat = offsetDouble.floatValue();
+            }
+
+            Double zoomDouble = (Double) methodCall.argument("zoom");
+            float zoomFloat = PDFView.DEFAULT_MIN_SCALE;
+            if (zoomDouble != null) {
+                zoomFloat = zoomDouble.floatValue();
+            }
+
+            result.success(pdfView.getPageAtOffset(offsetFloat, zoomFloat));
         }
     }
 
     private void getSecondaryPageOffset(MethodCall methodCall, Result result) {
         if (methodCall.argument("pageIndex") != null && methodCall.argument("zoom") != null) {
             int page = (int) methodCall.argument("pageIndex");
-            float zoom = (float) methodCall.argument("zoom");
-            result.success(pdfView.getSecondaryPageOffset(page, zoom));
+            Double zoomDouble = (Double) methodCall.argument("zoom");
+            float zoomFloat = PDFView.DEFAULT_MIN_SCALE;
+            if (zoomDouble != null) {
+                zoomFloat = zoomDouble.floatValue();
+            }
+            result.success(pdfView.getSecondaryPageOffset(page, zoomFloat).doubleValue());
         }
     }
 
     private void getPageOffset(MethodCall methodCall, Result result) {
         if (methodCall.argument("pageIndex") != null && methodCall.argument("zoom") != null) {
             int page = (int) methodCall.argument("pageIndex");
-            float zoom = (float) methodCall.argument("zoom");
-            result.success(pdfView.getPageOffset(page, zoom));
+            Double zoomDouble = (Double) methodCall.argument("zoom");
+            float zoomFloat = PDFView.DEFAULT_MIN_SCALE;
+            if (zoomDouble != null) {
+                zoomFloat = zoomDouble.floatValue();
+            }
+
+            result.success(pdfView.getPageOffset(page, zoomFloat).doubleValue());
         }
     }
 
     private void getPageSpacingWithZoom(MethodCall methodCall, Result result) {
         if (methodCall.argument("pageIndex") != null && methodCall.argument("zoom") != null) {
             int page = (int) methodCall.argument("pageIndex");
-            float zoom = (float) methodCall.argument("zoom");
-            result.success(pdfView.getPageSpacing(page, zoom));
+            Double zoomDouble = (Double) methodCall.argument("zoom");
+            float zoomFloat = PDFView.DEFAULT_MIN_SCALE;
+            if (zoomDouble != null) {
+                zoomFloat = zoomDouble.floatValue();
+            }
+
+            result.success(pdfView.getPageSpacing(page, zoomFloat).doubleValue());
         }
     }
 
     private void getPageLength(MethodCall methodCall, Result result) {
         if (methodCall.argument("pageIndex") != null && methodCall.argument("zoom") != null) {
             int page = (int) methodCall.argument("pageIndex");
-            float zoom = (float) methodCall.argument("zoom");
-            result.success(pdfView.getPageLength(page, zoom));
+            Double zoomDouble = (Double) methodCall.argument("zoom");
+            float zoomFloat = PDFView.DEFAULT_MIN_SCALE;
+            if (zoomDouble != null) {
+                zoomFloat = zoomDouble.floatValue();
+            }
+            result.success(pdfView.getPageLength(page, zoomFloat).doubleValue());
         }
     }
 
     private void getPageSpacing(MethodCall methodCall, Result result) {
         if (methodCall.argument("pageIndex") != null) {
             int page = (int) methodCall.argument("pageIndex");
-            result.success(pdfView.getPageSpacing(page));
+            result.success(pdfView.getPageSpacing(page).doubleValue());
         }
     }
 
     private void getCurrentYOffset(Result result) {
-        result.success(pdfView.getCurrentYOffset());
+        double currentYOffsetDouble = pdfView.getCurrentYOffset();
+        result.success(currentYOffsetDouble);
     }
 
     private void getCurrentXOffset(Result result) {
-        result.success(pdfView.getCurrentXOffset());
+        double currentXOffsetDouble = pdfView.getCurrentXOffset();
+        result.success(currentXOffsetDouble);
     }
 
     private void getSpacingPx(Result result) {
@@ -267,14 +301,16 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private void getPageHeight(MethodCall methodCall, Result result) {
         if (methodCall.argument("pageIndex") != null) {
             int page = (int) methodCall.argument("pageIndex");
-            result.success(pdfView.getPageSize(page).getHeight());
+            double heightDouble = pdfView.getPageSize(page).getHeight();
+            result.success(heightDouble);
         }
     }
 
     private void getPageWidth(MethodCall methodCall, Result result) {
         if (methodCall.argument("pageIndex") != null) {
             int page = (int) methodCall.argument("pageIndex");
-            result.success(pdfView.getPageSize(page).getWidth());
+            double widthDouble = pdfView.getPageSize(page).getWidth();
+            result.success(widthDouble);
         }
     }
 
@@ -289,6 +325,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     }
 
     private void getZoom(Result result) {
+        double zoomDouble = pdfView.getZoom();
         result.success(pdfView.getZoom());
     }
 
@@ -300,8 +337,12 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
     private void zoomTo(MethodCall methodCall, Result result) {
         if (methodCall.argument("zoom") != null) {
-            float zoom = (float) methodCall.argument("zoom");
-            pdfView.zoomTo(zoom);
+            Double zoomDouble = (Double) methodCall.argument("zoom");
+            float zoomFloat = PDFView.DEFAULT_MIN_SCALE;
+            if (zoomDouble != null) {
+                zoomFloat = zoomDouble.floatValue();
+            }
+            pdfView.zoomTo(zoomFloat);
         }
 
         result.success(true);
