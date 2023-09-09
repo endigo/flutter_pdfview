@@ -1,3 +1,7 @@
+## 1.3.2
+
+- upgrade android-pdf-viewer from 3.3.0-beta.1[https://github.com/93cgutierrez/AndroidPdfViewer/releases/tag/3.3.0-beta.1]  This is a fork of the [AndroidPdfViewer](https://github.com/mhiew/AndroidPdfViewer)
+
 ## 1.3.1
 
 - Upgrade compileSdkVersion to 33

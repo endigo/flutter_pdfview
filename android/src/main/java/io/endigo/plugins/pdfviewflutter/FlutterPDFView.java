@@ -4,6 +4,8 @@ import android.content.Context;
 import android.view.View;
 import android.net.Uri;
 
+import androidx.annotation.NonNull;
+
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
@@ -22,11 +24,16 @@ import com.github.barteksc.pdfviewer.util.Constants;
 import com.github.barteksc.pdfviewer.util.FitPolicy;
 
 import com.github.barteksc.pdfviewer.link.LinkHandler;
+import com.google.gson.Gson;
+
+import org.json.JSONObject;
 
 public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private final PDFView pdfView;
     private final MethodChannel methodChannel;
     private final LinkHandler linkHandler;
+    // Initialize Gson
+    Gson gson = new Gson();
 
     @SuppressWarnings("unchecked")
     FlutterPDFView(Context context, BinaryMessenger messenger, int id, Map<String, Object> params) {
@@ -40,16 +47,18 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
         Configurator config = null;
         if (params.get("filePath") != null) {
-          String filePath = (String) params.get("filePath");
-          config = pdfView.fromUri(getURI(filePath));
-        }
-        else if (params.get("pdfData") != null) {
-          byte[] data = (byte[]) params.get("pdfData");
-          config = pdfView.fromBytes(data);
+            String filePath = (String) params.get("filePath");
+            config = pdfView.fromUri(getURI(filePath));
+        } else if (params.get("pdfData") != null) {
+            byte[] data = (byte[]) params.get("pdfData");
+            config = pdfView.fromBytes(data);
         }
 
         if (config != null) {
             config
+                    .enableDoubletap(getBoolean(params, "enableDoubleTap"))
+                    .enableAntialiasing(getBoolean(params, "enableAntialiasing"))
+                    .enableAnnotationRendering(getBoolean(params, "enableAnnotationRendering"))
                     .enableSwipe(getBoolean(params, "enableSwipe"))
                     .swipeHorizontal(getBoolean(params, "swipeHorizontal"))
                     .password(getString(params, "password"))
@@ -58,41 +67,69 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .pageFling(getBoolean(params, "pageFling"))
                     .pageSnap(getBoolean(params, "pageSnap"))
                     .pageFitPolicy(getFitPolicy(params))
-                    .enableAnnotationRendering(true)
-                    .linkHandler(linkHandler).
-                    enableAntialiasing(false)
+                    .linkHandler(linkHandler)
                     // .fitEachPage(getBoolean(params,"fitEachPage"))
-                    .onPageChange(new OnPageChangeListener() {
-                        @Override
-                        public void onPageChanged(int page, int total) {
-                            Map<String, Object> args = new HashMap<>();
-                            args.put("page", page);
-                            args.put("total", total);
-                            methodChannel.invokeMethod("onPageChanged", args);
-                        }
-                    }).onError(new OnErrorListener() {
-                @Override
-                public void onError(Throwable t) {
-                    Map<String, Object> args = new HashMap<>();
-                    args.put("error", t.toString());
-                    methodChannel.invokeMethod("onError", args);
-                }
-            }).onPageError(new OnPageErrorListener() {
-                @Override
-                public void onPageError(int page, Throwable t) {
-                    Map<String, Object> args = new HashMap<>();
-                    args.put("page", page);
-                    args.put("error", t.toString());
-                    methodChannel.invokeMethod("onPageError", args);
-                }
-            }).onRender(new OnRenderListener() {
-                @Override
-                public void onInitiallyRendered(int pages) {
-                    Map<String, Object> args = new HashMap<>();
-                    args.put("pages", pages);
-                    methodChannel.invokeMethod("onRender", args);
-                }
-            }).enableDoubletap(true).defaultPage(getInt(params, "defaultPage")).load();
+                    .onTap(motionEvent -> {
+                        Map<String, Object> args = new HashMap<>();
+                        // Convert the object to JSON
+                        String json = gson.toJson(motionEvent);
+                        args.put("motionEvent", json);
+                        methodChannel.invokeMethod("onTap", args);
+                        return true;
+                    })
+                    .onDoubleTap((animator, oldZoom, newZoom) -> {
+                        Map<String, Object> args = new HashMap<>();
+                        // Convert the object to JSON
+                        String json = gson.toJson(animator);
+                        args.put("animator", json);
+                        args.put("oldZoom", oldZoom);
+                        args.put("newZoom", newZoom);
+                        methodChannel.invokeMethod("onDoubleTap", args);
+                        return true;
+                    })
+                    .onPinchZoom((animator, oldZoom, newZoom) -> {
+                        Map<String, Object> args = new HashMap<>();
+                        // Convert the object to JSON
+                        String json = gson.toJson(animator);
+                        args.put("animator", json);
+                        args.put("oldZoom", oldZoom);
+                        args.put("newZoom", newZoom);
+                        methodChannel.invokeMethod("onPinchZoom", args);
+                        return true;
+                    })
+                    .onScrollAnimation((animation, scrollMoveDirection) -> {
+                        Map<String, Object> args = new HashMap<>();
+                        // Convert the object to JSON
+                        String json = gson.toJson(animation);
+                        args.put("animation", json);
+                        args.put("scrollMoveDirection", scrollMoveDirection);
+                        methodChannel.invokeMethod("onScrollAnimation", args);
+                        return true;
+                    })
+                    .onPageChange((page, total) -> {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("page", page);
+                        args.put("total", total);
+                        methodChannel.invokeMethod("onPageChanged", args);
+                    })
+                    .onError(throwable -> {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("error", throwable.toString());
+                        methodChannel.invokeMethod("onError", args);
+                    })
+                    .onPageError((page, throwable) -> {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("page", page);
+                        args.put("error", throwable.toString());
+                        methodChannel.invokeMethod("onPageError", args);
+                    })
+                    .onRender(pages -> {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("pages", pages);
+                        methodChannel.invokeMethod("onRender", args);
+                    })
+                    .defaultPage(getInt(params, "defaultPage"))
+                    .load();
         }
     }
 
@@ -101,8 +138,9 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         return pdfView;
     }
 
+    //CAHNGE FLOAT IN AND OUT FOR DOUBLE
     @Override
-    public void onMethodCall(MethodCall methodCall, Result result) {
+    public void onMethodCall(MethodCall methodCall, @NonNull Result result) {
         switch (methodCall.method) {
             case "pageCount":
                 getPageCount(result);
@@ -113,6 +151,54 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
             case "setPage":
                 setPage(methodCall, result);
                 break;
+
+            case "zoomTo":
+                zoomTo(methodCall, result);
+                break;
+            case "resetZoom":
+                resetZoom(result);
+                break;
+            case "getZoom":
+                getZoom(result);
+                break;
+            case "getPageSize":
+                getPageSize(methodCall, result);
+                break;
+            case "getPageWidth":
+                getPageWidth(methodCall, result);
+                break;
+            case "getPageHeight":
+                getPageHeight(methodCall, result);
+                break;
+            case "getSpacingPx":
+                getSpacingPx(result);
+                break;
+            case "getCurrentXOffset":
+                getCurrentXOffset(result);
+                break;
+            case "getCurrentYOffset":
+                getCurrentYOffset(result);
+                break;
+            case "getPageSpacing":
+                getPageSpacing(methodCall, result);
+                break;
+            case "getPageLength":
+                getPageLength(methodCall, result);
+                break;
+            case "getPageSpacingWithZoom":
+                getPageSpacingWithZoom(methodCall, result);
+                break;
+            case "getPageOffset":
+                getPageOffset(methodCall, result);
+                break;
+            case "getSecondaryPageOffset":
+                getSecondaryPageOffset(methodCall, result);
+                break;
+            case "getPageAtOffset":
+                getPageAtOffset(methodCall, result);
+                break;
+
+
             case "updateSettings":
                 updateSettings(methodCall, result);
                 break;
@@ -120,6 +206,154 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                 result.notImplemented();
                 break;
         }
+    }
+
+    private void getPageAtOffset(MethodCall methodCall, Result result) {
+        if (methodCall.argument("offset") != null && methodCall.argument("zoom") != null) {
+
+            Double offsetDouble = (Double) methodCall.argument("offset");
+            float offsetFloat = 0;
+            if (offsetDouble != null) {
+                offsetFloat = offsetDouble.floatValue();
+            }
+
+            Double zoomDouble = (Double) methodCall.argument("zoom");
+            float zoomFloat = PDFView.DEFAULT_MIN_SCALE;
+            if (zoomDouble != null) {
+                zoomFloat = zoomDouble.floatValue();
+            }
+
+            result.success(pdfView.getPageAtOffset(offsetFloat, zoomFloat));
+        }
+    }
+
+    private void getSecondaryPageOffset(MethodCall methodCall, Result result) {
+        if (methodCall.argument("pageIndex") != null && methodCall.argument("zoom") != null) {
+            int page = (int) methodCall.argument("pageIndex");
+            Double zoomDouble = (Double) methodCall.argument("zoom");
+            float zoomFloat = PDFView.DEFAULT_MIN_SCALE;
+            if (zoomDouble != null) {
+                zoomFloat = zoomDouble.floatValue();
+            }
+            Float secondaryPageOffset = pdfView.getSecondaryPageOffset(page, zoomFloat);
+
+            result.success(secondaryPageOffset == null ? null : secondaryPageOffset.doubleValue());
+        }
+    }
+
+    private void getPageOffset(MethodCall methodCall, Result result) {
+        if (methodCall.argument("pageIndex") != null && methodCall.argument("zoom") != null) {
+            int page = (int) methodCall.argument("pageIndex");
+            Double zoomDouble = (Double) methodCall.argument("zoom");
+            float zoomFloat = PDFView.DEFAULT_MIN_SCALE;
+            if (zoomDouble != null) {
+                zoomFloat = zoomDouble.floatValue();
+            }
+            Float pageOffset = pdfView.getPageOffset(page, zoomFloat);
+
+            result.success(pageOffset == null ? null : pageOffset.doubleValue());
+        }
+    }
+
+    private void getPageSpacingWithZoom(MethodCall methodCall, Result result) {
+        if (methodCall.argument("pageIndex") != null && methodCall.argument("zoom") != null) {
+            int page = (int) methodCall.argument("pageIndex");
+            Double zoomDouble = (Double) methodCall.argument("zoom");
+            float zoomFloat = PDFView.DEFAULT_MIN_SCALE;
+            if (zoomDouble != null) {
+                zoomFloat = zoomDouble.floatValue();
+            }
+            Float pageSpacing = pdfView.getPageSpacing(page, zoomFloat);
+
+            result.success(pageSpacing == null ? null : pdfView.getPageSpacing(page, zoomFloat).doubleValue());
+        }
+    }
+
+    private void getPageLength(MethodCall methodCall, Result result) {
+        if (methodCall.argument("pageIndex") != null && methodCall.argument("zoom") != null) {
+            int page = (int) methodCall.argument("pageIndex");
+            Double zoomDouble = (Double) methodCall.argument("zoom");
+            float zoomFloat = PDFView.DEFAULT_MIN_SCALE;
+            if (zoomDouble != null) {
+                zoomFloat = zoomDouble.floatValue();
+            }
+            Float pageLength = pdfView.getPageLength(page, zoomFloat);
+
+            result.success(pageLength == null ? null : pageLength.doubleValue());
+        }
+    }
+
+    private void getPageSpacing(MethodCall methodCall, Result result) {
+        if (methodCall.argument("pageIndex") != null) {
+            int page = (int) methodCall.argument("pageIndex");
+            Float pageSpacing = pdfView.getPageSpacing(page);
+
+            result.success(pageSpacing == null ? null : pageSpacing.doubleValue());
+        }
+    }
+
+    private void getCurrentYOffset(Result result) {
+        double currentYOffsetDouble = pdfView.getCurrentYOffset();
+        result.success(currentYOffsetDouble);
+    }
+
+    private void getCurrentXOffset(Result result) {
+        double currentXOffsetDouble = pdfView.getCurrentXOffset();
+        result.success(currentXOffsetDouble);
+    }
+
+    private void getSpacingPx(Result result) {
+        result.success(pdfView.getSpacingPx());
+    }
+
+    private void getPageHeight(MethodCall methodCall, Result result) {
+        if (methodCall.argument("pageIndex") != null) {
+            int page = (int) methodCall.argument("pageIndex");
+            double heightDouble = pdfView.getPageSize(page).getHeight();
+            result.success(heightDouble);
+        }
+    }
+
+    private void getPageWidth(MethodCall methodCall, Result result) {
+        if (methodCall.argument("pageIndex") != null) {
+            int page = (int) methodCall.argument("pageIndex");
+            double widthDouble = pdfView.getPageSize(page).getWidth();
+            result.success(widthDouble);
+        }
+    }
+
+    private void getPageSize(MethodCall methodCall, Result result) {
+        String json = gson.toJson(pdfView.getPageSize(pdfView.getCurrentPage()));
+        if (methodCall.argument("pageIndex") != null) {
+            int page = (int) methodCall.argument("pageIndex");
+            //convert Object to JSON
+            json = gson.toJson(pdfView.getPageSize(page));
+        }
+        result.success(json);
+    }
+
+    private void getZoom(Result result) {
+        double zoomDouble = pdfView.getZoom();
+        result.success(pdfView.getZoom());
+    }
+
+    private void resetZoom(Result result) {
+        pdfView.resetZoom();
+        result.success(true);
+    }
+
+
+    private void zoomTo(MethodCall methodCall, Result result) {
+        if (methodCall.argument("zoom") != null) {
+            Double zoomDouble = (Double) methodCall.argument("zoom");
+            float zoomFloat = PDFView.DEFAULT_MIN_SCALE;
+            if (zoomDouble != null) {
+                zoomFloat = zoomDouble.floatValue();
+            }
+            pdfView.zoomTo(zoomFloat);
+        }
+
+        result.success(true);
     }
 
     void getPageCount(Result result) {
@@ -148,6 +382,16 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private void applySettings(Map<String, Object> settings) {
         for (String key : settings.keySet()) {
             switch (key) {
+                case "enableDoubleTap":
+                    //TODO: SHOULD CHECK
+                    //pdfView.enableDoubletap(getBoolean(settings, key));
+                    break;
+                case "enableAntialiasing":
+                    pdfView.enableAntialiasing(getBoolean(settings, key));
+                    break;
+                case "enableAnnotationRendering":
+                    pdfView.enableAnnotationRendering(getBoolean(settings, key));
+                    break;
                 case "enableSwipe":
                     pdfView.setSwipeEnabled(getBoolean(settings, key));
                     break;
