@@ -39,8 +39,8 @@ class PDFView extends StatefulWidget {
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
-  })
-      : assert(filePath != null || pdfData != null),
+    this.useHybridComposition = false,
+  })  : assert(filePath != null || pdfData != null),
         super(key: key);
 
   @override
@@ -53,6 +53,7 @@ class PDFView extends StatefulWidget {
   final ErrorCallback? onError;
   final PageErrorCallback? onPageError;
   final LinkHandlerCallback? onLinkHandler;
+  final bool useHybridComposition;
 
   /// Which gestures should be consumed by the pdf view.
   ///
@@ -83,24 +84,39 @@ class PDFView extends StatefulWidget {
 }
 
 class _PDFViewState extends State<PDFView> {
-  final Completer<PDFViewController> _controller =
-  Completer<PDFViewController>();
+  final Completer<PDFViewController> _controller = Completer<PDFViewController>();
 
   @override
   Widget build(BuildContext context) {
     if (defaultTargetPlatform == TargetPlatform.android) {
       return PlatformViewLink(
         viewType: 'plugins.endigo.io/pdfview',
-        surfaceFactory: (BuildContext context,
-            PlatformViewController controller,) {
+        surfaceFactory: (
+          BuildContext context,
+          PlatformViewController controller,
+        ) {
           return AndroidViewSurface(
             controller: controller as AndroidViewController,
-            gestureRecognizers: widget.gestureRecognizers ??
-                const <Factory<OneSequenceGestureRecognizer>>{},
+            gestureRecognizers: widget.gestureRecognizers ?? const <Factory<OneSequenceGestureRecognizer>>{},
             hitTestBehavior: PlatformViewHitTestBehavior.opaque,
           );
         },
         onCreatePlatformView: (PlatformViewCreationParams params) {
+          if (widget.useHybridComposition) {
+            return PlatformViewsService.initExpensiveAndroidView(
+              id: params.id,
+              viewType: 'plugins.endigo.io/pdfview',
+              layoutDirection: TextDirection.rtl,
+              creationParams: _CreationParams.fromWidget(widget).toMap(),
+              creationParamsCodec: const StandardMessageCodec(),
+            )
+            ..addOnPlatformViewCreatedListener(params
+                .onPlatformViewCreated)..addOnPlatformViewCreatedListener((
+                int id) {
+              _onPlatformViewCreated(id);
+            })
+            ..create();
+          }
           return PlatformViewsService.initSurfaceAndroidView(
             id: params.id,
             viewType: 'plugins.endigo.io/pdfview',
