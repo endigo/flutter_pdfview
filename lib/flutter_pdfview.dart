@@ -39,6 +39,7 @@ class PDFView extends StatefulWidget {
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
     this.backgroundColor,
+    this.useHybridComposition = false,
   })  : assert(filePath != null || pdfData != null),
         super(key: key);
 
@@ -119,6 +120,8 @@ class PDFView extends StatefulWidget {
 
   /// Use to change the background color. ex : "#FF0000" => red
   final Color? backgroundColor;
+
+  final bool useHybridComposition;
 }
 
 class _PDFViewState extends State<PDFView> {
@@ -142,7 +145,10 @@ class _PDFViewState extends State<PDFView> {
           );
         },
         onCreatePlatformView: (PlatformViewCreationParams params) {
-          return PlatformViewsService.initSurfaceAndroidView(
+          final androidView = widget.useHybridComposition
+              ? PlatformViewsService.initExpensiveAndroidView
+              : PlatformViewsService.initSurfaceAndroidView;
+          return androidView(
             id: params.id,
             viewType: 'plugins.endigo.io/pdfview',
             layoutDirection: TextDirection.rtl,
