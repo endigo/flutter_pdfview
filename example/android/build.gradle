@@ -24,10 +24,10 @@ subprojects {
     project.evaluationDependsOn(':app')
 }
 
-task clean(type: Delete) {
+tasks.register('clean', Delete) {
     delete rootProject.buildDir
 }
-configurations.all {
+configurations.configureEach {
     resolutionStrategy {
         force 'androidx.core:core-ktx:1.6.0'
     }

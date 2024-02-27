@@ -22,7 +22,7 @@ rootProject.allprojects {
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 33
+    compileSdk 34
 
     defaultConfig {
         minSdkVersion 16
@@ -32,7 +32,7 @@ android {
     lintOptions {
         disable 'InvalidPackage'
     }
-    namespace 'io.endigo.plugings.pdfview'
+    if (project.android.hasProperty("namespace")) { namespace 'io.endigo.plugins.pdfviewflutter' }
 }
 
 dependencies {

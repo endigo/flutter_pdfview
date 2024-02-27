@@ -160,9 +160,30 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     }
 
     void setPositionAndScale(MethodCall call, Result result) {
-        double xOffset = call.argument("xPos");
-        double yOffset = call.argument("yPos");
-        double zoom = call.argument("scale");
+        Double xPosObj = call.argument("xPos");
+        double xOffset;
+        if (xPosObj != null) {
+            xOffset = xPosObj; // Safe unboxing
+        } else {
+            // Handle null case, e.g., assign a default value
+            xOffset = 0.0;
+        }
+        Double yPosObj = call.argument("yPos");
+        double yOffset;
+        if (yPosObj != null) {
+            yOffset = yPosObj; // Safe unboxing
+        } else {
+            // Handle null case, e.g., assign a default value
+            yOffset = 0.0;
+        }
+        Double scaleObj = call.argument("scale");
+        double zoom;
+        if (scaleObj != null) {
+            zoom = scaleObj; // Safe unboxing
+        } else {
+            // Handle null case, e.g., assign a default value
+            zoom = 1.0;
+        }
 
         if (zoom != 1.0) {
             pdfView.zoomTo((float) zoom);
@@ -213,7 +234,14 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
     void setPage(MethodCall call, Result result) {
         if (call.argument("page") != null) {
-            int page = (int) call.argument("page");
+            Integer pageObj = call.argument("page");
+            int page;
+            if (pageObj != null) {
+                page = pageObj; // Safe unboxing
+            } else {
+                // Handle null case, e.g., assign a default value
+                page = 1;
+            }
             pdfView.jumpTo(page);
         }
 
@@ -257,7 +285,14 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     }
 
     boolean getBoolean(Map<String, Object> params, String key) {
-        return params.containsKey(key) ? (boolean) params.get(key) : false;
+        Boolean keyObj = (Boolean) params.get(key);
+        boolean bKey;
+        if (keyObj != null) {
+            bKey = keyObj;
+        } else {
+            bKey = false;
+        }
+        return params.containsKey(key) && bKey;
     }
 
     String getString(Map<String, Object> params, String key) {
@@ -265,7 +300,14 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     }
 
     int getInt(Map<String, Object> params, String key) {
-        return params.containsKey(key) ? (int) params.get(key) : 0;
+        Integer keyObj = (Integer) params.get(key);
+        int intKey;
+        if (keyObj != null) {
+            intKey = keyObj;
+        } else {
+            intKey = 0;
+        }
+        return params.containsKey(key) ? intKey : 0;
     }
 
     FitPolicy getFitPolicy(Map<String, Object> params) {
