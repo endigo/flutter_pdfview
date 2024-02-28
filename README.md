@@ -7,6 +7,8 @@ Native PDF View for iOS and Android
 [![Latest compatibility result for Beta channel](https://img.shields.io/endpoint?url=https://pub.green/packages/flutter_pdfview/badge?channel=beta)](https://pub.green/packages/flutter_pdfview)
 [![Latest compatibility result for Dev channel](https://img.shields.io/endpoint?url=https://pub.green/packages/flutter_pdfview/badge?channel=dev)](https://pub.green/packages/flutter_pdfview)
 
+# ⚠️ Looking for maintainers ⚠️
+
 # Use this package as a library
 
 ## 1. Depend on it
@@ -15,7 +17,6 @@ Add this to your package's pubspec.yaml file:
 
 ```
 dependencies:
-  flutter_pdfview: ^1.2.7
 ```
 
 ### 2. Install it
