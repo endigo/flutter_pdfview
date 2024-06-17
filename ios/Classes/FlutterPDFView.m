@@ -45,7 +45,20 @@
     NSLog(@"initWithFrame ->");
     _pdfView = [[FLTPDFView new] initWithFrame:frame arguments:args controller:self];
     _viewId = viewId;
-    
+
+    @try  {
+        NSString* hexBackgroundColor = args[@"hexBackgroundColor"];
+        unsigned rgbValue = 0;
+        NSScanner *scanner = [NSScanner scannerWithString:hexBackgroundColor];
+        [scanner setScanLocation:1]; // bypass '#' character
+        [scanner scanHexInt:&rgbValue];
+
+        UIColor *colour = [UIColor colorWithRed:((rgbValue & 0xFF0000) >> 16)/255.0
+                                          green:((rgbValue & 0xFF00) >> 8)/255.0 blue:(rgbValue & 0xFF)/255.0 alpha:1.0];
+        _pdfView.view.backgroundColor = colour;
+    } @catch (NSException *exception) {
+    }
+
     NSString* channelName = [NSString stringWithFormat:@"plugins.endigo.io/pdfview_%lld", viewId];
     _channel = [FlutterMethodChannel methodChannelWithName:channelName binaryMessenger:messenger];
     __weak __typeof__(self) weakSelf = self;

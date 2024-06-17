@@ -41,7 +41,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 ## Options
 
 | Name                  | Android | iOS |      Default      |
-| :-------------------- | :-----: | :-: | :---------------: |
+|:----------------------| :-----: | :-: |:-----------------:|
 | defaultPage           |   ✅    | ✅  |        `0`        |
 | onViewCreated         |   ✅    | ✅  |      `null`       |
 | onRender              |   ✅    | ✅  |      `null`       |
@@ -62,6 +62,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | pageFling             |   ✅    | ✅  |      `true`       |
 | pageSnap              |   ✅    | ❌  |      `true`       |
 | preventLinkNavigation |   ✅    | ✅  |      `false`      |
+| backgroundColor       |   ✅    | ✅  |      `null`       |
 
 ## Controller Options
 
@@ -80,6 +81,7 @@ PDFView(
   swipeHorizontal: true,
   autoSpacing: false,
   pageFling: false,
+  backgroundColor: Colors.grey,
   onRender: (_pages) {
     setState(() {
       pages = _pages;
