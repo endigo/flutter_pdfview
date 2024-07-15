@@ -241,7 +241,9 @@
 - (void)PDFViewWillClickOnLink:(PDFView *)sender
                        withURL:(NSURL *)url{
     if (!_preventLinkNavigation){
-        [[UIApplication sharedApplication] openURL:url];
+        // [[UIApplication sharedApplication] openURL:url];
+        // Deprecated in iOS 10
+        [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
     }
     [_controler invokeChannelMethod:@"onLinkHandler" arguments:url.absoluteString];
 }
