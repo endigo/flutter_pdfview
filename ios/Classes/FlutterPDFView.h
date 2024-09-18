@@ -23,7 +23,7 @@ API_AVAILABLE(ios(11.0))
 @interface FLTPDFView : UIView <FlutterPlatformView, PDFViewDelegate>
 - (instancetype)initWithFrame:(CGRect)frame
                     arguments:(id _Nullable)args
-                    controler:(FLTPDFViewController*)controler;
+                    controller:(FLTPDFViewController*) controller;
 - (void)layoutSubviews;
 - (UIView*)view;
 - (void)getPageCount:(FlutterMethodCall*)call result:(FlutterResult)result;
