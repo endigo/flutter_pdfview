@@ -17,6 +17,7 @@ Add this to your package's pubspec.yaml file:
 
 ```
 dependencies:
+  flutter_pdfview: 1.3.2
 ```
 
 ### 2. Install it
