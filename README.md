@@ -133,6 +133,9 @@ PDFView(
     </a>
 </p>
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=endigo/flutter_pdfview&type=Date)](https://star-history.com/#endigo/flutter_pdfview&Date)
 
 ### Developer
 
