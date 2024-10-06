@@ -350,10 +350,18 @@ class PDFViewController {
     return currentPage;
   }
 
-  Future<bool?> setPage(int page) async {
+  /// Moves the PDF to the specified page number.
+  ///
+  /// [page] is the page number to move to.
+  ///
+  /// [withAnimation] is whether or not to animate the transition (only works on Android), defaults to `false`.
+  ///
+  /// Returns `true` if the page was set successfully, otherwise `false`.
+  Future<bool?> setPage(int page, {bool withAnimation = false}) async {
     final bool? isSet =
         await _channel.invokeMethod('setPage', <String, dynamic>{
       'page': page,
+      'withAnimation': withAnimation,
     });
     return isSet;
   }
