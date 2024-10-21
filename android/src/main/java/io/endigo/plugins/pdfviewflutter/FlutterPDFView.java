@@ -1,6 +1,7 @@
 package io.endigo.plugins.pdfviewflutter;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.view.View;
 import android.net.Uri;
 
@@ -46,6 +47,13 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         else if (params.get("pdfData") != null) {
           byte[] data = (byte[]) params.get("pdfData");
           config = pdfView.fromBytes(data);
+        }
+
+        Object backgroundColor = params.get("hexBackgroundColor");
+        if(backgroundColor != null && backgroundColor instanceof String){
+            try {
+                pdfView.setBackgroundColor(Color.parseColor((String) backgroundColor));
+            }catch (IllegalArgumentException e){}
         }
 
         if (config != null) {
