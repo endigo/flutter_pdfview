@@ -1,3 +1,6 @@
+## 1.3.4
+- Add support for background color [278](https://github.com/endigo/flutter_pdfview/pull/278) @bobbybun
+
 ## 1.3.3
 - hotfix: Crash on iOS 18
 
