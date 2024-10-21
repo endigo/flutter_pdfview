@@ -42,7 +42,6 @@
                     arguments:(id _Nullable)args
               binaryMessenger:(NSObject<FlutterBinaryMessenger>*)messenger {
     self = [super init];
-    NSLog(@"initWithFrame ->");
     _pdfView = [[FLTPDFView new] initWithFrame:frame arguments:args controller:self];
     _viewId = viewId;
 
@@ -253,7 +252,14 @@
 - (void)PDFViewWillClickOnLink:(PDFView *)sender
                        withURL:(NSURL *)url{
     if (!_preventLinkNavigation){
-        [[UIApplication sharedApplication] openURL:url];
+        NSDictionary *options = @{};
+        [[UIApplication sharedApplication] openURL:url options:options completionHandler:^(BOOL success) {
+            if (success) {
+                NSLog(@"URL opened successfully");
+            } else {
+                NSLog(@"Failed to open URL");
+            }
+        } ];
     }
     [_controller invokeChannelMethod:@"onLinkHandler" arguments:url.absoluteString];
 }
