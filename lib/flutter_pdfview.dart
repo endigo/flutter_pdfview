@@ -20,6 +20,7 @@ class PDFView extends StatefulWidget {
     Key? key,
     this.filePath,
     this.pdfData,
+    this.pages,
     this.onViewCreated,
     this.onRender,
     this.onPageChanged,
@@ -119,11 +120,14 @@ class PDFView extends StatefulWidget {
 
   /// Use to change the background color. ex : "#FF0000" => red
   final Color? backgroundColor;
+
+  /// Use to show specific pages which are included in the list e.g. [1, 2, 6]
+  final List<int>? pages;
 }
 
 class _PDFViewState extends State<PDFView> {
   final Completer<PDFViewController> _controller =
-  Completer<PDFViewController>();
+      Completer<PDFViewController>();
 
   @override
   Widget build(BuildContext context) {
@@ -131,9 +135,9 @@ class _PDFViewState extends State<PDFView> {
       return PlatformViewLink(
         viewType: 'plugins.endigo.io/pdfview',
         surfaceFactory: (
-            BuildContext context,
-            PlatformViewController controller,
-            ) {
+          BuildContext context,
+          PlatformViewController controller,
+        ) {
           return AndroidViewSurface(
             controller: controller as AndroidViewController,
             gestureRecognizers: widget.gestureRecognizers ??
@@ -181,7 +185,7 @@ class _PDFViewState extends State<PDFView> {
   void didUpdateWidget(PDFView oldWidget) {
     super.didUpdateWidget(oldWidget);
     _controller.future.then(
-            (PDFViewController controller) => controller._updateWidget(widget));
+        (PDFViewController controller) => controller._updateWidget(widget));
   }
 }
 
@@ -220,33 +224,33 @@ class _CreationParams {
 class _PDFViewSettings {
   _PDFViewSettings(
       {this.enableSwipe,
-        this.swipeHorizontal,
-        this.password,
-        this.nightMode,
-        this.autoSpacing,
-        this.pageFling,
-        this.pageSnap,
-        this.defaultPage,
-        this.fitPolicy,
-        // this.fitEachPage,
-        this.preventLinkNavigation,
-        this.backgroundColor,
-      });
+      this.swipeHorizontal,
+      this.password,
+      this.nightMode,
+      this.autoSpacing,
+      this.pageFling,
+      this.pageSnap,
+      this.defaultPage,
+      this.fitPolicy,
+      // this.fitEachPage,
+      this.preventLinkNavigation,
+      this.backgroundColor,
+      this.pages});
 
   static _PDFViewSettings fromWidget(PDFView widget) {
     return _PDFViewSettings(
-      enableSwipe: widget.enableSwipe,
-      swipeHorizontal: widget.swipeHorizontal,
-      password: widget.password,
-      nightMode: widget.nightMode,
-      autoSpacing: widget.autoSpacing,
-      pageFling: widget.pageFling,
-      pageSnap: widget.pageSnap,
-      defaultPage: widget.defaultPage,
-      fitPolicy: widget.fitPolicy,
-      preventLinkNavigation: widget.preventLinkNavigation,
-      backgroundColor: widget.backgroundColor,
-    );
+        enableSwipe: widget.enableSwipe,
+        swipeHorizontal: widget.swipeHorizontal,
+        password: widget.password,
+        nightMode: widget.nightMode,
+        autoSpacing: widget.autoSpacing,
+        pageFling: widget.pageFling,
+        pageSnap: widget.pageSnap,
+        defaultPage: widget.defaultPage,
+        fitPolicy: widget.fitPolicy,
+        preventLinkNavigation: widget.preventLinkNavigation,
+        backgroundColor: widget.backgroundColor,
+        pages: widget.pages);
   }
 
   final bool? enableSwipe;
@@ -262,6 +266,7 @@ class _PDFViewSettings {
   final bool? preventLinkNavigation;
 
   final Color? backgroundColor;
+  final List<int>? pages;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -276,7 +281,8 @@ class _PDFViewSettings {
       'fitPolicy': fitPolicy.toString(),
       // 'fitEachPage': fitEachPage,
       'preventLinkNavigation': preventLinkNavigation,
-      "hexBackgroundColor" : backgroundColor == null
+      "pages": pages,
+      "hexBackgroundColor": backgroundColor == null
           ? null
           : "#${backgroundColor!.value.toRadixString(16)}",
     };
@@ -302,9 +308,9 @@ class _PDFViewSettings {
 
 class PDFViewController {
   PDFViewController._(
-      int id,
-      this._widget,
-      ) : _channel = MethodChannel('plugins.endigo.io/pdfview_$id') {
+    int id,
+    this._widget,
+  ) : _channel = MethodChannel('plugins.endigo.io/pdfview_$id') {
     _settings = _PDFViewSettings.fromWidget(_widget);
     _channel.setMethodCallHandler(_onMethodCall);
   }
@@ -365,7 +371,7 @@ class PDFViewController {
 
   Future<bool?> setPage(int page) async {
     final bool? isSet =
-    await _channel.invokeMethod('setPage', <String, dynamic>{
+        await _channel.invokeMethod('setPage', <String, dynamic>{
       'page': page,
     });
     return isSet;
