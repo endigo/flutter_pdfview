@@ -1,5 +1,5 @@
-#import "PDFViewFlutterPlugin.h"
-#import "FlutterPDFView.h"
+#import "./include/flutter_pdfview/PDFViewFlutterPlugin.h"
+#import "./include/flutter_pdfview/FlutterPDFView.h"
 
 @implementation FLTPDFViewFlutterPlugin
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
