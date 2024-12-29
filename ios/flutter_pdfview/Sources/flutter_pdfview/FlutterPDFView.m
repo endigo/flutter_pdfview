@@ -135,10 +135,10 @@
     if (document == nil) {
         [_controller invokeChannelMethod:@"onError" arguments:@{@"error" : @"cannot create document: File not in PDF format or corrupted."}];
     } else {
-        _pdfView.autoresizesSubviews = true;
+        _pdfView.autoresizesSubviews = YES;
         _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
         _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
-
+        
         BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
         if (swipeHorizontal) {
             _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
@@ -152,7 +152,7 @@
         _pdfView.displayMode = enableSwipe ? kPDFDisplaySinglePageContinuous : kPDFDisplaySinglePage;
         _pdfView.document = document;
 
-        _pdfView.maxScaleFactor = 4.0;
+        _pdfView.maxScaleFactor = [args[@"maxZoom"] doubleValue];
         _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
 
         NSString* password = args[@"password"];

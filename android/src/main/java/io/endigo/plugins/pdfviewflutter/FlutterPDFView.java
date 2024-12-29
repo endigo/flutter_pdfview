@@ -41,19 +41,19 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
         Configurator config = null;
         if (params.get("filePath") != null) {
-          String filePath = (String) params.get("filePath");
-          config = pdfView.fromUri(getURI(filePath));
-        }
-        else if (params.get("pdfData") != null) {
-          byte[] data = (byte[]) params.get("pdfData");
-          config = pdfView.fromBytes(data);
+            String filePath = (String) params.get("filePath");
+            config = pdfView.fromUri(getURI(filePath));
+        } else if (params.get("pdfData") != null) {
+            byte[] data = (byte[]) params.get("pdfData");
+            config = pdfView.fromBytes(data);
         }
 
         Object backgroundColor = params.get("hexBackgroundColor");
-        if(backgroundColor != null && backgroundColor instanceof String){
+        if (backgroundColor != null && backgroundColor instanceof String) {
             try {
                 pdfView.setBackgroundColor(Color.parseColor((String) backgroundColor));
-            }catch (IllegalArgumentException e){}
+            } catch (IllegalArgumentException e) {
+            }
         }
 
         if (config != null) {
@@ -67,9 +67,11 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .pageSnap(getBoolean(params, "pageSnap"))
                     .pageFitPolicy(getFitPolicy(params))
                     .enableAnnotationRendering(true)
-                    .linkHandler(linkHandler).
-                    enableAntialiasing(false)
+                    .linkHandler(linkHandler)
+                    .enableAntialiasing(false)
+                    .enableDoubletap(true)
                     // .fitEachPage(getBoolean(params,"fitEachPage"))
+                    .defaultPage(getInt(params, "defaultPage"))
                     .onPageChange(new OnPageChangeListener() {
                         @Override
                         public void onPageChanged(int page, int total) {
@@ -78,29 +80,31 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                             args.put("total", total);
                             methodChannel.invokeMethod("onPageChanged", args);
                         }
-                    }).onError(new OnErrorListener() {
-                @Override
-                public void onError(Throwable t) {
-                    Map<String, Object> args = new HashMap<>();
-                    args.put("error", t.toString());
-                    methodChannel.invokeMethod("onError", args);
-                }
-            }).onPageError(new OnPageErrorListener() {
-                @Override
-                public void onPageError(int page, Throwable t) {
-                    Map<String, Object> args = new HashMap<>();
-                    args.put("page", page);
-                    args.put("error", t.toString());
-                    methodChannel.invokeMethod("onPageError", args);
-                }
-            }).onRender(new OnRenderListener() {
-                @Override
-                public void onInitiallyRendered(int pages) {
-                    Map<String, Object> args = new HashMap<>();
-                    args.put("pages", pages);
-                    methodChannel.invokeMethod("onRender", args);
-                }
-            }).enableDoubletap(true).defaultPage(getInt(params, "defaultPage")).load();
+                    })
+                    .onError(new OnErrorListener() {
+                        @Override
+                        public void onError(Throwable t) {
+                            Map<String, Object> args = new HashMap<>();
+                            args.put("error", t.toString());
+                            methodChannel.invokeMethod("onError", args);
+                        }
+                    }).onPageError(new OnPageErrorListener() {
+                        @Override
+                        public void onPageError(int page, Throwable t) {
+                            Map<String, Object> args = new HashMap<>();
+                            args.put("page", page);
+                            args.put("error", t.toString());
+                            methodChannel.invokeMethod("onPageError", args);
+                        }
+                    }).onRender(new OnRenderListener() {
+                        @Override
+                        public void onInitiallyRendered(int pages) {
+                            Map<String, Object> args = new HashMap<>();
+                            args.put("pages", pages);
+                            methodChannel.invokeMethod("onRender", args);
+                        }
+                    })
+                    .load();
         }
     }
 
@@ -183,19 +187,19 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         methodChannel.setMethodCallHandler(null);
     }
 
-    boolean getBoolean(Map<String, Object> params, String key) {
+    private boolean getBoolean(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (boolean) params.get(key) : false;
     }
 
-    String getString(Map<String, Object> params, String key) {
+    private String getString(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (String) params.get(key) : "";
     }
 
-    int getInt(Map<String, Object> params, String key) {
+    private int getInt(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (int) params.get(key) : 0;
     }
 
-    FitPolicy getFitPolicy(Map<String, Object> params) {
+    private FitPolicy getFitPolicy(Map<String, Object> params) {
         String fitPolicy = getString(params, "fitPolicy");
         switch (fitPolicy) {
             case "FitPolicy.WIDTH":
