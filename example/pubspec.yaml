@@ -14,13 +14,13 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.2
   path_provider: ^2.0.1
+  flutter_pdfview:
+    path: ../
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  flutter_pdfview:
-    path: ../
 
 # For information on the generic Dart part of this file, see the
 # following page: https://www.dartlang.org/tools/pub/pubspec
@@ -31,6 +31,8 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  
 
   # To add assets to your application, add an assets section, like this:
   assets:
