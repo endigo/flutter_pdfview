@@ -230,7 +230,7 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
               print('goto uri: $uri');
             },
             onPageChanged: (int? page, int? total) {
-              print('page change: $page/$total');
+              print('page change: ${page ?? 0 + 1}/$total');
               setState(() {
                 currentPage = page;
               });
