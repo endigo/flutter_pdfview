@@ -47,15 +47,24 @@
 
     @try  {
         NSString* hexBackgroundColor = args[@"hexBackgroundColor"];
-        unsigned rgbValue = 0;
-        NSScanner *scanner = [NSScanner scannerWithString:hexBackgroundColor];
-        [scanner setScanLocation:1]; // bypass '#' character
-        [scanner scanHexInt:&rgbValue];
-
-        UIColor *colour = [UIColor colorWithRed:((rgbValue & 0xFF0000) >> 16)/255.0
-                                          green:((rgbValue & 0xFF00) >> 8)/255.0 blue:(rgbValue & 0xFF)/255.0 alpha:1.0];
-        _pdfView.view.backgroundColor = colour;
+        if ([hexBackgroundColor isKindOfClass:[NSString class]] && hexBackgroundColor.length > 0) {
+            unsigned rgbValue = 0;
+            NSScanner *scanner = [NSScanner scannerWithString:hexBackgroundColor];
+            [scanner setScanLocation:1]; // bypass '#' character
+            if ([scanner scanHexInt:&rgbValue]) {
+                UIColor *colour = [UIColor colorWithRed:((rgbValue & 0xFF0000) >> 16)/255.0
+                                                  green:((rgbValue & 0xFF00) >> 8)/255.0 
+                                                   blue:(rgbValue & 0xFF)/255.0 
+                                                  alpha:1.0];
+                _pdfView.view.backgroundColor = colour;
+            } else {
+                NSLog(@"Invalid hex color format: %@", hexBackgroundColor);
+            }
+        } else {
+            NSLog(@"hexBackgroundColor is not a valid string or is empty");
+        }
     } @catch (NSException *exception) {
+        NSLog(@"Exception while setting background color: %@", exception);
     }
 
     NSString* channelName = [NSString stringWithFormat:@"plugins.endigo.io/pdfview_%lld", viewId];
