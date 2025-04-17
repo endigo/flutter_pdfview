@@ -1,3 +1,6 @@
+## 1.4.0+1
+- Add error handling on backgrounndcolor in iOS
+
 ## 1.4.0
 - Add support for Swift Package Manager
 
