@@ -8,3 +8,4 @@
 ios/.symlinks
 
 build/
+example/android/app/.cxx
