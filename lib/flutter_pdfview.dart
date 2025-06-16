@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter/rendering.dart';
 
 typedef PDFViewCreatedCallback = void Function(PDFViewController controller);
 typedef RenderCallback = void Function(int? pages);
@@ -300,52 +300,48 @@ class _PDFViewSettings {
 class PDFViewController {
   PDFViewController._(
     int id,
-    this._widget,
-  ) : _channel = MethodChannel('plugins.endigo.io/pdfview_$id') {
-    _settings = _PDFViewSettings.fromWidget(_widget);
-    _channel.setMethodCallHandler(_onMethodCall);
+    PDFView widget,
+  )   : _channel = MethodChannel('plugins.endigo.io/pdfview_$id'),
+        _widget = widget {
+    _settings = _PDFViewSettings.fromWidget(widget);
+    _channel?.setMethodCallHandler(_onMethodCall);
   }
 
-  final MethodChannel _channel;
+  void dispose() {
+    _channel?.setMethodCallHandler(null);
+    _channel = null;
+    _widget = null;
+  }
+
+  MethodChannel? _channel;
 
   late _PDFViewSettings _settings;
 
-  PDFView _widget;
+  PDFView? _widget;
 
   Future<bool?> _onMethodCall(MethodCall call) async {
+    final widget = _widget;
+    if (widget == null) return null;
+
     switch (call.method) {
       case 'onRender':
-        if (_widget.onRender != null) {
-          _widget.onRender!(call.arguments['pages']);
-        }
-
+        widget.onRender?.call(call.arguments['pages']);
         return null;
       case 'onPageChanged':
-        if (_widget.onPageChanged != null) {
-          _widget.onPageChanged!(
-            call.arguments['page'],
-            call.arguments['total'],
-          );
-        }
-
+        widget.onPageChanged?.call(
+          call.arguments['page'],
+          call.arguments['total'],
+        );
         return null;
       case 'onError':
-        if (_widget.onError != null) {
-          _widget.onError!(call.arguments['error']);
-        }
-
+        widget.onError?.call(call.arguments['error']);
         return null;
       case 'onPageError':
-        if (_widget.onPageError != null) {
-          _widget.onPageError!(call.arguments['page'], call.arguments['error']);
-        }
-
+        widget.onPageError
+            ?.call(call.arguments['page'], call.arguments['error']);
         return null;
       case 'onLinkHandler':
-        if (_widget.onLinkHandler != null) {
-          _widget.onLinkHandler!(call.arguments);
-        }
-
+        widget.onLinkHandler?.call(call.arguments);
         return null;
     }
     throw MissingPluginException(
@@ -353,18 +349,18 @@ class PDFViewController {
   }
 
   Future<int?> getPageCount() async {
-    final int? pageCount = await _channel.invokeMethod('pageCount');
+    final int? pageCount = await _channel?.invokeMethod('pageCount');
     return pageCount;
   }
 
   Future<int?> getCurrentPage() async {
-    final int? currentPage = await _channel.invokeMethod('currentPage');
+    final int? currentPage = await _channel?.invokeMethod('currentPage');
     return currentPage;
   }
 
   Future<bool?> setPage(int page) async {
     final bool? isSet =
-        await _channel.invokeMethod('setPage', <String, dynamic>{
+        await _channel?.invokeMethod('setPage', <String, dynamic>{
       'page': page,
     });
     return isSet;
@@ -381,6 +377,6 @@ class PDFViewController {
       return null;
     }
     _settings = setting;
-    return _channel.invokeMethod('updateSettings', updateMap);
+    return _channel?.invokeMethod('updateSettings', updateMap);
   }
 }

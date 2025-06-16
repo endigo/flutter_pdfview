@@ -102,7 +102,7 @@
 @end
 
 @implementation FLTPDFView {
-    FLTPDFViewController* _controller;
+    FLTPDFViewController* __weak _controller;
     PDFView* _pdfView;
     NSNumber* _pageCount;
     NSNumber* _currentPage;
