@@ -311,16 +311,15 @@ class PDFViewController {
   )   : _channel = MethodChannel('plugins.endigo.io/pdfview_$id'),
         _widget = widget {
     _settings = _PDFViewSettings.fromWidget(widget);
-    _channel?.setMethodCallHandler(_onMethodCall);
+    _channel.setMethodCallHandler(_onMethodCall);
   }
 
   void dispose() {
-    _channel?.setMethodCallHandler(null);
-    _channel = null;
+    _channel.setMethodCallHandler(null);
     _widget = null;
   }
 
-  MethodChannel? _channel;
+  MethodChannel _channel;
 
   late _PDFViewSettings _settings;
 
@@ -356,18 +355,18 @@ class PDFViewController {
   }
 
   Future<int?> getPageCount() async {
-    final int? pageCount = await _channel?.invokeMethod('pageCount');
+    final int? pageCount = await _channel.invokeMethod('pageCount');
     return pageCount;
   }
 
   Future<int?> getCurrentPage() async {
-    final int? currentPage = await _channel?.invokeMethod('currentPage');
+    final int? currentPage = await _channel.invokeMethod('currentPage');
     return currentPage;
   }
 
   Future<bool?> setPage(int page) async {
     final bool? isSet =
-        await _channel?.invokeMethod('setPage', <String, dynamic>{
+        await _channel.invokeMethod('setPage', <String, dynamic>{
       'page': page,
     });
     return isSet;
@@ -384,6 +383,6 @@ class PDFViewController {
       return null;
     }
     _settings = setting;
-    return _channel?.invokeMethod('updateSettings', updateMap);
+    return _channel.invokeMethod('updateSettings', updateMap);
   }
 }
