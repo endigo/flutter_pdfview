@@ -183,6 +183,13 @@ class _PDFViewState extends State<PDFView> {
     _controller.future.then(
         (PDFViewController controller) => controller._updateWidget(widget));
   }
+
+  @override
+  void dispose() {
+    _controller.future
+        .then((PDFViewController controller) => controller.dispose());
+    super.dispose();
+  }
 }
 
 class _CreationParams {
