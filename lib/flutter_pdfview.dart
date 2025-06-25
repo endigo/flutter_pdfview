@@ -282,7 +282,7 @@ class _PDFViewSettings {
       'preventLinkNavigation': preventLinkNavigation,
       "hexBackgroundColor": backgroundColor == null
           ? null
-          : "#${backgroundColor!.value.toRadixString(16)}",
+          : "#${backgroundColor!.toARGB32().toRadixString(16)}",
     };
   }
 
