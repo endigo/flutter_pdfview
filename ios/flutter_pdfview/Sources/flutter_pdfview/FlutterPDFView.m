@@ -46,22 +46,14 @@
     _viewId = viewId;
 
     @try  {
-        NSString* hexBackgroundColor = args[@"hexBackgroundColor"];
-        if ([hexBackgroundColor isKindOfClass:[NSString class]] && hexBackgroundColor.length > 0) {
-            unsigned rgbValue = 0;
-            NSScanner *scanner = [NSScanner scannerWithString:hexBackgroundColor];
-            [scanner setScanLocation:1]; // bypass '#' character
-            if ([scanner scanHexInt:&rgbValue]) {
-                UIColor *colour = [UIColor colorWithRed:((rgbValue & 0xFF0000) >> 16)/255.0
-                                                  green:((rgbValue & 0xFF00) >> 8)/255.0 
-                                                   blue:(rgbValue & 0xFF)/255.0 
-                                                  alpha:1.0];
-                _pdfView.view.backgroundColor = colour;
-            } else {
-                NSLog(@"Invalid hex color format: %@", hexBackgroundColor);
-            }
-        } else {
-            NSLog(@"hexBackgroundColor is not a valid string or is empty");
+        NSNumber* backgroundColor = args[@"backgroundColor"];
+        if ([backgroundColor isKindOfClass:[NSNumber class]]) {
+            unsigned int argb = [backgroundColor unsignedIntValue];
+            CGFloat a = ((argb & 0xFF000000) >> 24) / 255.0;
+            CGFloat r = ((argb & 0x00FF0000) >> 16) / 255.0;
+            CGFloat g = ((argb & 0x0000FF00) >> 8) / 255.0;
+            CGFloat b = (argb & 0x000000FF) / 255.0;
+            _pdfView.view.backgroundColor = [UIColor colorWithRed:r green:g blue:b alpha:a];
         }
     } @catch (NSException *exception) {
         NSLog(@"Exception while setting background color: %@", exception);

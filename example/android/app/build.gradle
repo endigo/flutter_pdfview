@@ -23,7 +23,7 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.example.flutter_pdfview_example"
-    compileSdkVersion 34
+    compileSdkVersion 35
 
     lintOptions {
         disable 'InvalidPackage'

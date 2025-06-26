@@ -48,12 +48,10 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
             config = pdfView.fromBytes(data);
         }
 
-        Object backgroundColor = params.get("hexBackgroundColor");
-        if (backgroundColor != null && backgroundColor instanceof String) {
-            try {
-                pdfView.setBackgroundColor(Color.parseColor((String) backgroundColor));
-            } catch (IllegalArgumentException e) {
-            }
+        Object backgroundColor = params.get("backgroundColor");
+        if (backgroundColor != null) {
+            int color = ((Number) backgroundColor).intValue();
+            pdfView.setBackgroundColor(color);
         }
 
         if (config != null) {

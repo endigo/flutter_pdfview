@@ -1,3 +1,6 @@
+## 1.4.1+1
+- Revert `.toARGB32()` to depricated `.value`
+
 ## 1.4.1
 - Fixed memory leak on iOS [#315](https://github.com/endigo/flutter_pdfview/pull/315) @flbaue
 

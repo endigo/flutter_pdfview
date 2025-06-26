@@ -280,9 +280,7 @@ class _PDFViewSettings {
       'defaultPage': defaultPage,
       'fitPolicy': fitPolicy.toString(),
       'preventLinkNavigation': preventLinkNavigation,
-      "hexBackgroundColor": backgroundColor == null
-          ? null
-          : "#${backgroundColor!.toARGB32().toRadixString(16)}",
+      'backgroundColor': backgroundColor?.value,
     };
   }
 
