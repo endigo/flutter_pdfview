@@ -21,7 +21,7 @@ rootProject.allprojects {
 apply plugin: 'com.android.library'
 
 android {
-    namespace "com.example.flutter_pdfview"
+    namespace "io.endigo.plugins.pdfviewflutter"
     compileSdkVersion 30
 
     defaultConfig {
