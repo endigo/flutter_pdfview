@@ -1,3 +1,10 @@
+## 1.4.2-beta.1
+- Add Android 16KB page size support [#321](https://github.com/endigo/flutter_pdfview/pull/321) @opsenes
+- Update Android PDF viewer library to `io.github.oothp:android-pdf-viewer:3.2.0-beta05`
+- Upgrade Android Gradle Plugin to 8.11.1
+- Upgrade Gradle wrapper to 8.14.3
+- Enable AndroidX support
+
 ## 1.4.1+1
 - Revert `.toARGB32()` to depricated `.value`
 
