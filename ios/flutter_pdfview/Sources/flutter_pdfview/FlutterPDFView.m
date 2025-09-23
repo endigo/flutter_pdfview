@@ -103,12 +103,18 @@
     BOOL _autoSpacing;
     PDFPage* _defaultPage;
     BOOL _defaultPageSet;
+    BOOL _isIPad;
+    BOOL _isScrolling;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
                     arguments:(id _Nullable)args
                     controller:(nonnull FLTPDFViewController *)controller {
     _controller = controller;
+
+    // Detect if device is iPad
+    _isIPad = (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad);
+    _isScrolling = NO;
 
     _pdfView = [[PDFView alloc] initWithFrame: frame];
     _pdfView.delegate = self;
@@ -148,8 +154,15 @@
 
         _pdfView.autoScales = _autoSpacing;
 
-        [_pdfView usePageViewController:pageFling withViewOptions:nil];
-        _pdfView.displayMode = enableSwipe ? kPDFDisplaySinglePageContinuous : kPDFDisplaySinglePage;
+        // On iPad, avoid conflicting display modes with page view controller
+        if (_isIPad && pageFling && enableSwipe) {
+            // For iPad with both pageFling and enableSwipe, prefer page-based navigation
+            [_pdfView usePageViewController:YES withViewOptions:nil];
+            _pdfView.displayMode = kPDFDisplaySinglePage;
+        } else {
+            [_pdfView usePageViewController:pageFling withViewOptions:nil];
+            _pdfView.displayMode = enableSwipe ? kPDFDisplaySinglePageContinuous : kPDFDisplaySinglePage;
+        }
         _pdfView.document = document;
 
         _pdfView.maxScaleFactor = [args[@"maxZoom"] doubleValue];
@@ -163,6 +176,9 @@
         UITapGestureRecognizer *tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onDoubleTap:)];
         tapGestureRecognizer.numberOfTapsRequired = 2;
         tapGestureRecognizer.numberOfTouchesRequired = 1;
+        tapGestureRecognizer.delegate = self;
+        tapGestureRecognizer.delaysTouchesBegan = NO;
+        tapGestureRecognizer.delaysTouchesEnded = NO;
         [_pdfView addGestureRecognizer:tapGestureRecognizer];
 
         NSUInteger pageCount = [document pageCount];
@@ -178,19 +194,46 @@
         });
     }
 
+    // Configure scroll view with defensive handling for iPad
     if (@available(iOS 11.0, *)) {
-        UIScrollView *_scrollView;
+        // Delay scroll view configuration to avoid conflicts during initialization
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            @try {
+                UIScrollView *scrollView = nil;
 
-        for (id subview in _pdfView.subviews) {
-            if ([subview isKindOfClass: [UIScrollView class]]) {
-                _scrollView = subview;
+                for (id subview in self->_pdfView.subviews) {
+                    if ([subview isKindOfClass: [UIScrollView class]]) {
+                        scrollView = subview;
+                        break;
+                    }
+                }
+
+                if (scrollView != nil) {
+                    // On iPad, use more conservative scroll configuration
+                    if (self->_isIPad) {
+                        // Allow system to manage insets on iPad for better compatibility
+                        scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAutomatic;
+
+                        // Set delegate to monitor scroll events
+                        if ([scrollView.delegate isEqual:nil]) {
+                            scrollView.delegate = (id<UIScrollViewDelegate>)self;
+                        }
+                    } else {
+                        // iPhone keeps existing behavior
+                        scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+                        if (@available(iOS 13.0, *)) {
+                            scrollView.automaticallyAdjustsScrollIndicatorInsets = NO;
+                        }
+                    }
+
+                    // Ensure scroll view recognizes gestures properly
+                    scrollView.delaysContentTouches = YES;
+                    scrollView.canCancelContentTouches = YES;
+                }
+            } @catch (NSException *exception) {
+                NSLog(@"Warning: Failed to configure PDF scroll view: %@", exception.reason);
             }
-        }
-
-        _scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
-        if (@available(iOS 13.0, *)) {
-            _scrollView.automaticallyAdjustsScrollIndicatorInsets = NO;
-        }
+        });
     }
 
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(handlePageChanged:) name:PDFViewPageChangedNotification object:_pdfView];
@@ -201,16 +244,27 @@
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    _pdfView.frame = self.frame;
-    _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
-    _pdfView.maxScaleFactor = 4.0;
-    if (_autoSpacing) {
-        _pdfView.scaleFactor = _pdfView.scaleFactorForSizeToFit;
+
+    // Skip layout updates during scrolling to prevent conflicts
+    if (_isScrolling) {
+        return;
     }
-    
-    if (!_defaultPageSet && _defaultPage != nil) {
-        [_pdfView goToPage: _defaultPage];
-        _defaultPageSet = true;
+
+    // Wrap layout updates in try-catch for safety
+    @try {
+        _pdfView.frame = self.frame;
+        _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
+        _pdfView.maxScaleFactor = 4.0;
+        if (_autoSpacing) {
+            _pdfView.scaleFactor = _pdfView.scaleFactorForSizeToFit;
+        }
+
+        if (!_defaultPageSet && _defaultPage != nil) {
+            [_pdfView goToPage: _defaultPage];
+            _defaultPageSet = true;
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"Warning: Layout update failed: %@", exception.reason);
     }
 }
 
@@ -266,22 +320,71 @@
 
 - (void) onDoubleTap: (UITapGestureRecognizer *)recognizer {
     if (recognizer.state == UIGestureRecognizerStateEnded) {
-        if ([_pdfView scaleFactor] == _pdfView.scaleFactorForSizeToFit) {
-            CGPoint point = [recognizer locationInView:_pdfView];
-            PDFPage* page = [_pdfView pageForPoint:point nearest:YES];
-            PDFPoint pdfPoint = [_pdfView convertPoint:point toPage:page];
-            PDFRect rect = [page boundsForBox:kPDFDisplayBoxMediaBox];
-            PDFDestination* destination = [[PDFDestination alloc] initWithPage:page atPoint:CGPointMake(pdfPoint.x - (rect.size.width / 4),pdfPoint.y + (rect.size.height / 4))];
-            [UIView animateWithDuration:0.2 animations:^{
-                self-> _pdfView.scaleFactor = self->_pdfView.scaleFactorForSizeToFit *2;
-                [self->_pdfView goToDestination:destination];
-            }];
-        } else {
-          [UIView animateWithDuration:0.2 animations:^{
-            self->_pdfView.scaleFactor = self->_pdfView.scaleFactorForSizeToFit;
-          }];
+        // Prevent zooming during scrolling
+        if (_isScrolling) {
+            return;
+        }
+
+        @try {
+            if ([_pdfView scaleFactor] == _pdfView.scaleFactorForSizeToFit) {
+                CGPoint point = [recognizer locationInView:_pdfView];
+                PDFPage* page = [_pdfView pageForPoint:point nearest:YES];
+                if (page != nil) {
+                    PDFPoint pdfPoint = [_pdfView convertPoint:point toPage:page];
+                    PDFRect rect = [page boundsForBox:kPDFDisplayBoxMediaBox];
+                    PDFDestination* destination = [[PDFDestination alloc] initWithPage:page atPoint:CGPointMake(pdfPoint.x - (rect.size.width / 4),pdfPoint.y + (rect.size.height / 4))];
+                    [UIView animateWithDuration:0.2 animations:^{
+                        self-> _pdfView.scaleFactor = self->_pdfView.scaleFactorForSizeToFit * 2;
+                        [self->_pdfView goToDestination:destination];
+                    }];
+                }
+            } else {
+                [UIView animateWithDuration:0.2 animations:^{
+                    self->_pdfView.scaleFactor = self->_pdfView.scaleFactorForSizeToFit;
+                }];
+            }
+        } @catch (NSException *exception) {
+            NSLog(@"Warning: Double-tap zoom failed: %@", exception.reason);
         }
     }
+}
+
+#pragma mark - UIGestureRecognizerDelegate
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    // Allow double-tap to work with scroll gestures
+    if ([gestureRecognizer isKindOfClass:[UITapGestureRecognizer class]]) {
+        return YES;
+    }
+    return NO;
+}
+
+- (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer {
+    // Prevent gesture conflicts during scrolling on iPad
+    if (_isIPad && _isScrolling && [gestureRecognizer isKindOfClass:[UITapGestureRecognizer class]]) {
+        return NO;
+    }
+    return YES;
+}
+
+#pragma mark - UIScrollViewDelegate
+
+- (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
+    _isScrolling = YES;
+}
+
+- (void)scrollViewDidEndDragging:(UIScrollView *)scrollView willDecelerate:(BOOL)decelerate {
+    if (!decelerate) {
+        _isScrolling = NO;
+    }
+}
+
+- (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView {
+    _isScrolling = NO;
+}
+
+- (void)scrollViewDidEndScrollingAnimation:(UIScrollView *)scrollView {
+    _isScrolling = NO;
 }
 
 @end

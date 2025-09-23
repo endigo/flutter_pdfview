@@ -20,7 +20,7 @@ API_AVAILABLE(ios(11.0))
 @end
 
 API_AVAILABLE(ios(11.0))
-@interface FLTPDFView : UIView <FlutterPlatformView, PDFViewDelegate>
+@interface FLTPDFView : UIView <FlutterPlatformView, PDFViewDelegate, UIGestureRecognizerDelegate, UIScrollViewDelegate>
 - (instancetype)initWithFrame:(CGRect)frame
                     arguments:(id _Nullable)args
                     controller:(FLTPDFViewController*) controller;
