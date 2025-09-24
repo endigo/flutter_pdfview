@@ -39,7 +39,9 @@ class PDFView extends StatefulWidget {
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
     this.backgroundColor,
+    this.maxZoom = 3.0,
   })  : assert(filePath != null || pdfData != null),
+        assert(maxZoom > 1.0, 'maxZoom must be greater than 1.0'),
         super(key: key);
 
   @override
@@ -119,6 +121,9 @@ class PDFView extends StatefulWidget {
 
   /// Use to change the background color. ex : "#FF0000" => red
   final Color? backgroundColor;
+
+  /// Use to change the maximal zoom. Must be greater than 1.0, default 3.0.
+  final double maxZoom;
 }
 
 class _PDFViewState extends State<PDFView> {
@@ -237,6 +242,7 @@ class _PDFViewSettings {
     this.fitPolicy,
     this.preventLinkNavigation,
     this.backgroundColor,
+    this.maxZoom,
   });
 
   static _PDFViewSettings fromWidget(PDFView widget) {
@@ -252,6 +258,7 @@ class _PDFViewSettings {
       fitPolicy: widget.fitPolicy,
       preventLinkNavigation: widget.preventLinkNavigation,
       backgroundColor: widget.backgroundColor,
+      maxZoom: widget.maxZoom,
     );
   }
 
@@ -267,6 +274,7 @@ class _PDFViewSettings {
   final bool? preventLinkNavigation;
 
   final Color? backgroundColor;
+  final double? maxZoom;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -281,6 +289,7 @@ class _PDFViewSettings {
       'fitPolicy': fitPolicy.toString(),
       'preventLinkNavigation': preventLinkNavigation,
       'backgroundColor': backgroundColor?.value,
+      'maxZoom': maxZoom,
     };
   }
 
