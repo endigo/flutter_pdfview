@@ -46,18 +46,29 @@
     _viewId = viewId;
 
     @try  {
+        NSNumber* nightMode = args[@"nightMode"];
+        NSNumber* nightModeBackgroundColor = args[@"nightModeBackgroundColor"];
         NSNumber* backgroundColor = args[@"backgroundColor"];
-        if ([backgroundColor isKindOfClass:[NSNumber class]]) {
-            unsigned int argb = [backgroundColor unsignedIntValue];
-            CGFloat a = ((argb & 0xFF000000) >> 24) / 255.0;
-            CGFloat r = ((argb & 0x00FF0000) >> 16) / 255.0;
-            CGFloat g = ((argb & 0x0000FF00) >> 8) / 255.0;
-            CGFloat b = (argb & 0x000000FF) / 255.0;
-            _pdfView.view.backgroundColor = [UIColor colorWithRed:r green:g blue:b alpha:a];
+        UIColor* convertedColor = nil;
+        if ([nightMode boolValue] && [nightModeBackgroundColor isKindOfClass:[NSNumber class]]) {
+            convertedColor = [self colorFromARGB:[nightModeBackgroundColor unsignedIntValue]];
+        } else if ([backgroundColor isKindOfClass:[NSNumber class]]) {
+            convertedColor = [self colorFromARGB:[backgroundColor unsignedIntValue]];
+        }
+        if (convertedColor) {
+            _pdfView.view.backgroundColor = convertedColor;
         }
     } @catch (NSException *exception) {
         NSLog(@"Exception while setting background color: %@", exception);
     }
+// Helper function to convert ARGB integer to UIColor
+- (UIColor*)colorFromARGB:(unsigned int)argb {
+    CGFloat a = ((argb & 0xFF000000) >> 24) / 255.0;
+    CGFloat r = ((argb & 0x00FF0000) >> 16) / 255.0;
+    CGFloat g = ((argb & 0x0000FF00) >> 8) / 255.0;
+    CGFloat b = (argb & 0x000000FF) / 255.0;
+    return [UIColor colorWithRed:r green:g blue:b alpha:a];
+}
 
     NSString* channelName = [NSString stringWithFormat:@"plugins.endigo.io/pdfview_%lld", viewId];
     _channel = [FlutterMethodChannel methodChannelWithName:channelName binaryMessenger:messenger];

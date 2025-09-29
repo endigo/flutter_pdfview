@@ -49,7 +49,12 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         }
 
         Object backgroundColor = params.get("backgroundColor");
-        if (backgroundColor != null) {
+        Object nightModeBackgroundColor = params.get("nightModeBackgroundColor");
+        boolean nightMode = getBoolean(params, "nightMode");
+        if (nightMode && nightModeBackgroundColor instanceof Number) {
+            int color = ((Number) nightModeBackgroundColor).intValue();
+            pdfView.setBackgroundColor(color);
+        } else if (backgroundColor instanceof Number) {
             int color = ((Number) backgroundColor).intValue();
             pdfView.setBackgroundColor(color);
         }

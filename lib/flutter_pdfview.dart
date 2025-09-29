@@ -39,6 +39,7 @@ class PDFView extends StatefulWidget {
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
     this.backgroundColor,
+    this.nightModeBackgroundColor,
   })  : assert(filePath != null || pdfData != null),
         super(key: key);
 
@@ -119,6 +120,9 @@ class PDFView extends StatefulWidget {
 
   /// Use to change the background color. ex : "#FF0000" => red
   final Color? backgroundColor;
+
+  /// Use to change the night mode background color. ex : "#222222" => dark gray
+  final Color? nightModeBackgroundColor;
 }
 
 class _PDFViewState extends State<PDFView> {
@@ -237,6 +241,7 @@ class _PDFViewSettings {
     this.fitPolicy,
     this.preventLinkNavigation,
     this.backgroundColor,
+    this.nightModeBackgroundColor,
   });
 
   static _PDFViewSettings fromWidget(PDFView widget) {
@@ -252,6 +257,7 @@ class _PDFViewSettings {
       fitPolicy: widget.fitPolicy,
       preventLinkNavigation: widget.preventLinkNavigation,
       backgroundColor: widget.backgroundColor,
+      nightModeBackgroundColor: widget.nightModeBackgroundColor,
     );
   }
 
@@ -267,6 +273,7 @@ class _PDFViewSettings {
   final bool? preventLinkNavigation;
 
   final Color? backgroundColor;
+  final Color? nightModeBackgroundColor;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -281,6 +288,7 @@ class _PDFViewSettings {
       'fitPolicy': fitPolicy.toString(),
       'preventLinkNavigation': preventLinkNavigation,
       'backgroundColor': backgroundColor?.value,
+      'nightModeBackgroundColor': nightModeBackgroundColor?.value,
     };
   }
 

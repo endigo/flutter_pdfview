@@ -1,11 +1,14 @@
+## NEXT VERSION
+- Add `nightModeBackgroundColor` property to allow custom background color in night mode (Android/iOS)
+
 ## 1.4.3
-- Stable Android 16KB page size support
-- Fix iPad scroll direction crash issue [#325](https://github.com/endigo/flutter_pdfview/issues/325)
+Stable Android 16KB page size support
+Fix iPad scroll direction crash issue [#325](https://github.com/endigo/flutter_pdfview/issues/325)
   - Add defensive scroll view configuration for iPad devices
   - Implement gesture conflict resolution to prevent "Failed to determine navigation direction for scroll" errors
   - Add safe layout updates during scrolling animations
   - Use more conservative scroll settings on iPad to improve compatibility
-- Add iPad Safe Mode example in demo app for recommended PDF configurations on iPad
+Add iPad Safe Mode example in demo app for recommended PDF configurations on iPad
 
 ## 1.4.2-beta.1
 - Add Android 16KB page size support [#321](https://github.com/endigo/flutter_pdfview/pull/321) @opsenes
