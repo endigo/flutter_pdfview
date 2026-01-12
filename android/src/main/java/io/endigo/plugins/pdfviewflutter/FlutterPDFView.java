@@ -39,6 +39,16 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
         linkHandler = new PDFLinkHandler(context, pdfView, methodChannel, preventLinkNavigation);
 
+
+        pdfView.useBestQuality(getBoolean(params, "useBestQuality"));
+        pdfView.enableRenderDuringScale(getBoolean(params, "enableRenderDuringScale"));
+        Float thumbnailRatio = getFloat(params, "thumbnailRatio");
+
+        if (thumbnailRatio != null) {
+            Constants.THUMBNAIL_RATIO = thumbnailRatio;
+        }
+//        Constants.Cache.THUMBNAILS_CACHE_SIZE = 0;
+
         Configurator config = null;
         if (params.get("filePath") != null) {
             String filePath = (String) params.get("filePath");
@@ -66,7 +76,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .pageFitPolicy(getFitPolicy(params))
                     .enableAnnotationRendering(true)
                     .linkHandler(linkHandler)
-                    .enableAntialiasing(false)
+                    .enableAntialiasing(getBoolean(params, "enableAntialiasing"))
                     .enableDoubletap(true)
                     // .fitEachPage(getBoolean(params,"fitEachPage"))
                     .defaultPage(getInt(params, "defaultPage"))
@@ -195,6 +205,17 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
     private int getInt(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (int) params.get(key) : 0;
+    }
+
+    private Float getFloat(Map<String, Object> params, String key) {
+        if (!params.containsKey(key)) {
+            return null;
+        }
+        Object value = params.get(key);
+        if (value instanceof Number) {
+            return ((Number) value).floatValue();
+        }
+        return null;
     }
 
     private FitPolicy getFitPolicy(Map<String, Object> params) {
