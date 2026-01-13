@@ -1,4 +1,9 @@
+## 1.4.4
+
+- Fixes an Android rendering [#330](https://github.com/endigo/flutter_pdfview/pull/330) @TimelessLin
+
 ## 1.4.3
+
 - Stable Android 16KB page size support
 - Fix iPad scroll direction crash issue [#325](https://github.com/endigo/flutter_pdfview/issues/325)
   - Add defensive scroll view configuration for iPad devices
@@ -8,6 +13,7 @@
 - Add iPad Safe Mode example in demo app for recommended PDF configurations on iPad
 
 ## 1.4.2-beta.1
+
 - Add Android 16KB page size support [#321](https://github.com/endigo/flutter_pdfview/pull/321) @opsenes
 - Update Android PDF viewer library to `io.github.oothp:android-pdf-viewer:3.2.0-beta05`
 - Upgrade Android Gradle Plugin to 8.11.1
@@ -15,27 +21,36 @@
 - Enable AndroidX support
 
 ## 1.4.1+1
+
 - Revert `.toARGB32()` to depricated `.value`
 
 ## 1.4.1
+
 - Fixed memory leak on iOS [#315](https://github.com/endigo/flutter_pdfview/pull/315) @flbaue
 
 ## 1.4.0+1
+
 - Add error handling on background color in iOS
 
 ## 1.4.0
+
 - Add support for Swift Package Manager
 
 ## 1.3.4
+
 - Add support for background color [278](https://github.com/endigo/flutter_pdfview/pull/278) @bobbybun
 
 ## 1.3.3
+
 - hotfix: Crash on iOS 18
 
 ## 1.3.2
+
 - build.gradle namespace [#253](https://github.com/endigo/flutter_pdfview/pull/253) @DrBu7cher
-- 
+-
+
 ## 1.3.1
+
 - Upgrade compileSdkVersion to 33
 - Upgrade sdk
 
