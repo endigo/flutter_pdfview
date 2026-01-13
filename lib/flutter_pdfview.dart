@@ -34,6 +34,10 @@ class PDFView extends StatefulWidget {
     this.autoSpacing = true,
     this.pageFling = true,
     this.pageSnap = true,
+    this.enableAntialiasing = true,
+    this.useBestQuality = true,
+    this.enableRenderDuringScale = true,
+    this.thumbnailRatio = 0.8,
     this.fitEachPage = true,
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
@@ -101,6 +105,18 @@ class PDFView extends StatefulWidget {
   /// Indicates whether or not the viewer snaps to a page after the user has scrolled to it. If set to true, snapping is enabled.
   final bool pageSnap;
 
+  /// Controls whether the PDF renderer uses anti-aliasing (Android only).
+  final bool enableAntialiasing;
+
+  /// Improves render quality at the cost of performance (Android only).
+  final bool useBestQuality;
+
+  /// Renders during scale gestures for smoother zooming (Android only).
+  final bool enableRenderDuringScale;
+
+  /// Thumbnail ratio used by AndroidPdfViewer (Android only).
+  final double? thumbnailRatio;
+
   /// Represents the default page to display when the PDF document is loaded.
   final int defaultPage;
 
@@ -123,7 +139,7 @@ class PDFView extends StatefulWidget {
 
 class _PDFViewState extends State<PDFView> {
   final Completer<PDFViewController> _controller =
-      Completer<PDFViewController>();
+  Completer<PDFViewController>();
 
   @override
   Widget build(BuildContext context) {
@@ -131,9 +147,9 @@ class _PDFViewState extends State<PDFView> {
       return PlatformViewLink(
         viewType: 'plugins.endigo.io/pdfview',
         surfaceFactory: (
-          BuildContext context,
-          PlatformViewController controller,
-        ) {
+            BuildContext context,
+            PlatformViewController controller,
+            ) {
           return AndroidViewSurface(
             controller: controller as AndroidViewController,
             gestureRecognizers: widget.gestureRecognizers ??
@@ -181,7 +197,7 @@ class _PDFViewState extends State<PDFView> {
   void didUpdateWidget(PDFView oldWidget) {
     super.didUpdateWidget(oldWidget);
     _controller.future.then(
-        (PDFViewController controller) => controller._updateWidget(widget));
+            (PDFViewController controller) => controller._updateWidget(widget));
   }
 
   @override
@@ -233,6 +249,10 @@ class _PDFViewSettings {
     this.autoSpacing,
     this.pageFling,
     this.pageSnap,
+    this.enableAntialiasing,
+    this.useBestQuality,
+    this.enableRenderDuringScale,
+    this.thumbnailRatio,
     this.defaultPage,
     this.fitPolicy,
     this.preventLinkNavigation,
@@ -248,6 +268,10 @@ class _PDFViewSettings {
       autoSpacing: widget.autoSpacing,
       pageFling: widget.pageFling,
       pageSnap: widget.pageSnap,
+      enableAntialiasing: widget.enableAntialiasing,
+      useBestQuality: widget.useBestQuality,
+      enableRenderDuringScale: widget.enableRenderDuringScale,
+      thumbnailRatio: widget.thumbnailRatio,
       defaultPage: widget.defaultPage,
       fitPolicy: widget.fitPolicy,
       preventLinkNavigation: widget.preventLinkNavigation,
@@ -262,6 +286,10 @@ class _PDFViewSettings {
   final bool? autoSpacing;
   final bool? pageFling;
   final bool? pageSnap;
+  final bool? enableAntialiasing;
+  final bool? useBestQuality;
+  final bool? enableRenderDuringScale;
+  final double? thumbnailRatio;
   final int? defaultPage;
   final FitPolicy? fitPolicy;
   final bool? preventLinkNavigation;
@@ -277,6 +305,10 @@ class _PDFViewSettings {
       'autoSpacing': autoSpacing,
       'pageFling': pageFling,
       'pageSnap': pageSnap,
+      'enableAntialiasing': enableAntialiasing,
+      'useBestQuality': useBestQuality,
+      'enableRenderDuringScale': enableRenderDuringScale,
+      'thumbnailRatio': thumbnailRatio,
       'defaultPage': defaultPage,
       'fitPolicy': fitPolicy.toString(),
       'preventLinkNavigation': preventLinkNavigation,
@@ -304,9 +336,9 @@ class _PDFViewSettings {
 
 class PDFViewController {
   PDFViewController._(
-    int id,
-    PDFView widget,
-  )   : _channel = MethodChannel('plugins.endigo.io/pdfview_$id'),
+      int id,
+      PDFView widget,
+      )   : _channel = MethodChannel('plugins.endigo.io/pdfview_$id'),
         _widget = widget {
     _settings = _PDFViewSettings.fromWidget(widget);
     _channel.setMethodCallHandler(_onMethodCall);
@@ -364,7 +396,7 @@ class PDFViewController {
 
   Future<bool?> setPage(int page) async {
     final bool? isSet =
-        await _channel.invokeMethod('setPage', <String, dynamic>{
+    await _channel.invokeMethod('setPage', <String, dynamic>{
       'page': page,
     });
     return isSet;
