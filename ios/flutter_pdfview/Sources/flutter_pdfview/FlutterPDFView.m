@@ -165,7 +165,11 @@
         }
         _pdfView.document = document;
 
-        _pdfView.maxScaleFactor = [args[@"maxZoom"] doubleValue];
+        NSNumber *maxZoom = args[@"maxZoom"];
+        if (maxZoom != nil && [maxZoom isKindOfClass:[NSNumber class]]) {
+            _pdfView.maxScaleFactor = [maxZoom doubleValue];
+        }
+
         _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
 
         NSString* password = args[@"password"];

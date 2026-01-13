@@ -64,6 +64,15 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
             pdfView.setBackgroundColor(color);
         }
 
+        Object maxZoom = params.get("maxZoom");
+        if (maxZoom != null) {
+            float max = ((Number) maxZoom).floatValue();
+            // NOTE: Android's PDFView zoom scaling is about half of iOS PDFKit.
+            // Multiply by 2 to normalize so that a Dart value like maxZoom = 3.0
+            // results in ~300% zoom on both iOS and Android.
+            pdfView.setMaxZoom(max * 2);
+        }
+
         if (config != null) {
             config
                     .enableSwipe(getBoolean(params, "enableSwipe"))
