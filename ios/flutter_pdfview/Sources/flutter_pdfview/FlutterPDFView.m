@@ -42,7 +42,11 @@
                     arguments:(id _Nullable)args
               binaryMessenger:(NSObject<FlutterBinaryMessenger>*)messenger {
     self = [super init];
-    _pdfView = [[FLTPDFView new] initWithFrame:frame arguments:args controller:self];
+    if (!self) return nil;
+
+    // NOTE: `new` already calls `init`. Re-initializing a UIView can crash on newer UIKit
+    // during trait collection initialization. Use alloc/init instead.
+    _pdfView = [[FLTPDFView alloc] initWithFrame:frame arguments:args controller:self];
     _viewId = viewId;
 
     @try  {
