@@ -352,6 +352,12 @@ class _PDFViewSettings {
     if (preventLinkNavigation != newSettings.preventLinkNavigation) {
       updates['preventLinkNavigation'] = newSettings.preventLinkNavigation;
     }
+    if (maxZoom != newSettings.maxZoom) {
+      updates['maxZoom'] = newSettings.maxZoom;
+    }
+    if (minZoom != newSettings.minZoom) {
+      updates['minZoom'] = newSettings.minZoom;
+    }
     return updates;
   }
 }

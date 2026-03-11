@@ -126,6 +126,7 @@
     BOOL _isObserving;
     CGFloat _maxScaleFactor;
     CGFloat _minScaleFactor;
+    BOOL _hasSentInitialPage;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -336,15 +337,27 @@
     @try {
         _pdfView.frame = self.frame;
         CGFloat fitScale = _pdfView.scaleFactorForSizeToFit;
-        _pdfView.minScaleFactor = (_minScaleFactor > 0) ? fmin(fitScale, _minScaleFactor) : fitScale;
-        _pdfView.maxScaleFactor = _maxScaleFactor;
+        CGFloat minScale = (_minScaleFactor > 0) ? _minScaleFactor : fitScale;
+        _pdfView.minScaleFactor = minScale;
+        _pdfView.maxScaleFactor = fmax(_maxScaleFactor, minScale);
         if (_autoSpacing) {
-            _pdfView.scaleFactor = _pdfView.scaleFactorForSizeToFit;
+            CGFloat clampedScale = fmin(fmax(fitScale, _pdfView.minScaleFactor), _pdfView.maxScaleFactor);
+            _pdfView.scaleFactor = clampedScale;
         }
 
         if (!_defaultPageSet && _defaultPage != nil) {
             [_pdfView goToPage: _defaultPage];
             _defaultPageSet = true;
+        }
+
+        if (!_hasSentInitialPage && _defaultPageSet && _pdfView.document != nil && _pdfView.currentPage != nil) {
+            _hasSentInitialPage = YES;
+            NSUInteger currentPageIndex = [_pdfView.document indexForPage:_pdfView.currentPage];
+            NSUInteger pageCount = [_pdfView.document pageCount];
+            [_controller invokeChannelMethod:@"onPageChanged" arguments:@{
+                @"page" : [NSNumber numberWithUnsignedLong:currentPageIndex],
+                @"total" : [NSNumber numberWithUnsignedLong:pageCount]
+            }];
         }
     } @catch (NSException *exception) {
         NSLog(@"Warning: Layout update failed: %@", exception.reason);

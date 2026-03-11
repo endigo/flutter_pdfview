@@ -129,8 +129,13 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
             Float maxZoom = getFloat(params, "maxZoom");
             Float minZoom = getFloat(params, "minZoom");
-            pdfView.setMaxZoom(maxZoom != null ? maxZoom : DEFAULT_MAX_ZOOM);
-            pdfView.setMinZoom(minZoom != null ? minZoom : DEFAULT_MIN_ZOOM);
+            float effectiveMax = maxZoom != null ? maxZoom : DEFAULT_MAX_ZOOM;
+            float effectiveMin = minZoom != null ? minZoom : DEFAULT_MIN_ZOOM;
+            if (effectiveMin > effectiveMax) {
+                effectiveMin = effectiveMax;
+            }
+            pdfView.setMaxZoom(effectiveMax);
+            pdfView.setMinZoom(effectiveMin);
         }
         configurator = config;
     }
