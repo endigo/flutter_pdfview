@@ -28,6 +28,9 @@ import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.platform.PlatformView;
 
 public class FlutterPDFView implements PlatformView, MethodCallHandler {
+    private static final float DEFAULT_MAX_ZOOM = 4.0f;
+    private static final float DEFAULT_MIN_ZOOM = 1.0f;
+
     private final PDFView pdfView;
     private final Configurator configurator;
     private final MethodChannel methodChannel;
@@ -123,6 +126,11 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                         args.put("pages", nbPages);
                         methodChannel.invokeMethod("onLoadComplete", args);
                     }).load();
+
+            Float maxZoom = getFloat(params, "maxZoom");
+            Float minZoom = getFloat(params, "minZoom");
+            pdfView.setMaxZoom(maxZoom != null ? maxZoom : DEFAULT_MAX_ZOOM);
+            pdfView.setMinZoom(minZoom != null ? minZoom : DEFAULT_MIN_ZOOM);
         }
         configurator = config;
     }
