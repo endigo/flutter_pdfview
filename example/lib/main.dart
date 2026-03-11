@@ -219,6 +219,7 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
                 : true, // Vertical scrolling is safer on iPad
             autoSpacing:
                 widget.isIPadSafe ? true : false, // Let PDFKit handle spacing
+            spacing: widget.isIPadSafe ? 0 : 10,
             pageFling: widget.isIPadSafe
                 ? false
                 : true, // Disable page fling to avoid conflicts

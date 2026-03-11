@@ -59,6 +59,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | nightMode             |   ✅    | ❌  |      `false`      |
 | password              |   ✅    | ✅  |      `null`       |
 | autoSpacing           |   ✅    | ✅  |      `true`       |
+| spacing               |   ✅    | ✅  |        `0`        |
 | pageFling             |   ✅    | ✅  |      `true`       |
 | pageSnap              |   ✅    | ❌  |      `true`       |
 | preventLinkNavigation |   ✅    | ✅  |      `false`      |

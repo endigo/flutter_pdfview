@@ -71,6 +71,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .password(getString(params, "password"))
                     .nightMode(getBoolean(params, "nightMode"))
                     .autoSpacing(getBoolean(params, "autoSpacing"))
+                    .spacing(getInt(params, "spacing"))
                     .pageFling(getBoolean(params, "pageFling"))
                     .pageSnap(getBoolean(params, "pageSnap"))
                     .pageFitPolicy(getFitPolicy(params))

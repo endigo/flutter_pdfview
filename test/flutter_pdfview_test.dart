@@ -167,12 +167,14 @@ void main() {
         swipeHorizontal: true,
         pageFling: false,
         pageSnap: false,
+        spacing: 15,
       );
 
       expect(customPdfView.enableSwipe, false);
       expect(customPdfView.swipeHorizontal, true);
       expect(customPdfView.pageFling, false);
       expect(customPdfView.pageSnap, false);
+      expect(customPdfView.spacing, 15);
     });
   });
 

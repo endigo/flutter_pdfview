@@ -32,6 +32,7 @@ class PDFView extends StatefulWidget {
     this.password,
     this.nightMode = false,
     this.autoSpacing = true,
+    this.spacing = 0,
     this.pageFling = true,
     this.pageSnap = true,
     this.enableAntialiasing = true,
@@ -98,6 +99,9 @@ class PDFView extends StatefulWidget {
 
   /// Indicates whether or not the PDF viewer automatically adds spacing between pages. If set to true, spacing is added.
   final bool autoSpacing;
+
+  /// Indicates the amount of spacing between pages in the PDF document.
+  final int spacing;
 
   /// Indicates whether or not the user can "fling" pages in the PDF document. If set to true, page flinging is enabled.
   final bool pageFling;
@@ -247,6 +251,7 @@ class _PDFViewSettings {
     this.password,
     this.nightMode,
     this.autoSpacing,
+    this.spacing,
     this.pageFling,
     this.pageSnap,
     this.enableAntialiasing,
@@ -266,6 +271,7 @@ class _PDFViewSettings {
       password: widget.password,
       nightMode: widget.nightMode,
       autoSpacing: widget.autoSpacing,
+      spacing: widget.spacing,
       pageFling: widget.pageFling,
       pageSnap: widget.pageSnap,
       enableAntialiasing: widget.enableAntialiasing,
@@ -284,6 +290,7 @@ class _PDFViewSettings {
   final String? password;
   final bool? nightMode;
   final bool? autoSpacing;
+  final int? spacing;
   final bool? pageFling;
   final bool? pageSnap;
   final bool? enableAntialiasing;
@@ -303,6 +310,7 @@ class _PDFViewSettings {
       'password': password,
       'nightMode': nightMode,
       'autoSpacing': autoSpacing,
+      'spacing': spacing,
       'pageFling': pageFling,
       'pageSnap': pageSnap,
       'enableAntialiasing': enableAntialiasing,

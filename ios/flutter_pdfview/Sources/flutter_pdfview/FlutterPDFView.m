@@ -101,6 +101,7 @@
     PDFDestination* _currentDestination;
     BOOL _preventLinkNavigation;
     BOOL _autoSpacing;
+    NSInteger _spacing;
     PDFPage* _defaultPage;
     BOOL _defaultPageSet;
     BOOL _isIPad;
@@ -120,6 +121,7 @@
     _pdfView.delegate = self;
 
     _autoSpacing = [args[@"autoSpacing"] boolValue];
+    _spacing = [args[@"spacing"] integerValue];
     BOOL pageFling = [args[@"pageFling"] boolValue];
     BOOL enableSwipe = [args[@"enableSwipe"] boolValue];
     _preventLinkNavigation = [args[@"preventLinkNavigation"] boolValue];
@@ -153,6 +155,10 @@
         }
 
         _pdfView.autoScales = _autoSpacing;
+
+        if (@available(iOS 11.0, *)) {
+            _pdfView.pageBreakMargins = UIEdgeInsetsMake(_spacing, 0, _spacing, 0);
+        }
 
         // On iPad, avoid conflicting display modes with page view controller
         if (_isIPad && pageFling && enableSwipe) {
