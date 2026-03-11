@@ -124,6 +124,8 @@
     BOOL _isScrolling;
     BOOL _didLoadComplete;
     BOOL _isObserving;
+    CGFloat _maxScaleFactor;
+    CGFloat _minScaleFactor;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -160,19 +162,22 @@
         }
 
 
-        if (_document == nil) {
-            [_controller invokeChannelMethod:@"onError" arguments:@{@"error" : @"cannot create document: File not in PDF format or corrupted."}];
-        } else {
-            _pdfView.autoresizesSubviews = YES;
-            _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-            _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    if (document == nil) {
+        __weak __typeof__(self) weakSelf = self;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [weakSelf->_controller invokeChannelMethod:@"onError" arguments:@{@"error" : @"cannot create document: File not in PDF format or corrupted."}];
+        });
+    } else {
+        _pdfView.autoresizesSubviews = YES;
+        _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+        _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
 
-            BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
-            if (swipeHorizontal) {
-                _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
-            } else {
-                _pdfView.displayDirection = kPDFDisplayDirectionVertical;
-            }
+        BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
+        if (swipeHorizontal) {
+            _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
+        } else {
+            _pdfView.displayDirection = kPDFDisplayDirectionVertical;
+        }
 
             _pdfView.autoScales = _autoSpacing;
 
@@ -188,8 +193,14 @@
             _pdfView.displaysPageBreaks = NO;
             _pdfView.document = _document;
 
-            _pdfView.maxScaleFactor = 4.0;
-            _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
+        _maxScaleFactor = [args[@"maxZoom"] doubleValue];
+        if (_maxScaleFactor <= 0) {
+            _maxScaleFactor = 4.0;
+        }
+        _minScaleFactor = [args[@"minZoom"] doubleValue];
+
+        _pdfView.maxScaleFactor = _maxScaleFactor;
+        _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
 
             NSString* password = args[@"password"];
             if ([password isKindOfClass:[NSString class]] && [_pdfView.document isEncrypted]) {
@@ -324,6 +335,9 @@
     // Wrap layout updates in try-catch for safety
     @try {
         _pdfView.frame = self.frame;
+        CGFloat fitScale = _pdfView.scaleFactorForSizeToFit;
+        _pdfView.minScaleFactor = (_minScaleFactor > 0) ? fmin(fitScale, _minScaleFactor) : fitScale;
+        _pdfView.maxScaleFactor = _maxScaleFactor;
         if (_autoSpacing) {
             _pdfView.scaleFactor = _pdfView.scaleFactorForSizeToFit;
         }
@@ -430,7 +444,7 @@
         } else if (targetOffset.y > maxOffsetY) {
             targetOffset.y = maxOffsetY;
         }
-        
+
         [_scrollView setContentOffset:targetOffset animated:NO];
     }
 
