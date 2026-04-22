@@ -112,7 +112,7 @@ PDFView(
   onLoadComplete: (int? pages) {
     print('# of pages: $pages');
   },
-  onDraw: () {
+  onDraw: (double xOffset, double yOffset, double scale) {
     print('onDraw');
   },
 ),

@@ -188,10 +188,14 @@ class PDFScreen extends StatefulWidget {
 
 class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
   final Completer<PDFViewController> _controller = Completer<PDFViewController>();
-  int? pages = 0;
-  int? currentPage = 0;
-  bool isReady = false;
-  String errorMessage = '';
+  int? _pages = 0;
+  int? _currentPage = 0;
+  bool _isReady = false;
+  String _errorMessage = '';
+
+  double _xOffset = 0.0;
+  double _yOffset = 0.0;
+  double _scale = 1.0;
 
   @override
   Widget build(BuildContext context) {
@@ -216,7 +220,7 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
             autoSpacing: widget.isIPadSafe ? true : false, // Let PDFKit handle spacing
             pageFling: widget.isIPadSafe ? false : true, // Disable page fling to avoid conflicts
             pageSnap: widget.isIPadSafe ? false : true, // Disable page snap for smoother scrolling
-            defaultPage: currentPage!,
+            defaultPage: _currentPage!,
             fitPolicy: FitPolicy.BOTH,
             preventLinkNavigation: false, // if set to true the link is handled in flutter
             backgroundColor: Color(0xFFFEF7FF),
@@ -224,19 +228,19 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
             // nightModeBackgroundColor: Colors.amber,
             onRender: (_pages) {
               setState(() {
-                pages = _pages;
-                isReady = true;
+                this._pages = _pages;
+                _isReady = true;
               });
             },
             onError: (error) {
               setState(() {
-                errorMessage = error.toString();
+                _errorMessage = error.toString();
               });
               print(error.toString());
             },
             onPageError: (page, error) {
               setState(() {
-                errorMessage = '$page: ${error.toString()}';
+                _errorMessage = '$page: ${error.toString()}';
               });
               print('$page: ${error.toString()}');
             },
@@ -249,19 +253,44 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
             onPageChanged: (int? page, int? total) {
               print('page change: ${(page ?? 0) + 1}/$total');
               setState(() {
-                currentPage = page;
+                _currentPage = page;
               });
             },
+            onLoadComplete: (int? pages) {
+              final pagesText = '# of pages: $pages';
+              final snackBar = SnackBar(content: Text(pagesText));
+              ScaffoldMessenger.of(context).showSnackBar(snackBar);
+              print(pagesText);
+            },
+            onDraw: (double pdfXOffset, double pdfYOffset, double pdfScale) {
+              setState(() {
+                _xOffset = pdfXOffset;
+                _yOffset = pdfYOffset;
+                _scale = pdfScale;
+              });
+              print('onDraw - x offset: $pdfXOffset, y offset: $pdfYOffset scale: $pdfScale');
+            },
           ),
-          errorMessage.isEmpty
-              ? !isReady
-                  ? Center(
-                      child: CircularProgressIndicator(),
-                    )
+          _errorMessage.isEmpty
+              ? !_isReady
+                  ? Center(child: CircularProgressIndicator())
                   : Container()
-              : Center(
-                  child: Text(errorMessage),
-                )
+              : Center(child: Text(_errorMessage)),
+          Positioned(
+              left: 10,
+              top: 10,
+              child: Container(
+                color: Colors.orange,
+                padding: EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text('X Offset: ${_xOffset.toStringAsFixed(2)}'),
+                    Text('Y Offset: ${_yOffset.toStringAsFixed(2)}'),
+                    Text('Scale: ${_scale.toStringAsFixed(2)}')
+                  ],
+                ),
+              ))
         ],
       ),
       floatingActionButton: FutureBuilder<PDFViewController>(
@@ -269,9 +298,9 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
         builder: (context, AsyncSnapshot<PDFViewController> snapshot) {
           if (snapshot.hasData) {
             return FloatingActionButton.extended(
-              label: Text("Go to ${pages! ~/ 2}"),
+              label: Text("Go to ${this._pages! ~/ 2}"),
               onPressed: () async {
-                await snapshot.data!.setPage(pages! ~/ 2);
+                await snapshot.data!.setPage(this._pages! ~/ 2);
               },
             );
           }
