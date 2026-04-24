@@ -225,7 +225,8 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
             preventLinkNavigation: false, // if set to true the link is handled in flutter
             backgroundColor: Color(0xFFFEF7FF),
             nightMode: true,
-            // nightModeBackgroundColor: Colors.amber,
+            maxZoom: 4.0,
+            minZoom: 1.0,
             onRender: (_pages) {
               setState(() {
                 this._pages = _pages;

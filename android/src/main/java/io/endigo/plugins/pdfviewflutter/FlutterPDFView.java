@@ -368,6 +368,12 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     final PDFLinkHandler plh = (PDFLinkHandler) this.linkHandler;
                     plh.setPreventLinkNavigation(getBoolean(settings, key));
                     break;
+                case "maxZoom":
+                    pdfView.setMaxZoom(getFloat(settings, key));
+                    break;
+                case "minZoom":
+                    pdfView.setMinZoom(getFloat(settings, key));
+                    break;
                 default:
                     throw new IllegalArgumentException("Unknown PDFView setting: " + key);
             }
