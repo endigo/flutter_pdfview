@@ -96,7 +96,7 @@ The plugin follows Flutter's federated plugin architecture with platform-specifi
 
 ### Android
 - Minimum SDK: 21
-- Compile SDK: 35
+- Compile SDK: 36
 - Uses AndroidX libraries
 - ProGuard rules included for release builds
 - Gradle 8.1.0 build tools

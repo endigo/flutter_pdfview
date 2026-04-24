@@ -12,6 +12,8 @@ typedef PageChangedCallback = void Function(int? page, int? total);
 typedef ErrorCallback = void Function(dynamic error);
 typedef PageErrorCallback = void Function(int? page, dynamic error);
 typedef LinkHandlerCallback = void Function(String? uri);
+typedef LoadCompleteCallback = void Function(int? pages);
+typedef DrawCallback = void Function(double pdfXOffset, double pdfYOffset, double pdfScale);
 
 enum FitPolicy { WIDTH, HEIGHT, BOTH }
 
@@ -26,6 +28,8 @@ class PDFView extends StatefulWidget {
     this.onError,
     this.onPageError,
     this.onLinkHandler,
+    this.onLoadComplete,
+    this.onDraw,
     this.gestureRecognizers,
     this.enableSwipe = true,
     this.swipeHorizontal = false,
@@ -66,6 +70,8 @@ class PDFView extends StatefulWidget {
 
   /// Used with preventLinkNavigation=true. It's helpful to customize link navigation
   final LinkHandlerCallback? onLinkHandler;
+  final LoadCompleteCallback? onLoadComplete;
+  final DrawCallback? onDraw;
 
   /// Which gestures should be consumed by the pdf view.
   ///
@@ -138,8 +144,7 @@ class PDFView extends StatefulWidget {
 }
 
 class _PDFViewState extends State<PDFView> {
-  final Completer<PDFViewController> _controller =
-  Completer<PDFViewController>();
+  final Completer<PDFViewController> _controller = Completer<PDFViewController>();
 
   @override
   Widget build(BuildContext context) {
@@ -147,13 +152,13 @@ class _PDFViewState extends State<PDFView> {
       return PlatformViewLink(
         viewType: 'plugins.endigo.io/pdfview',
         surfaceFactory: (
-            BuildContext context,
-            PlatformViewController controller,
-            ) {
+          BuildContext context,
+          PlatformViewController controller,
+        ) {
           return AndroidViewSurface(
             controller: controller as AndroidViewController,
-            gestureRecognizers: widget.gestureRecognizers ??
-                const <Factory<OneSequenceGestureRecognizer>>{},
+            gestureRecognizers:
+                widget.gestureRecognizers ?? const <Factory<OneSequenceGestureRecognizer>>{},
             hitTestBehavior: PlatformViewHitTestBehavior.opaque,
           );
         },
@@ -181,8 +186,7 @@ class _PDFViewState extends State<PDFView> {
         creationParamsCodec: const StandardMessageCodec(),
       );
     }
-    return Text(
-        '$defaultTargetPlatform is not yet supported by the pdfview_flutter plugin');
+    return Text('$defaultTargetPlatform is not yet supported by the pdfview_flutter plugin');
   }
 
   void _onPlatformViewCreated(int id) {
@@ -196,14 +200,12 @@ class _PDFViewState extends State<PDFView> {
   @override
   void didUpdateWidget(PDFView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _controller.future.then(
-            (PDFViewController controller) => controller._updateWidget(widget));
+    _controller.future.then((PDFViewController controller) => controller._updateWidget(widget));
   }
 
   @override
   void dispose() {
-    _controller.future
-        .then((PDFViewController controller) => controller.dispose());
+    _controller.future.then((PDFViewController controller) => controller.dispose());
     super.dispose();
   }
 }
@@ -336,9 +338,9 @@ class _PDFViewSettings {
 
 class PDFViewController {
   PDFViewController._(
-      int id,
-      PDFView widget,
-      )   : _channel = MethodChannel('plugins.endigo.io/pdfview_$id'),
+    int id,
+    PDFView widget,
+  )   : _channel = MethodChannel('plugins.endigo.io/pdfview_$id'),
         _widget = widget {
     _settings = _PDFViewSettings.fromWidget(widget);
     _channel.setMethodCallHandler(_onMethodCall);
@@ -354,6 +356,9 @@ class PDFViewController {
   late _PDFViewSettings _settings;
 
   PDFView? _widget;
+
+  Completer<void>? _setPositionCompleter;
+  Completer<void>? _setScaleCompleter;
 
   Future<bool?> _onMethodCall(MethodCall call) async {
     final widget = _widget;
@@ -373,20 +378,101 @@ class PDFViewController {
         widget.onError?.call(call.arguments['error']);
         return null;
       case 'onPageError':
-        widget.onPageError
-            ?.call(call.arguments['page'], call.arguments['error']);
+        widget.onPageError?.call(call.arguments['page'], call.arguments['error']);
         return null;
       case 'onLinkHandler':
         widget.onLinkHandler?.call(call.arguments);
         return null;
+      case 'onLoadComplete':
+        widget.onLoadComplete?.call(call.arguments['pages']);
+        return null;
+      case 'onDraw':
+        widget.onDraw?.call(
+            call.arguments['pdfXOffset'], call.arguments['pdfYOffset'], call.arguments['pdfScale']);
+        return null;
     }
-    throw MissingPluginException(
-        '${call.method} was invoked but has no handler');
+    throw MissingPluginException('${call.method} was invoked but has no handler');
   }
 
   Future<int?> getPageCount() async {
     final int? pageCount = await _channel.invokeMethod('pageCount');
     return pageCount;
+  }
+
+  Future<Size> getCurrentPageSize() async {
+    return _channel
+        .invokeMethod('currentPageSize')
+        .then((pageSize) => Size(pageSize[0] ?? 0, pageSize[1] ?? 0));
+  }
+
+  Future<Offset> getPosition() async {
+    if (_setPositionCompleter != null && !_setPositionCompleter!.isCompleted) {
+      await _setPositionCompleter!.future;
+    }
+
+    final position = await _channel.invokeMethod('getPosition');
+    return Offset(position[0] ?? 0, position[1] ?? 0);
+  }
+
+  Future<double> getScale() async {
+    if (_setScaleCompleter != null && !_setScaleCompleter!.isCompleted) {
+      await _setScaleCompleter!.future;
+    }
+
+    final scale = await _channel.invokeMethod('getScale');
+    return scale ?? 1;
+  }
+
+  Future<bool> setPosition(Offset position) async {
+    if (_setPositionCompleter != null && !_setPositionCompleter!.isCompleted) {
+      await _setPositionCompleter!.future;
+    }
+    _setPositionCompleter = Completer<void>();
+    final bool isSet = await _channel.invokeMethod('setPosition', <String, double>{
+      'xPos': position.dx,
+      'yPos': position.dy,
+    });
+    if (!_setPositionCompleter!.isCompleted) {
+      _setPositionCompleter!.complete();
+    }
+    return isSet;
+  }
+
+  Future<bool> setScale(double scale) async {
+    if (_setScaleCompleter != null && !_setScaleCompleter!.isCompleted) {
+      await _setScaleCompleter!.future;
+    }
+    _setScaleCompleter = Completer<void>();
+    final bool isSet = await _channel.invokeMethod('setScale', <String, double>{
+      'scale': scale,
+    });
+    if (!_setScaleCompleter!.isCompleted) {
+      _setScaleCompleter!.complete();
+    }
+    return isSet;
+  }
+
+  Future<bool> setZoomLimits(double minZoom, double midZoom, double maxZoom) async {
+    return await _channel.invokeMethod<bool>('setZoomLimits', <String, dynamic>{
+          'minZoom': minZoom,
+          'midZoom': midZoom,
+          'maxZoom': maxZoom,
+        }) ??
+        false;
+  }
+
+  Future<String> getScreenshot(String fileName) async {
+    final String imageFileName =
+        await _channel.invokeMethod<String>('getScreenshot', <String, dynamic>{
+              'fileName': fileName,
+            }) ??
+            '';
+    return imageFileName;
+  }
+
+  Future<bool> reload() async {
+    final bool result = await _channel.invokeMethod<bool>('reload') ?? false;
+    return result;
   }
 
   Future<int?> getCurrentPage() async {
@@ -395,8 +481,7 @@ class PDFViewController {
   }
 
   Future<bool?> setPage(int page) async {
-    final bool? isSet =
-    await _channel.invokeMethod('setPage', <String, dynamic>{
+    final bool? isSet = await _channel.invokeMethod('setPage', <String, dynamic>{
       'page': page,
     });
     return isSet;

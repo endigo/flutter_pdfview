@@ -1,9 +1,24 @@
 package io.endigo.plugins.pdfviewflutter;
 
 import android.content.Context;
-import android.graphics.Color;
-import android.view.View;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.net.Uri;
+import android.view.View;
+
+import androidx.annotation.NonNull;
+
+import com.github.barteksc.pdfviewer.PDFView;
+import com.github.barteksc.pdfviewer.PDFView.Configurator;
+import com.github.barteksc.pdfviewer.link.LinkHandler;
+import com.github.barteksc.pdfviewer.util.Constants;
+import com.github.barteksc.pdfviewer.util.FitPolicy;
+import com.shockwave.pdfium.util.SizeF;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
@@ -12,26 +27,21 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.platform.PlatformView;
 
-import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
-
-import com.github.barteksc.pdfviewer.PDFView;
-import com.github.barteksc.pdfviewer.PDFView.Configurator;
-import com.github.barteksc.pdfviewer.listener.*;
-import com.github.barteksc.pdfviewer.util.Constants;
-import com.github.barteksc.pdfviewer.util.FitPolicy;
-
-import com.github.barteksc.pdfviewer.link.LinkHandler;
-
 public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private final PDFView pdfView;
+    private final Configurator configurator;
     private final MethodChannel methodChannel;
     private final LinkHandler linkHandler;
+    private final Map<String, Object> onDrawArgs = new HashMap<>();
+    private long _lastDrawTime = 0;
+    private static final long DRAW_THROTTLE_MS = 16; // ~1 frame at 60fps
+    private final float displayDensity;
+    public static final String TAG = "FlutterPDFView";
 
-    @SuppressWarnings("unchecked")
+
     FlutterPDFView(Context context, BinaryMessenger messenger, int id, Map<String, Object> params) {
         pdfView = new PDFView(context, null);
+        displayDensity = context.getResources().getDisplayMetrics().density;
         final boolean preventLinkNavigation = getBoolean(params, "preventLinkNavigation");
 
         methodChannel = new MethodChannel(messenger, "plugins.endigo.io/pdfview_" + id);
@@ -80,40 +90,41 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .enableDoubletap(true)
                     // .fitEachPage(getBoolean(params,"fitEachPage"))
                     .defaultPage(getInt(params, "defaultPage"))
-                    .onPageChange(new OnPageChangeListener() {
-                        @Override
-                        public void onPageChanged(int page, int total) {
-                            Map<String, Object> args = new HashMap<>();
-                            args.put("page", page);
-                            args.put("total", total);
-                            methodChannel.invokeMethod("onPageChanged", args);
-                        }
+                    .onPageChange((page, total) -> {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("page", page);
+                        args.put("total", total);
+                        methodChannel.invokeMethod("onPageChanged", args);
                     })
-                    .onError(new OnErrorListener() {
-                        @Override
-                        public void onError(Throwable t) {
-                            Map<String, Object> args = new HashMap<>();
-                            args.put("error", t.toString());
-                            methodChannel.invokeMethod("onError", args);
-                        }
-                    }).onPageError(new OnPageErrorListener() {
-                        @Override
-                        public void onPageError(int page, Throwable t) {
-                            Map<String, Object> args = new HashMap<>();
-                            args.put("page", page);
-                            args.put("error", t.toString());
-                            methodChannel.invokeMethod("onPageError", args);
-                        }
-                    }).onRender(new OnRenderListener() {
-                        @Override
-                        public void onInitiallyRendered(int pages) {
-                            Map<String, Object> args = new HashMap<>();
-                            args.put("pages", pages);
-                            methodChannel.invokeMethod("onRender", args);
-                        }
-                    })
-                    .load();
+                    .onError(t -> {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("error", t.toString());
+                        methodChannel.invokeMethod("onError", args);
+                    }).onPageError((page, t) -> {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("page", page);
+                        args.put("error", t.toString());
+                        methodChannel.invokeMethod("onPageError", args);
+                    }).onRender(pages -> {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("pages", pages);
+                        methodChannel.invokeMethod("onRender", args);
+                    }).onDraw((canvas, pageWidth, pageHeight, displayedPage) -> {
+                        long now = System.currentTimeMillis();
+                        if (now - _lastDrawTime < DRAW_THROTTLE_MS) return;
+                        _lastDrawTime = now;
+                        onDrawArgs.clear();
+                        onDrawArgs.put("pdfXOffset", pdfView.getCurrentXOffset() / displayDensity);
+                        onDrawArgs.put("pdfYOffset", pdfView.getCurrentYOffset() / displayDensity);
+                        onDrawArgs.put("pdfScale", pdfView.getZoom());
+                        methodChannel.invokeMethod("onDraw", onDrawArgs);
+                    }).onLoad(nbPages -> {
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("pages", nbPages);
+                        methodChannel.invokeMethod("onLoadComplete", args);
+                    }).load();
         }
+        configurator = config;
     }
 
     @Override
@@ -122,10 +133,31 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     }
 
     @Override
-    public void onMethodCall(MethodCall methodCall, Result result) {
+    public void onMethodCall(MethodCall methodCall, @NonNull Result result) {
         switch (methodCall.method) {
             case "pageCount":
                 getPageCount(result);
+                break;
+            case "currentPageSize":
+                getCurrentPageSize(result);
+                break;
+            case "getPosition":
+                getPosition(result);
+                break;
+            case "getScale":
+                getScale(result);
+                break;
+            case "setPosition":
+                setPosition(methodCall, result);
+                break;
+            case "setScale":
+                setScale(methodCall, result);
+                break;
+            case "getScreenshot":
+                getScreenshot(methodCall, result);
+                break;
+            case "reload":
+                reload(result);
                 break;
             case "currentPage":
                 getCurrentPage(result);
@@ -135,6 +167,9 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                 break;
             case "updateSettings":
                 updateSettings(methodCall, result);
+                break;
+            case "setZoomLimits":
+                setZoomLimits(methodCall, result);
                 break;
             default:
                 result.notImplemented();
@@ -146,13 +181,149 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         result.success(pdfView.getPageCount());
     }
 
+    void getCurrentPageSize(Result result) {
+        if (pdfView.getPageCount() == 0) {
+            result.error("INVALID_STATE", "No pages loaded", null);
+            return;
+        }
+        SizeF size = pdfView.getPageSize(pdfView.getCurrentPage());
+        if (size == null) {
+            result.error("FAIL", "Could not get page size", null);
+            return;
+        }
+        result.success(new float[]{size.getWidth(), size.getHeight()});
+    }
+
+    void getPosition(Result result) {
+        float xOffset = pdfView.getCurrentXOffset() / displayDensity;
+        float yOffset = pdfView.getCurrentYOffset() / displayDensity;
+
+        result.success(new float[]{xOffset, yOffset});
+    }
+
+    void getScale(Result result) {
+        float zoom = pdfView.getZoom();
+
+        result.success(zoom);
+    }
+
+    void setPosition(MethodCall call, Result result) {
+        Double xPosObj = call.argument("xPos");
+        double xOffset;
+        if (xPosObj != null) {
+            xOffset = xPosObj; // Safe unboxing
+        } else {
+            xOffset = 0.0;
+        }
+        Double yPosObj = call.argument("yPos");
+        double yOffset;
+        if (yPosObj != null) {
+            yOffset = yPosObj; // Safe unboxing
+        } else {
+            yOffset = 0.0;
+        }
+        pdfView.moveTo((float) xOffset * displayDensity, (float) yOffset * displayDensity);
+        pdfView.loadPages();
+        result.success(true);
+    }
+
+    void setScale(MethodCall call, Result result) {
+        Double scaleObj = call.argument("scale");
+        double zoom;
+        if (scaleObj != null) {
+            zoom = scaleObj; // Safe unboxing
+        } else {
+            zoom = 1.0;
+        }
+
+        if (zoom != 1.0) {
+            pdfView.zoomTo((float) zoom);
+        }
+        pdfView.loadPages();
+        result.success(true);
+    }
+
+    void setZoomLimits(MethodCall call, Result result) {
+        Double minZoom = call.argument("minZoom");
+        Double midZoom = call.argument("midZoom");
+        Double maxZoom = call.argument("maxZoom");
+        double minZ = (minZoom != null ? minZoom : 1.0);
+        double midZ = (midZoom != null ? midZoom : 1.0);
+        double maxZ = (maxZoom != null ? maxZoom : 1.0);
+        if (minZ <= 0 || midZ <= 0 || maxZ <= 0 || minZ > midZ || midZ > maxZ) {
+            result.error("INVALID_ARGS", "Expected 0 < minZoom ≤ midZoom ≤ maxZoom", null);
+            return;
+        }
+        pdfView.setMinZoom((float) minZ);
+        pdfView.setMidZoom((float) midZ);
+        pdfView.setMaxZoom((float) maxZ);
+        result.success(true);
+    }
+
+    void getScreenshot(MethodCall call, Result result) {
+        String pdfFileName = call.argument("fileName");
+        if (pdfFileName == null || pdfFileName.isEmpty()) {
+            result.error("FAIL", "fileName is required", null);
+            return;
+        }
+        try {
+            File outputFile = new File(pdfFileName);
+            File parent = outputFile.getParentFile();
+            if (parent == null) {
+                result.error("FAIL", "fileName must include a directory path", null);
+                return;
+            }
+            String imageFileName = outputFile.getAbsolutePath();
+            Bitmap bmp = loadBitmapFromPDFView();
+            if (bmp == null) {
+                result.error("FAIL", "PDFView is not laid out yet", null);
+                return;
+            }
+            try (FileOutputStream fileOut = new FileOutputStream(outputFile, false)) {
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, fileOut);
+            } finally {
+                bmp.recycle();
+            }
+            result.success(imageFileName);
+        } catch (Exception e) {
+            result.error("FAIL", "Failed to generate image", e.getMessage());
+        }
+    }
+
+    Bitmap loadBitmapFromPDFView() {
+        int width = pdfView.getWidth();
+        int height = pdfView.getHeight();
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        pdfView.draw(canvas);
+        return bitmap;
+    }
+
+    void reload(Result result) {
+        if (configurator != null) {
+            configurator.load();
+            result.success(true);
+        } else {
+            result.success(false);
+        }
+    }
+
     void getCurrentPage(Result result) {
         result.success(pdfView.getCurrentPage());
     }
 
     void setPage(MethodCall call, Result result) {
         if (call.argument("page") != null) {
-            int page = (int) call.argument("page");
+            Integer pageObj = call.argument("page");
+            int page;
+            if (pageObj != null) {
+                page = pageObj; // Safe unboxing
+            } else {
+                page = 1;
+            }
             pdfView.jumpTo(page);
         }
 
@@ -196,7 +367,14 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     }
 
     private boolean getBoolean(Map<String, Object> params, String key) {
-        return params.containsKey(key) ? (boolean) params.get(key) : false;
+        Boolean keyObj = (Boolean) params.get(key);
+        boolean bKey;
+        if (keyObj != null) {
+            bKey = keyObj;
+        } else {
+            bKey = false;
+        }
+        return params.containsKey(key) && bKey;
     }
 
     private String getString(Map<String, Object> params, String key) {
@@ -204,7 +382,14 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     }
 
     private int getInt(Map<String, Object> params, String key) {
-        return params.containsKey(key) ? (int) params.get(key) : 0;
+        Integer keyObj = (Integer) params.get(key);
+        int intKey;
+        if (keyObj != null) {
+            intKey = keyObj;
+        } else {
+            intKey = 0;
+        }
+        return params.containsKey(key) ? intKey : 0;
     }
 
     private Float getFloat(Map<String, Object> params, String key) {

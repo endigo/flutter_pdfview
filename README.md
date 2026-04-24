@@ -15,7 +15,7 @@ Add this to your package's pubspec.yaml file:
 
 ```
 dependencies:
-  flutter_pdfview: 1.3.2
+  flutter_pdfview: 1.4.4
 ```
 
 ### 2. Install it
@@ -46,6 +46,8 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | onViewCreated         |   ✅    | ✅  |      `null`       |
 | onRender              |   ✅    | ✅  |      `null`       |
 | onPageChanged         |   ✅    | ✅  |      `null`       |
+| onLoadComplete        |   ✅    | ✅  |      `null`       |
+| onDraw                |   ✅    | ✅  |      `null`       |
 | onError               |   ✅    | ✅  |      `null`       |
 | onPageError           |   ✅    | ❌  |      `null`       |
 | onLinkHandle          |   ✅    | ✅  |      `null`       |
@@ -57,7 +59,6 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | swipeHorizontal       |   ✅    | ✅  |      `false`      |
 | password              |   ✅    | ✅  |      `null`       |
 | nightMode             |   ✅    | ❌  |      `false`      |
-| password              |   ✅    | ✅  |      `null`       |
 | autoSpacing           |   ✅    | ✅  |      `true`       |
 | pageFling             |   ✅    | ✅  |      `true`       |
 | pageSnap              |   ✅    | ❌  |      `true`       |
@@ -66,11 +67,19 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 
 ## Controller Options
 
-| Name           |     Description      | Parameters |     Return     |
-| :------------- | :------------------: | :--------: | :------------: |
-| getPageCount   | Get total page count |     -      | `Future<int>`  |
-| getCurrentPage |   Get current page   |     -      | `Future<int>`  |
-| setPage        |    Go to/Set page    | `int page` | `Future<bool>` |
+| Name               |                                         Description                                          |                    Parameters                    |      Return      |
+|:-------------------|:--------------------------------------------------------------------------------------------:|:------------------------------------------------:|:----------------:|
+| getPageCount       |                                     Get total page count                                     |                        -                         |  `Future<int>`   |
+| getCurrentPage     |                                       Get current page                                       |                        -                         |  `Future<int>`   |
+| setPage            |                                        Go to/Set page                                        |                    `int page`                    |  `Future<bool>`  |
+| getCurrentPageSize |                        Return the width and height of the loaded page                        |                        -                         |  `Future<Size>`  |
+| getScreenshot      |               Create a PNG of the contents of the PDFView and save to fileName               |                `String fileName`                 | `Future<String>` |
+| getPosition        | Get the position of the top left of the PDF with respect to the origin (top left of PDFView) |                        -                         | `Future<Offset>` |
+| getScale           |                             Get the PDF zoom value, for zooming                              |                        -                         | `Future<double>` |
+| setPosition        | Set the position of the top left of the PDF with respect to the origin (top left of PDFView) |                `Offset position`                 |  `Future<bool>`  |
+| setScale           |                             Set the PDF zoom value, for zooming                              |                  `double scale`                  |  `Future<bool>`  |
+| setZoomLimits      |                  Set the minimum, maximum and mid bounds of the zoom limits                  | `double minZoom, double midZoom, double maxZoom` |        -         |
+| reload             |                            Reload the PDF document in the PDFView                            |                        -                         |  `Future<bool>`  |
 
 ## Example
 
@@ -100,6 +109,12 @@ PDFView(
   onPageChanged: (int page, int total) {
     print('page change: $page/$total');
   },
+  onLoadComplete: (int? pages) {
+    print('# of pages: $pages');
+  },
+  onDraw: (double xOffset, double yOffset, double scale) {
+    print('onDraw');
+  },
 ),
 ```
 
@@ -109,7 +124,7 @@ PDFView(
 
 [AndroidPdfViewer](https://github.com/barteksc/AndroidPdfViewer)
 
-### iOS (only support> 11.0)
+### iOS (only support> 12.0)
 
 [PDFKit](https://developer.apple.com/documentation/pdfkit)
 

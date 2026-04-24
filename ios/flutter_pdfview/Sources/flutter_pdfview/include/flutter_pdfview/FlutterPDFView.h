@@ -1,7 +1,3 @@
-// Copyright 2018 The Chromium Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 #import <Flutter/Flutter.h>
 #import <PDFKit/PDFKit.h>
 
@@ -27,9 +23,16 @@ API_AVAILABLE(ios(11.0))
 - (void)layoutSubviews;
 - (UIView*)view;
 - (void)getPageCount:(FlutterMethodCall*)call result:(FlutterResult)result;
+- (void)getCurrentPageSize:(FlutterMethodCall*)call result:(FlutterResult)result;
+- (void)getPosition:(FlutterMethodCall*)call result:(FlutterResult)result;
+- (void)getScale:(FlutterMethodCall*)call result:(FlutterResult)result;
+- (void)setPosition:(FlutterMethodCall*)call result:(FlutterResult)result;
+- (void)setScale:(FlutterMethodCall*)call result:(FlutterResult)result;
 - (void)getCurrentPage:(FlutterMethodCall*)call result:(FlutterResult)result;
 - (void)setPage:(FlutterMethodCall*)call result:(FlutterResult)result;
 - (void)onUpdateSettings:(FlutterMethodCall*)call result:(FlutterResult)result;
+- (void)setZoomLimits:(FlutterMethodCall*)call result:(FlutterResult)result;
+- (void)reload:(FlutterMethodCall*)call result:(FlutterResult)result;
 @end
 
 API_AVAILABLE(ios(11.0))
