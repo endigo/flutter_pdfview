@@ -163,10 +163,11 @@
         }
 
 
-    if (document == nil) {
+    if (_document == nil) {
         __weak __typeof__(self) weakSelf = self;
         dispatch_async(dispatch_get_main_queue(), ^{
-            FLTPDFView *strongSelf = weakSelf;
+            __typeof__(weakSelf) strongSelf = weakSelf;
+            if (strongSelf == nil) { return; }
             [strongSelf->_controller invokeChannelMethod:@"onError" arguments:@{@"error" : @"cannot create document: File not in PDF format or corrupted."}];
         });
     } else {
