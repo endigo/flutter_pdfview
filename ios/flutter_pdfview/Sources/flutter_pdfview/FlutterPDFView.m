@@ -268,7 +268,7 @@
                         dispatch_async(dispatch_get_main_queue(), ^{
                             __strong __typeof__(weakSelf) strongSelf = weakSelf;
                             if (strongSelf == nil) { return; }
-                            [strongSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: [self->_document pageCount]]];
+                            [strongSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: [strongSelf->_document pageCount]]];
                         });
                     } @catch (NSException *exception) {
                         NSLog(@"Warning: Failed to configure PDF scroll view: %@",
@@ -339,8 +339,8 @@
     @try {
         _pdfView.frame = self.frame;
         CGFloat fitScale = _pdfView.scaleFactorForSizeToFit;
-        CGFloat minScale = fitScale * (_minScaleFactor > 0 ? _minScaleFactor : 1.0);
-        CGFloat maxScale = fitScale * (_maxScaleFactor > 0 ? _maxScaleFactor : 4.0);
+        CGFloat minScale = fitScale * _minScaleFactor;
+        CGFloat maxScale = fitScale * _maxScaleFactor;
         _pdfView.minScaleFactor = minScale;
         _pdfView.maxScaleFactor = fmax(maxScale, minScale);
         
@@ -528,6 +528,7 @@
 }
 
 -(void)handlePageChanged:(NSNotification*)notification {
+    _hasSentInitialPage = YES;
     _currentPage = _pdfView.currentPage;
     _pageNo = (int)[_pdfView.document indexForPage:_currentPage] + 1;
     [_controller invokeChannelMethod:@"onPageChanged" arguments:@{@"page" : [NSNumber numberWithUnsignedLong: _pageNo - 1], @"total" : [NSNumber numberWithUnsignedLong: [_pdfView.document pageCount]]}];
