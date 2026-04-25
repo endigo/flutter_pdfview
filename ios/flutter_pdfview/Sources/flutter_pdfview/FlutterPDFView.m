@@ -166,7 +166,7 @@
     if (_document == nil) {
         __weak __typeof__(self) weakSelf = self;
         dispatch_async(dispatch_get_main_queue(), ^{
-            __typeof__(weakSelf) strongSelf = weakSelf;
+            __strong __typeof__(weakSelf) strongSelf = weakSelf;
             if (strongSelf == nil) { return; }
             [strongSelf->_controller invokeChannelMethod:@"onError" arguments:@{@"error" : @"cannot create document: File not in PDF format or corrupted."}];
         });
@@ -196,14 +196,12 @@
             _pdfView.displaysPageBreaks = NO;
             _pdfView.document = _document;
 
-        _maxScaleFactor = [args[@"maxZoom"] doubleValue];
-        if (_maxScaleFactor <= 0) {
-            _maxScaleFactor = 4.0;
-        }
-        _minScaleFactor = [args[@"minZoom"] doubleValue];
-
-        _pdfView.maxScaleFactor = _maxScaleFactor;
-        _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
+            double maxZoomArg = [args[@"maxZoom"] doubleValue];
+            double minZoomArg = [args[@"minZoom"] doubleValue];
+            if (maxZoomArg <= 0) { maxZoomArg = 4.0; }
+            if (minZoomArg <= 0) { minZoomArg = 1.0; }
+            _maxScaleFactor = maxZoomArg;
+            _minScaleFactor = minZoomArg;
 
             NSString* password = args[@"password"];
             if ([password isKindOfClass:[NSString class]] && [_pdfView.document isEncrypted]) {
@@ -268,7 +266,9 @@
                         }
                         __weak __typeof__(self) weakSelf = self;
                         dispatch_async(dispatch_get_main_queue(), ^{
-                            [weakSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: [self->_document pageCount]]];
+                            __strong __typeof__(weakSelf) strongSelf = weakSelf;
+                            if (strongSelf == nil) { return; }
+                            [strongSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: [self->_document pageCount]]];
                         });
                     } @catch (NSException *exception) {
                         NSLog(@"Warning: Failed to configure PDF scroll view: %@",
@@ -339,9 +339,11 @@
     @try {
         _pdfView.frame = self.frame;
         CGFloat fitScale = _pdfView.scaleFactorForSizeToFit;
-        CGFloat minScale = (_minScaleFactor > 0) ? _minScaleFactor : fitScale;
+        CGFloat minScale = fitScale * (_minScaleFactor > 0 ? _minScaleFactor : 1.0);
+        CGFloat maxScale = fitScale * (_maxScaleFactor > 0 ? _maxScaleFactor : 4.0);
         _pdfView.minScaleFactor = minScale;
-        _pdfView.maxScaleFactor = fmax(_maxScaleFactor, minScale);
+        _pdfView.maxScaleFactor = fmax(maxScale, minScale);
+        
         if (_autoSpacing) {
             CGFloat clampedScale = fmin(fmax(fitScale, _pdfView.minScaleFactor), _pdfView.maxScaleFactor);
             _pdfView.scaleFactor = clampedScale;
