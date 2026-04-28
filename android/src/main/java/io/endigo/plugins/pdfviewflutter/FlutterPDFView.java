@@ -28,6 +28,9 @@ import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.platform.PlatformView;
 
 public class FlutterPDFView implements PlatformView, MethodCallHandler {
+    private static final float DEFAULT_MAX_ZOOM = 4.0f;
+    private static final float DEFAULT_MIN_ZOOM = 1.0f;
+
     private final PDFView pdfView;
     private final Configurator configurator;
     private final MethodChannel methodChannel;
@@ -123,6 +126,16 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                         args.put("pages", nbPages);
                         methodChannel.invokeMethod("onLoadComplete", args);
                     }).load();
+
+            Float maxZoom = getFloat(params, "maxZoom");
+            Float minZoom = getFloat(params, "minZoom");
+            float effectiveMax = maxZoom != null ? maxZoom : DEFAULT_MAX_ZOOM;
+            float effectiveMin = minZoom != null ? minZoom : DEFAULT_MIN_ZOOM;
+            if (effectiveMin > effectiveMax) {
+                effectiveMin = effectiveMax;
+            }
+            pdfView.setMaxZoom(effectiveMax);
+            pdfView.setMinZoom(effectiveMin);
         }
         configurator = config;
     }
@@ -354,6 +367,12 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                 case "preventLinkNavigation":
                     final PDFLinkHandler plh = (PDFLinkHandler) this.linkHandler;
                     plh.setPreventLinkNavigation(getBoolean(settings, key));
+                    break;
+                case "maxZoom":
+                    pdfView.setMaxZoom(getFloat(settings, key));
+                    break;
+                case "minZoom":
+                    pdfView.setMinZoom(getFloat(settings, key));
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown PDFView setting: " + key);

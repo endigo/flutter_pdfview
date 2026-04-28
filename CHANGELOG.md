@@ -1,3 +1,14 @@
+## 1.4.5
+
+- Upgrade Java source/target compatibility from 1.8 to 17 [#334](https://github.com/endigo/flutter_pdfview/issues/334)
+- Add iOS Privacy Manifest (PrivacyInfo.xcprivacy) [#271](https://github.com/endigo/flutter_pdfview/issues/271)
+- Fix iOS `onError` callback not firing for invalid documents [#211](https://github.com/endigo/flutter_pdfview/issues/211)
+- Fix iOS `onPageChanged` not triggered on first load [#66](https://github.com/endigo/flutter_pdfview/issues/66)
+- Fix iOS landscape PDF wrong initial zoom by preserving user-configured max scale factor [#247](https://github.com/endigo/flutter_pdfview/issues/247)
+- Add configurable `maxZoom` and `minZoom` parameters [#296](https://github.com/endigo/flutter_pdfview/issues/296)
+- Update iOS deployment target to 13.0 in podspec and Package.swift (aligns with Flutter's own iOS 13.0+ requirement)
+- Fix example app build error with undefined `nightModeBackgroundColor` parameter
+
 ## 1.4.4
 
 - Fixes an Android rendering [#330](https://github.com/endigo/flutter_pdfview/pull/330) @TimelessLin

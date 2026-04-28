@@ -47,7 +47,12 @@ class PDFView extends StatefulWidget {
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
     this.backgroundColor,
+    this.maxZoom = 4.0,
+    this.minZoom = 1.0,
   })  : assert(filePath != null || pdfData != null),
+        assert(maxZoom > 0, 'maxZoom must be greater than 0'),
+        assert(minZoom > 0, 'minZoom must be greater than 0'),
+        assert(maxZoom >= minZoom, 'maxZoom must be >= minZoom'),
         super(key: key);
 
   @override
@@ -141,6 +146,12 @@ class PDFView extends StatefulWidget {
 
   /// Use to change the background color. ex : "#FF0000" => red
   final Color? backgroundColor;
+
+  /// Maximum zoom level. Defaults to 4.0.
+  final double maxZoom;
+
+  /// Minimum zoom level. Defaults to 1.0 (fit to page).
+  final double minZoom;
 }
 
 class _PDFViewState extends State<PDFView> {
@@ -259,6 +270,8 @@ class _PDFViewSettings {
     this.fitPolicy,
     this.preventLinkNavigation,
     this.backgroundColor,
+    this.maxZoom,
+    this.minZoom,
   });
 
   static _PDFViewSettings fromWidget(PDFView widget) {
@@ -278,6 +291,8 @@ class _PDFViewSettings {
       fitPolicy: widget.fitPolicy,
       preventLinkNavigation: widget.preventLinkNavigation,
       backgroundColor: widget.backgroundColor,
+      maxZoom: widget.maxZoom,
+      minZoom: widget.minZoom,
     );
   }
 
@@ -298,6 +313,9 @@ class _PDFViewSettings {
 
   final Color? backgroundColor;
 
+  final double? maxZoom;
+  final double? minZoom;
+
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'enableSwipe': enableSwipe,
@@ -315,6 +333,8 @@ class _PDFViewSettings {
       'fitPolicy': fitPolicy.toString(),
       'preventLinkNavigation': preventLinkNavigation,
       'backgroundColor': backgroundColor?.value,
+      'maxZoom': maxZoom,
+      'minZoom': minZoom,
     };
   }
 
@@ -331,6 +351,12 @@ class _PDFViewSettings {
     }
     if (preventLinkNavigation != newSettings.preventLinkNavigation) {
       updates['preventLinkNavigation'] = newSettings.preventLinkNavigation;
+    }
+    if (maxZoom != newSettings.maxZoom) {
+      updates['maxZoom'] = newSettings.maxZoom;
+    }
+    if (minZoom != newSettings.minZoom) {
+      updates['minZoom'] = newSettings.minZoom;
     }
     return updates;
   }

@@ -124,6 +124,9 @@
     BOOL _isScrolling;
     BOOL _didLoadComplete;
     BOOL _isObserving;
+    CGFloat _maxScaleFactor;
+    CGFloat _minScaleFactor;
+    BOOL _hasSentInitialPage;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -160,19 +163,24 @@
         }
 
 
-        if (_document == nil) {
-            [_controller invokeChannelMethod:@"onError" arguments:@{@"error" : @"cannot create document: File not in PDF format or corrupted."}];
-        } else {
-            _pdfView.autoresizesSubviews = YES;
-            _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-            _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    if (_document == nil) {
+        __weak __typeof__(self) weakSelf = self;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong __typeof__(weakSelf) strongSelf = weakSelf;
+            if (strongSelf == nil) { return; }
+            [strongSelf->_controller invokeChannelMethod:@"onError" arguments:@{@"error" : @"cannot create document: File not in PDF format or corrupted."}];
+        });
+    } else {
+        _pdfView.autoresizesSubviews = YES;
+        _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+        _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
 
-            BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
-            if (swipeHorizontal) {
-                _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
-            } else {
-                _pdfView.displayDirection = kPDFDisplayDirectionVertical;
-            }
+        BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
+        if (swipeHorizontal) {
+            _pdfView.displayDirection = kPDFDisplayDirectionHorizontal;
+        } else {
+            _pdfView.displayDirection = kPDFDisplayDirectionVertical;
+        }
 
             _pdfView.autoScales = _autoSpacing;
 
@@ -188,8 +196,12 @@
             _pdfView.displaysPageBreaks = NO;
             _pdfView.document = _document;
 
-            _pdfView.maxScaleFactor = 4.0;
-            _pdfView.minScaleFactor = _pdfView.scaleFactorForSizeToFit;
+            double maxZoomArg = [args[@"maxZoom"] doubleValue];
+            double minZoomArg = [args[@"minZoom"] doubleValue];
+            if (maxZoomArg <= 0) { maxZoomArg = 4.0; }
+            if (minZoomArg <= 0) { minZoomArg = 1.0; }
+            _maxScaleFactor = maxZoomArg;
+            _minScaleFactor = minZoomArg;
 
             NSString* password = args[@"password"];
             if ([password isKindOfClass:[NSString class]] && [_pdfView.document isEncrypted]) {
@@ -254,7 +266,9 @@
                         }
                         __weak __typeof__(self) weakSelf = self;
                         dispatch_async(dispatch_get_main_queue(), ^{
-                            [weakSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: [self->_document pageCount]]];
+                            __strong __typeof__(weakSelf) strongSelf = weakSelf;
+                            if (strongSelf == nil) { return; }
+                            [strongSelf handleRenderCompleted:[NSNumber numberWithUnsignedLong: [strongSelf->_document pageCount]]];
                         });
                     } @catch (NSException *exception) {
                         NSLog(@"Warning: Failed to configure PDF scroll view: %@",
@@ -324,13 +338,30 @@
     // Wrap layout updates in try-catch for safety
     @try {
         _pdfView.frame = self.frame;
+        CGFloat fitScale = _pdfView.scaleFactorForSizeToFit;
+        CGFloat minScale = fitScale * _minScaleFactor;
+        CGFloat maxScale = fitScale * _maxScaleFactor;
+        _pdfView.minScaleFactor = minScale;
+        _pdfView.maxScaleFactor = fmax(maxScale, minScale);
+        
         if (_autoSpacing) {
-            _pdfView.scaleFactor = _pdfView.scaleFactorForSizeToFit;
+            CGFloat clampedScale = fmin(fmax(fitScale, _pdfView.minScaleFactor), _pdfView.maxScaleFactor);
+            _pdfView.scaleFactor = clampedScale;
         }
 
         if (!_defaultPageSet && _defaultPage != nil) {
             [_pdfView goToPage: _defaultPage];
             _defaultPageSet = true;
+        }
+
+        if (!_hasSentInitialPage && _defaultPageSet && _pdfView.document != nil && _pdfView.currentPage != nil) {
+            _hasSentInitialPage = YES;
+            NSUInteger currentPageIndex = [_pdfView.document indexForPage:_pdfView.currentPage];
+            NSUInteger pageCount = [_pdfView.document pageCount];
+            [_controller invokeChannelMethod:@"onPageChanged" arguments:@{
+                @"page" : [NSNumber numberWithUnsignedLong:currentPageIndex],
+                @"total" : [NSNumber numberWithUnsignedLong:pageCount]
+            }];
         }
     } @catch (NSException *exception) {
         NSLog(@"Warning: Layout update failed: %@", exception.reason);
@@ -430,7 +461,7 @@
         } else if (targetOffset.y > maxOffsetY) {
             targetOffset.y = maxOffsetY;
         }
-        
+
         [_scrollView setContentOffset:targetOffset animated:NO];
     }
 
@@ -497,6 +528,7 @@
 }
 
 -(void)handlePageChanged:(NSNotification*)notification {
+    _hasSentInitialPage = YES;
     _currentPage = _pdfView.currentPage;
     _pageNo = (int)[_pdfView.document indexForPage:_currentPage] + 1;
     [_controller invokeChannelMethod:@"onPageChanged" arguments:@{@"page" : [NSNumber numberWithUnsignedLong: _pageNo - 1], @"total" : [NSNumber numberWithUnsignedLong: [_pdfView.document pageCount]]}];
