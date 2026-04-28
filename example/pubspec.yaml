@@ -4,7 +4,8 @@ description: Demonstrates how to use the flutter_pdfview plugin.
 publish_to: "none"
 
 environment:
-  sdk: ">=2.17.0 <4.0.0"
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.27.0"
 
 dependencies:
   flutter:
@@ -12,15 +13,15 @@ dependencies:
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.2
-  path_provider: ^2.0.1
-  flutter_pdfview:
-    path: ../
+  cupertino_icons: ^1.0.8
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
+  flutter_pdfview:
+    path: ../
 
 # For information on the generic Dart part of this file, see the
 # following page: https://www.dartlang.org/tools/pub/pubspec

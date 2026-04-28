@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "flutter_pdfview",
     platforms: [
-        .iOS("12.0"),
+        .iOS("13.0"),
     ],
     products: [
         .library(name: "flutter-pdfview", targets: ["flutter_pdfview"])
@@ -16,7 +16,9 @@ let package = Package(
         .target(
             name: "flutter_pdfview",
             dependencies: [],
-            resources: [],
+            resources: [
+                .process("PrivacyInfo.xcprivacy"),
+            ],
             cSettings: [
                 .headerSearchPath("include/flutter_pdfview")
             ]

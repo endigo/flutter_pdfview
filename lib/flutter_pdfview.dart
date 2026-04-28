@@ -12,6 +12,9 @@ typedef PageChangedCallback = void Function(int? page, int? total);
 typedef ErrorCallback = void Function(dynamic error);
 typedef PageErrorCallback = void Function(int? page, dynamic error);
 typedef LinkHandlerCallback = void Function(String? uri);
+typedef LoadCompleteCallback = void Function(int? pages);
+typedef DrawCallback = void Function(
+    double pdfXOffset, double pdfYOffset, double pdfScale);
 
 enum FitPolicy { WIDTH, HEIGHT, BOTH }
 
@@ -26,6 +29,8 @@ class PDFView extends StatefulWidget {
     this.onError,
     this.onPageError,
     this.onLinkHandler,
+    this.onLoadComplete,
+    this.onDraw,
     this.gestureRecognizers,
     this.enableSwipe = true,
     this.swipeHorizontal = false,
@@ -43,7 +48,12 @@ class PDFView extends StatefulWidget {
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
     this.backgroundColor,
+    this.maxZoom = 4.0,
+    this.minZoom = 1.0,
   })  : assert(filePath != null || pdfData != null),
+        assert(maxZoom > 0, 'maxZoom must be greater than 0'),
+        assert(minZoom > 0, 'minZoom must be greater than 0'),
+        assert(maxZoom >= minZoom, 'maxZoom must be >= minZoom'),
         super(key: key);
 
   @override
@@ -66,6 +76,8 @@ class PDFView extends StatefulWidget {
 
   /// Used with preventLinkNavigation=true. It's helpful to customize link navigation
   final LinkHandlerCallback? onLinkHandler;
+  final LoadCompleteCallback? onLoadComplete;
+  final DrawCallback? onDraw;
 
   /// Which gestures should be consumed by the pdf view.
   ///
@@ -135,11 +147,17 @@ class PDFView extends StatefulWidget {
 
   /// Use to change the background color. ex : "#FF0000" => red
   final Color? backgroundColor;
+
+  /// Maximum zoom level. Defaults to 4.0.
+  final double maxZoom;
+
+  /// Minimum zoom level. Defaults to 1.0 (fit to page).
+  final double minZoom;
 }
 
 class _PDFViewState extends State<PDFView> {
   final Completer<PDFViewController> _controller =
-  Completer<PDFViewController>();
+      Completer<PDFViewController>();
 
   @override
   Widget build(BuildContext context) {
@@ -147,9 +165,9 @@ class _PDFViewState extends State<PDFView> {
       return PlatformViewLink(
         viewType: 'plugins.endigo.io/pdfview',
         surfaceFactory: (
-            BuildContext context,
-            PlatformViewController controller,
-            ) {
+          BuildContext context,
+          PlatformViewController controller,
+        ) {
           return AndroidViewSurface(
             controller: controller as AndroidViewController,
             gestureRecognizers: widget.gestureRecognizers ??
@@ -197,7 +215,7 @@ class _PDFViewState extends State<PDFView> {
   void didUpdateWidget(PDFView oldWidget) {
     super.didUpdateWidget(oldWidget);
     _controller.future.then(
-            (PDFViewController controller) => controller._updateWidget(widget));
+        (PDFViewController controller) => controller._updateWidget(widget));
   }
 
   @override
@@ -257,6 +275,8 @@ class _PDFViewSettings {
     this.fitPolicy,
     this.preventLinkNavigation,
     this.backgroundColor,
+    this.maxZoom,
+    this.minZoom,
   });
 
   static _PDFViewSettings fromWidget(PDFView widget) {
@@ -276,6 +296,8 @@ class _PDFViewSettings {
       fitPolicy: widget.fitPolicy,
       preventLinkNavigation: widget.preventLinkNavigation,
       backgroundColor: widget.backgroundColor,
+      maxZoom: widget.maxZoom,
+      minZoom: widget.minZoom,
     );
   }
 
@@ -296,6 +318,9 @@ class _PDFViewSettings {
 
   final Color? backgroundColor;
 
+  final double? maxZoom;
+  final double? minZoom;
+
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'enableSwipe': enableSwipe,
@@ -312,7 +337,9 @@ class _PDFViewSettings {
       'defaultPage': defaultPage,
       'fitPolicy': fitPolicy.toString(),
       'preventLinkNavigation': preventLinkNavigation,
-      'backgroundColor': backgroundColor?.value,
+      'backgroundColor': backgroundColor?.toARGB32(),
+      'maxZoom': maxZoom,
+      'minZoom': minZoom,
     };
   }
 
@@ -330,15 +357,21 @@ class _PDFViewSettings {
     if (preventLinkNavigation != newSettings.preventLinkNavigation) {
       updates['preventLinkNavigation'] = newSettings.preventLinkNavigation;
     }
+    if (maxZoom != newSettings.maxZoom) {
+      updates['maxZoom'] = newSettings.maxZoom;
+    }
+    if (minZoom != newSettings.minZoom) {
+      updates['minZoom'] = newSettings.minZoom;
+    }
     return updates;
   }
 }
 
 class PDFViewController {
   PDFViewController._(
-      int id,
-      PDFView widget,
-      )   : _channel = MethodChannel('plugins.endigo.io/pdfview_$id'),
+    int id,
+    PDFView widget,
+  )   : _channel = MethodChannel('plugins.endigo.io/pdfview_$id'),
         _widget = widget {
     _settings = _PDFViewSettings.fromWidget(widget);
     _channel.setMethodCallHandler(_onMethodCall);
@@ -354,6 +387,9 @@ class PDFViewController {
   late _PDFViewSettings _settings;
 
   PDFView? _widget;
+
+  Completer<void>? _setPositionCompleter;
+  Completer<void>? _setScaleCompleter;
 
   Future<bool?> _onMethodCall(MethodCall call) async {
     final widget = _widget;
@@ -379,6 +415,13 @@ class PDFViewController {
       case 'onLinkHandler':
         widget.onLinkHandler?.call(call.arguments);
         return null;
+      case 'onLoadComplete':
+        widget.onLoadComplete?.call(call.arguments['pages']);
+        return null;
+      case 'onDraw':
+        widget.onDraw?.call(call.arguments['pdfXOffset'],
+            call.arguments['pdfYOffset'], call.arguments['pdfScale']);
+        return null;
     }
     throw MissingPluginException(
         '${call.method} was invoked but has no handler');
@@ -389,6 +432,84 @@ class PDFViewController {
     return pageCount;
   }
 
+  Future<Size> getCurrentPageSize() async {
+    return _channel
+        .invokeMethod('currentPageSize')
+        .then((pageSize) => Size(pageSize[0] ?? 0, pageSize[1] ?? 0));
+  }
+
+  Future<Offset> getPosition() async {
+    if (_setPositionCompleter != null && !_setPositionCompleter!.isCompleted) {
+      await _setPositionCompleter!.future;
+    }
+
+    final position = await _channel.invokeMethod('getPosition');
+    return Offset(position[0] ?? 0, position[1] ?? 0);
+  }
+
+  Future<double> getScale() async {
+    if (_setScaleCompleter != null && !_setScaleCompleter!.isCompleted) {
+      await _setScaleCompleter!.future;
+    }
+
+    final scale = await _channel.invokeMethod('getScale');
+    return scale ?? 1;
+  }
+
+  Future<bool> setPosition(Offset position) async {
+    if (_setPositionCompleter != null && !_setPositionCompleter!.isCompleted) {
+      await _setPositionCompleter!.future;
+    }
+    _setPositionCompleter = Completer<void>();
+    final bool isSet =
+        await _channel.invokeMethod('setPosition', <String, double>{
+      'xPos': position.dx,
+      'yPos': position.dy,
+    });
+    if (!_setPositionCompleter!.isCompleted) {
+      _setPositionCompleter!.complete();
+    }
+    return isSet;
+  }
+
+  Future<bool> setScale(double scale) async {
+    if (_setScaleCompleter != null && !_setScaleCompleter!.isCompleted) {
+      await _setScaleCompleter!.future;
+    }
+    _setScaleCompleter = Completer<void>();
+    final bool isSet = await _channel.invokeMethod('setScale', <String, double>{
+      'scale': scale,
+    });
+    if (!_setScaleCompleter!.isCompleted) {
+      _setScaleCompleter!.complete();
+    }
+    return isSet;
+  }
+
+  Future<bool> setZoomLimits(
+      double minZoom, double midZoom, double maxZoom) async {
+    return await _channel.invokeMethod<bool>('setZoomLimits', <String, dynamic>{
+          'minZoom': minZoom,
+          'midZoom': midZoom,
+          'maxZoom': maxZoom,
+        }) ??
+        false;
+  }
+
+  Future<String> getScreenshot(String fileName) async {
+    final String imageFileName =
+        await _channel.invokeMethod<String>('getScreenshot', <String, dynamic>{
+              'fileName': fileName,
+            }) ??
+            '';
+    return imageFileName;
+  }
+
+  Future<bool> reload() async {
+    final bool result = await _channel.invokeMethod<bool>('reload') ?? false;
+    return result;
+  }
+
   Future<int?> getCurrentPage() async {
     final int? currentPage = await _channel.invokeMethod('currentPage');
     return currentPage;
@@ -396,7 +517,7 @@ class PDFViewController {
 
   Future<bool?> setPage(int page) async {
     final bool? isSet =
-    await _channel.invokeMethod('setPage', <String, dynamic>{
+        await _channel.invokeMethod('setPage', <String, dynamic>{
       'page': page,
     });
     return isSet;

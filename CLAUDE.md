@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Flutter plugin that provides native PDF viewing capabilities for iOS and Android platforms. The plugin wraps platform-specific PDF rendering libraries:
 - **iOS**: Uses native PDFKit (iOS 11.0+)
-- **Android**: Uses AndroidPdfViewer library (com.github.mhiew:android-pdf-viewer:3.2.0-beta.3)
+- **Android**: Uses AndroidPdfViewer library (com.github.marain87:AndroidPdfViewer:3.2.8)
 
 ## Key Commands
 
@@ -90,13 +90,13 @@ The plugin follows Flutter's federated plugin architecture with platform-specifi
 ## Platform-Specific Considerations
 
 ### iOS
-- Minimum iOS version: 11.0 (PDFKit requirement)
+- Minimum iOS version: 13.0 (as of v1.4.5)
 - Uses Swift Package Manager for dependency management
 - Background color handling uses deprecated `.value` method (as of v1.4.1+1)
 
 ### Android
 - Minimum SDK: 21
-- Compile SDK: 35
+- Compile SDK: 36
 - Uses AndroidX libraries
 - ProGuard rules included for release builds
 - Gradle 8.1.0 build tools

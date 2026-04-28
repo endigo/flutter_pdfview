@@ -15,11 +15,14 @@ let package = Package(
         .library(name: "FlutterGeneratedPluginSwiftPackage", type: .static, targets: ["FlutterGeneratedPluginSwiftPackage"])
     ],
     dependencies: [
-        
+        .package(name: "flutter_pdfview", path: "/Users/jasonelder/Documents/Flutter/flutter_pdfview/ios/flutter_pdfview")
     ],
     targets: [
         .target(
-            name: "FlutterGeneratedPluginSwiftPackage"
+            name: "FlutterGeneratedPluginSwiftPackage",
+            dependencies: [
+                .product(name: "flutter-pdfview", package: "flutter_pdfview")
+            ]
         )
     ]
 )

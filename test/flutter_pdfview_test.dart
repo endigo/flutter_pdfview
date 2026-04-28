@@ -38,6 +38,8 @@ void main() {
       defaultPage: 0,
       fitPolicy: FitPolicy.WIDTH,
       preventLinkNavigation: false,
+      maxZoom: 4.0,
+      minZoom: 1.0,
     );
   });
 
@@ -57,8 +59,7 @@ void main() {
       );
     });
 
-    testWidgets('PDFView with custom background color',
-        (WidgetTester tester) async {
+    testWidgets('PDFView with custom background color', (WidgetTester tester) async {
       final customPdfView = PDFView(
         filePath: 'test.pdf',
         backgroundColor: Colors.blue,
@@ -73,8 +74,7 @@ void main() {
       );
     });
 
-    testWidgets('PDFView with password protection',
-        (WidgetTester tester) async {
+    testWidgets('PDFView with password protection', (WidgetTester tester) async {
       final protectedPdfView = PDFView(
         filePath: 'test.pdf',
         password: 'test123',
@@ -89,8 +89,7 @@ void main() {
       );
     });
 
-    testWidgets('PDFView with onViewCreated callback',
-        (WidgetTester tester) async {
+    testWidgets('PDFView with onViewCreated callback', (WidgetTester tester) async {
       PDFViewController? controller;
       final pdfViewWithCallback = PDFView(
         filePath: 'test.pdf',
@@ -98,6 +97,7 @@ void main() {
           controller = c;
         },
       );
+      expect(controller, isNull);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -122,6 +122,7 @@ void main() {
           pageCount = pages;
         },
       );
+      expect(pageCount, isNull);
 
       await tester.pumpWidget(
         MaterialApp(
