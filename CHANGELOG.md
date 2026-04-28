@@ -1,4 +1,4 @@
-## 1.4.5
+## 1.4.5-beta.1
 
 - Upgrade Java source/target compatibility from 1.8 to 17 [#334](https://github.com/endigo/flutter_pdfview/issues/334)
 - Add iOS Privacy Manifest (PrivacyInfo.xcprivacy) [#271](https://github.com/endigo/flutter_pdfview/issues/271)
@@ -8,6 +8,17 @@
 - Add configurable `maxZoom` and `minZoom` parameters [#296](https://github.com/endigo/flutter_pdfview/issues/296)
 - Update iOS deployment target to 13.0 in podspec and Package.swift (aligns with Flutter's own iOS 13.0+ requirement)
 - Fix example app build error with undefined `nightModeBackgroundColor` parameter
+- Add `onLoadComplete` callback triggered when the PDFView has loaded its document [#333](https://github.com/endigo/flutter_pdfview/pull/333) @JaseElder
+- Add `onDraw` callback triggered on each draw within the PDFView [#333](https://github.com/endigo/flutter_pdfview/pull/333) @JaseElder
+- Add `getCurrentPageSize()` controller method returning width and height of the loaded page [#333](https://github.com/endigo/flutter_pdfview/pull/333) @JaseElder
+- Add `getScreenshot(String fileName)` controller method to save a PNG of the PDFView contents [#333](https://github.com/endigo/flutter_pdfview/pull/333) @JaseElder
+- Add `getPosition()` and `setPosition(Offset position)` controller methods for the PDF top-left offset [#333](https://github.com/endigo/flutter_pdfview/pull/333) @JaseElder
+- Add `getScale()` and `setScale(double scale)` controller methods for PDF zoom [#333](https://github.com/endigo/flutter_pdfview/pull/333) @JaseElder
+- Add `reload()` controller method to reload the PDF document [#333](https://github.com/endigo/flutter_pdfview/pull/333) @JaseElder
+- Add `setZoomLimits(double minZoom, double midZoom, double maxZoom)` controller method [#333](https://github.com/endigo/flutter_pdfview/pull/333) @JaseElder
+- Add safe unboxing and completers for get/set viewport position to avoid contention and race conditions [#333](https://github.com/endigo/flutter_pdfview/pull/333) @JaseElder
+- Upgrade AndroidPdfViewer to 3.2.8 [#333](https://github.com/endigo/flutter_pdfview/pull/333) @JaseElder
+- Fix deprecated color `.value` usage [#333](https://github.com/endigo/flutter_pdfview/pull/333) @JaseElder
 
 ## 1.4.4
 
