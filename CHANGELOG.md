@@ -6,6 +6,8 @@
 - Fix iOS `onPageChanged` not triggered on first load [#66](https://github.com/endigo/flutter_pdfview/issues/66)
 - Fix iOS landscape PDF wrong initial zoom by preserving user-configured max scale factor [#247](https://github.com/endigo/flutter_pdfview/issues/247)
 - Add configurable `maxZoom` and `minZoom` parameters [#296](https://github.com/endigo/flutter_pdfview/issues/296)
+- **BREAKING**: Raise minimum Flutter version to 3.27.0 and Dart SDK to 3.6.0
+- Migrate `backgroundColor` serialization from deprecated `Color.value` to `Color.toARGB32()`
 - Update iOS deployment target to 13.0 in podspec and Package.swift (aligns with Flutter's own iOS 13.0+ requirement)
 - Fix example app build error with undefined `nightModeBackgroundColor` parameter
 - Add `onLoadComplete` callback triggered when the PDFView has loaded its document [#333](https://github.com/endigo/flutter_pdfview/pull/333) @JaseElder

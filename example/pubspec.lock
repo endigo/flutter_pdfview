@@ -100,7 +100,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "1.4.5"
+    version: "1.4.5-beta.1"
   flutter_test:
     dependency: "direct dev"
     description: flutter

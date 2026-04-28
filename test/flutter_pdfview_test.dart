@@ -97,6 +97,7 @@ void main() {
           controller = c;
         },
       );
+      expect(controller, isNull);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -121,6 +122,7 @@ void main() {
           pageCount = pages;
         },
       );
+      expect(pageCount, isNull);
 
       await tester.pumpWidget(
         MaterialApp(
