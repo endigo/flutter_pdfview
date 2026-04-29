@@ -64,6 +64,8 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | pageSnap              |   ✅    | ❌  |      `true`       |
 | preventLinkNavigation |   ✅    | ✅  |      `false`      |
 | backgroundColor       |   ✅    | ✅  |      `null`       |
+| minZoom               |   ✅    | ✅  |        1.0        |
+| maxZoom               |   ✅    | ✅  |        4.0        |
 
 ## Controller Options
 

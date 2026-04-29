@@ -408,11 +408,11 @@
   }
 
   return
-      @[ [NSNumber numberWithFloat:MAX(x, 0)], [NSNumber numberWithFloat:y] ];
+      @[ [NSNumber numberWithFloat:x], [NSNumber numberWithFloat:y] ];
 }
 
 - (void)getPosition:(FlutterMethodCall*)call result:(FlutterResult)result {
-    if (_currentPage == nil || _pageCount == nil) {
+    if (_scrollView == nil) {
         result([FlutterError errorWithCode:@"INVALID_STATE" message:@"PDFView not ready" details:nil]);
         return;
     }
@@ -426,7 +426,7 @@
 }
 
 - (void)setPosition:(FlutterMethodCall *)call result:(FlutterResult)result {
-    if (_currentPage == nil || _pageCount == nil) {
+    if (_scrollView == nil) {
         result([FlutterError errorWithCode:@"INVALID_STATE"
                                    message:@"PDFView not ready"
                                    details:nil]);
@@ -435,35 +435,33 @@
 
     NSDictionary<NSString *, NSNumber *> *arguments = [call arguments];
 
-    if (_scrollView) {
-        float targetX = -arguments[@"xPos"].floatValue;
-        float targetY = -arguments[@"yPos"].floatValue;
+    float targetX = -arguments[@"xPos"].floatValue;
+    float targetY = -arguments[@"yPos"].floatValue;
 
-        CGPoint targetOffset = CGPointMake(targetX, targetY);
+    CGPoint targetOffset = CGPointMake(targetX, targetY);
 
-        float minOffsetY = 0.0;
-        float maxOffsetY = 0.0;
+    float minOffsetY = 0.0;
+    float maxOffsetY = 0.0;
 
-        if (@available(iOS 11.0, *)) {
-            targetOffset.x -= _scrollView.adjustedContentInset.left;
-            targetOffset.y -= _scrollView.adjustedContentInset.top;
-            minOffsetY = -_scrollView.adjustedContentInset.top;
-            maxOffsetY = MAX(minOffsetY, _scrollView.contentSize.height - _scrollView.bounds.size.height + _scrollView.adjustedContentInset.bottom);
-        } else {
-            targetOffset.x -= _scrollView.contentInset.left;
-            targetOffset.y -= _scrollView.contentInset.top;
-            minOffsetY = -_scrollView.contentInset.top;
-            maxOffsetY = MAX(minOffsetY, _scrollView.contentSize.height - _scrollView.bounds.size.height + _scrollView.contentInset.bottom);
-        }
-
-        if (targetOffset.y < minOffsetY) {
-            targetOffset.y = minOffsetY;
-        } else if (targetOffset.y > maxOffsetY) {
-            targetOffset.y = maxOffsetY;
-        }
-
-        [_scrollView setContentOffset:targetOffset animated:NO];
+    if (@available(iOS 11.0, *)) {
+        targetOffset.x -= _scrollView.adjustedContentInset.left;
+        targetOffset.y -= _scrollView.adjustedContentInset.top;
+        minOffsetY = -_scrollView.adjustedContentInset.top;
+        maxOffsetY = MAX(minOffsetY, _scrollView.contentSize.height - _scrollView.bounds.size.height + _scrollView.adjustedContentInset.bottom);
+    } else {
+        targetOffset.x -= _scrollView.contentInset.left;
+        targetOffset.y -= _scrollView.contentInset.top;
+        minOffsetY = -_scrollView.contentInset.top;
+        maxOffsetY = MAX(minOffsetY, _scrollView.contentSize.height - _scrollView.bounds.size.height + _scrollView.contentInset.bottom);
     }
+
+    if (targetOffset.y < minOffsetY) {
+        targetOffset.y = minOffsetY;
+    } else if (targetOffset.y > maxOffsetY) {
+        targetOffset.y = maxOffsetY;
+    }
+
+    [_scrollView setContentOffset:targetOffset animated:NO];
 
     result([NSNumber numberWithBool:YES]);
 }
