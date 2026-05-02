@@ -2,6 +2,7 @@
 
 - Fix iOS PDF view reporting not ready when it is on initial load
 - Add `minZoom` and `maxZoom` to the README.md
+- Fix Android memory leak by recycling `PDFView` on dispose
 
 ## 1.4.5-beta.1
 
