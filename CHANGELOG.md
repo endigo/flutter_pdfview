@@ -1,3 +1,8 @@
+## 1.4.5-beta.2
+
+- Fix iOS PDF view reporting not ready when it is on initial load
+- Add `minZoom` and `maxZoom` to the README.md
+
 ## 1.4.5-beta.1
 
 - Upgrade Java source/target compatibility from 1.8 to 17 [#334](https://github.com/endigo/flutter_pdfview/issues/334)
