@@ -382,6 +382,9 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
     @Override
     public void dispose() {
+        if (pdfView != null) {
+            pdfView.recycle();
+        }
         methodChannel.setMethodCallHandler(null);
     }
 
