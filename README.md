@@ -66,6 +66,9 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | backgroundColor       |   ✅    | ✅  |      `null`       |
 | minZoom               |   ✅    | ✅  |        1.0        |
 | maxZoom               |   ✅    | ✅  |        4.0        |
+| showScrollIndicators* |   ✅    | ✅  |      `false`      |
+
+*`showScrollIndicators` is ignored in iOS if `pageFling` is set to true
 
 ## Controller Options
 
@@ -92,6 +95,7 @@ PDFView(
   swipeHorizontal: true,
   autoSpacing: false,
   pageFling: false,
+  showScrollIndicators: true,
   backgroundColor: Colors.grey,
   onRender: (_pages) {
     setState(() {
