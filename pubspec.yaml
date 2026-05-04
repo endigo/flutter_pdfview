@@ -5,8 +5,8 @@ homepage: https://github.com/endigo/flutter_pdfview
 
 topics:
   - pdf
-  - annotations
-  - drawing
+  - viewer
+  - native
 
 environment:
   sdk: ">=3.6.0 <4.0.0"
