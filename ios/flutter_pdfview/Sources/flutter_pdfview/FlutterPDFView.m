@@ -276,7 +276,7 @@
                                   scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAutomatic;
 
                                   // Set delegate to monitor scroll events
-                                  if ([scrollView.delegate isEqual:nil]) {
+                                  if (scrollView.delegate == nil) {
                                       scrollView.delegate = (id<UIScrollViewDelegate>)self;
                                   }
                               } else {
