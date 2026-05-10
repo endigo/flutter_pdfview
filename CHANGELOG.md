@@ -1,3 +1,7 @@
+## 1.4.5-beta.3
+
+- Fixed issue #337: Added showScrollIndicators option to control native scroll indicator visibility.
+
 ## 1.4.5-beta.2
 
 - Fix iOS PDF view reporting not ready when it is on initial load
