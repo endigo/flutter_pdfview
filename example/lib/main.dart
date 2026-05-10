@@ -213,13 +213,14 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
         children: <Widget>[
           PDFView(
             filePath: widget.path,
+            enableSwipe: true,
             // iPad Safe Mode: Avoid conflicting scroll configurations
-            enableSwipe: widget.isIPadSafe ? true : true,
             swipeHorizontal:
                 widget.isIPadSafe ? false : true, // Vertical scrolling is safer on iPad
             autoSpacing: widget.isIPadSafe ? true : false, // Let PDFKit handle spacing
             pageFling: widget.isIPadSafe ? false : true, // Disable page fling to avoid conflicts
-            pageSnap: widget.isIPadSafe ? false : true, // Disable page snap for smoother scrolling
+            pageSnap: false, // Disable page snap for smoother scrolling
+            showScrollIndicators: true,
             defaultPage: _currentPage!,
             fitPolicy: FitPolicy.BOTH,
             preventLinkNavigation: false, // if set to true the link is handled in flutter

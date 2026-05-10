@@ -13,8 +13,7 @@ typedef ErrorCallback = void Function(dynamic error);
 typedef PageErrorCallback = void Function(int? page, dynamic error);
 typedef LinkHandlerCallback = void Function(String? uri);
 typedef LoadCompleteCallback = void Function(int? pages);
-typedef DrawCallback = void Function(
-    double pdfXOffset, double pdfYOffset, double pdfScale);
+typedef DrawCallback = void Function(double pdfXOffset, double pdfYOffset, double pdfScale);
 
 enum FitPolicy { WIDTH, HEIGHT, BOTH }
 
@@ -34,6 +33,7 @@ class PDFView extends StatefulWidget {
     this.gestureRecognizers,
     this.enableSwipe = true,
     this.swipeHorizontal = false,
+    this.showScrollIndicators = false,
     this.password,
     this.nightMode = false,
     this.autoSpacing = true,
@@ -102,6 +102,10 @@ class PDFView extends StatefulWidget {
   /// Indicates whether or not the user can swipe horizontally to change pages in the PDF document. If set to true, horizontal swiping is enabled.
   final bool swipeHorizontal;
 
+  /// Indicates whether or not the PDF Viewer should show scroll indicators - scroll handles on Android and scrollbars on iOS
+  /// NB: on iOS, if pageFling is set to true, scroll indicators will not show
+  final bool showScrollIndicators;
+
   /// Represents the password for a password-protected PDF document. It can be nullable
   final String? password;
 
@@ -114,7 +118,8 @@ class PDFView extends StatefulWidget {
   /// Indicates whether or not the user can "fling" pages in the PDF document. If set to true, page flinging is enabled.
   final bool pageFling;
 
-  /// Indicates whether or not the viewer snaps to a page after the user has scrolled to it. If set to true, snapping is enabled.
+  /// Indicates whether or not the viewer snaps to a page after the user has scrolled to it.
+  /// If set to true, snapping is enabled. No effect in iOS
   final bool pageSnap;
 
   /// Controls whether the PDF renderer uses anti-aliasing (Android only).
@@ -156,8 +161,7 @@ class PDFView extends StatefulWidget {
 }
 
 class _PDFViewState extends State<PDFView> {
-  final Completer<PDFViewController> _controller =
-      Completer<PDFViewController>();
+  final Completer<PDFViewController> _controller = Completer<PDFViewController>();
 
   @override
   Widget build(BuildContext context) {
@@ -170,8 +174,8 @@ class _PDFViewState extends State<PDFView> {
         ) {
           return AndroidViewSurface(
             controller: controller as AndroidViewController,
-            gestureRecognizers: widget.gestureRecognizers ??
-                const <Factory<OneSequenceGestureRecognizer>>{},
+            gestureRecognizers:
+                widget.gestureRecognizers ?? const <Factory<OneSequenceGestureRecognizer>>{},
             hitTestBehavior: PlatformViewHitTestBehavior.opaque,
           );
         },
@@ -199,8 +203,7 @@ class _PDFViewState extends State<PDFView> {
         creationParamsCodec: const StandardMessageCodec(),
       );
     }
-    return Text(
-        '$defaultTargetPlatform is not yet supported by the pdfview_flutter plugin');
+    return Text('$defaultTargetPlatform is not yet supported by the pdfview_flutter plugin');
   }
 
   void _onPlatformViewCreated(int id) {
@@ -214,14 +217,12 @@ class _PDFViewState extends State<PDFView> {
   @override
   void didUpdateWidget(PDFView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _controller.future.then(
-        (PDFViewController controller) => controller._updateWidget(widget));
+    _controller.future.then((PDFViewController controller) => controller._updateWidget(widget));
   }
 
   @override
   void dispose() {
-    _controller.future
-        .then((PDFViewController controller) => controller.dispose());
+    _controller.future.then((PDFViewController controller) => controller.dispose());
     super.dispose();
   }
 }
@@ -262,6 +263,7 @@ class _PDFViewSettings {
   _PDFViewSettings({
     this.enableSwipe,
     this.swipeHorizontal,
+    this.showScrollIndicators,
     this.password,
     this.nightMode,
     this.autoSpacing,
@@ -283,6 +285,7 @@ class _PDFViewSettings {
     return _PDFViewSettings(
       enableSwipe: widget.enableSwipe,
       swipeHorizontal: widget.swipeHorizontal,
+      showScrollIndicators: widget.showScrollIndicators,
       password: widget.password,
       nightMode: widget.nightMode,
       autoSpacing: widget.autoSpacing,
@@ -303,6 +306,7 @@ class _PDFViewSettings {
 
   final bool? enableSwipe;
   final bool? swipeHorizontal;
+  final bool? showScrollIndicators;
   final String? password;
   final bool? nightMode;
   final bool? autoSpacing;
@@ -325,6 +329,7 @@ class _PDFViewSettings {
     return <String, dynamic>{
       'enableSwipe': enableSwipe,
       'swipeHorizontal': swipeHorizontal,
+      'showScrollIndicators': showScrollIndicators,
       'password': password,
       'nightMode': nightMode,
       'autoSpacing': autoSpacing,
@@ -409,8 +414,7 @@ class PDFViewController {
         widget.onError?.call(call.arguments['error']);
         return null;
       case 'onPageError':
-        widget.onPageError
-            ?.call(call.arguments['page'], call.arguments['error']);
+        widget.onPageError?.call(call.arguments['page'], call.arguments['error']);
         return null;
       case 'onLinkHandler':
         widget.onLinkHandler?.call(call.arguments);
@@ -419,12 +423,11 @@ class PDFViewController {
         widget.onLoadComplete?.call(call.arguments['pages']);
         return null;
       case 'onDraw':
-        widget.onDraw?.call(call.arguments['pdfXOffset'],
-            call.arguments['pdfYOffset'], call.arguments['pdfScale']);
+        widget.onDraw?.call(
+            call.arguments['pdfXOffset'], call.arguments['pdfYOffset'], call.arguments['pdfScale']);
         return null;
     }
-    throw MissingPluginException(
-        '${call.method} was invoked but has no handler');
+    throw MissingPluginException('${call.method} was invoked but has no handler');
   }
 
   Future<int?> getPageCount() async {
@@ -461,8 +464,7 @@ class PDFViewController {
       await _setPositionCompleter!.future;
     }
     _setPositionCompleter = Completer<void>();
-    final bool isSet =
-        await _channel.invokeMethod('setPosition', <String, double>{
+    final bool isSet = await _channel.invokeMethod('setPosition', <String, double>{
       'xPos': position.dx,
       'yPos': position.dy,
     });
@@ -486,8 +488,7 @@ class PDFViewController {
     return isSet;
   }
 
-  Future<bool> setZoomLimits(
-      double minZoom, double midZoom, double maxZoom) async {
+  Future<bool> setZoomLimits(double minZoom, double midZoom, double maxZoom) async {
     return await _channel.invokeMethod<bool>('setZoomLimits', <String, dynamic>{
           'minZoom': minZoom,
           'midZoom': midZoom,
@@ -516,8 +517,7 @@ class PDFViewController {
   }
 
   Future<bool?> setPage(int page) async {
-    final bool? isSet =
-        await _channel.invokeMethod('setPage', <String, dynamic>{
+    final bool? isSet = await _channel.invokeMethod('setPage', <String, dynamic>{
       'page': page,
     });
     return isSet;

@@ -11,6 +11,7 @@ import androidx.annotation.NonNull;
 import com.github.barteksc.pdfviewer.PDFView;
 import com.github.barteksc.pdfviewer.PDFView.Configurator;
 import com.github.barteksc.pdfviewer.link.LinkHandler;
+import com.github.barteksc.pdfviewer.scroll.DefaultScrollHandle;
 import com.github.barteksc.pdfviewer.util.Constants;
 import com.github.barteksc.pdfviewer.util.FitPolicy;
 import com.shockwave.pdfium.util.SizeF;
@@ -19,6 +20,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
@@ -55,12 +57,10 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
         pdfView.useBestQuality(getBoolean(params, "useBestQuality"));
         pdfView.enableRenderDuringScale(getBoolean(params, "enableRenderDuringScale"));
-        Float thumbnailRatio = getFloat(params, "thumbnailRatio");
-
-        if (thumbnailRatio != null) {
-            Constants.THUMBNAIL_RATIO = thumbnailRatio;
+        Object thumbnailRatioObj = params.get("thumbnailRatio");
+        if (thumbnailRatioObj instanceof Number) {
+            Constants.THUMBNAIL_RATIO = ((Number) thumbnailRatioObj).floatValue();
         }
-//        Constants.Cache.THUMBNAILS_CACHE_SIZE = 0;
 
         Configurator config = null;
         if (params.get("filePath") != null) {
@@ -88,6 +88,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .pageSnap(getBoolean(params, "pageSnap"))
                     .pageFitPolicy(getFitPolicy(params))
                     .enableAnnotationRendering(true)
+                    .scrollHandle(getBoolean(params, "showScrollIndicators") ? new DefaultScrollHandle(context) : null)
                     .linkHandler(linkHandler)
                     .enableAntialiasing(getBoolean(params, "enableAntialiasing"))
                     .enableDoubletap(true)
@@ -127,10 +128,10 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                         methodChannel.invokeMethod("onLoadComplete", args);
                     }).load();
 
-            Float maxZoom = getFloat(params, "maxZoom");
-            Float minZoom = getFloat(params, "minZoom");
-            float effectiveMax = maxZoom != null ? maxZoom : DEFAULT_MAX_ZOOM;
-            float effectiveMin = minZoom != null ? minZoom : DEFAULT_MIN_ZOOM;
+            float effectiveMax = getFloat(params, "maxZoom", DEFAULT_MAX_ZOOM);
+            float effectiveMin = getFloat(params, "minZoom", DEFAULT_MIN_ZOOM);
+//            float effectiveMax = maxZoom != null ? maxZoom : DEFAULT_MAX_ZOOM;
+//            float effectiveMin = minZoom != null ? minZoom : DEFAULT_MIN_ZOOM;
             if (effectiveMin > effectiveMax) {
                 effectiveMin = effectiveMax;
             }
@@ -223,18 +224,10 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     void setPosition(MethodCall call, Result result) {
         Double xPosObj = call.argument("xPos");
         double xOffset;
-        if (xPosObj != null) {
-            xOffset = xPosObj; // Safe unboxing
-        } else {
-            xOffset = 0.0;
-        }
+        xOffset = Objects.requireNonNullElse(xPosObj, 0.0); // Safe unboxing
         Double yPosObj = call.argument("yPos");
         double yOffset;
-        if (yPosObj != null) {
-            yOffset = yPosObj; // Safe unboxing
-        } else {
-            yOffset = 0.0;
-        }
+        yOffset = Objects.requireNonNullElse(yPosObj, 0.0); // Safe unboxing
         pdfView.moveTo((float) xOffset * displayDensity, (float) yOffset * displayDensity);
         pdfView.loadPages();
         result.success(true);
@@ -243,11 +236,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     void setScale(MethodCall call, Result result) {
         Double scaleObj = call.argument("scale");
         double zoom;
-        if (scaleObj != null) {
-            zoom = scaleObj; // Safe unboxing
-        } else {
-            zoom = 1.0;
-        }
+        zoom = Objects.requireNonNullElse(scaleObj, 1.0); // Safe unboxing
 
         if (zoom != 1.0) {
             pdfView.zoomTo((float) zoom);
@@ -332,11 +321,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         if (call.argument("page") != null) {
             Integer pageObj = call.argument("page");
             int page;
-            if (pageObj != null) {
-                page = pageObj; // Safe unboxing
-            } else {
-                page = 1;
-            }
+            page = Objects.requireNonNullElse(pageObj, 1); // Safe unboxing
             pdfView.jumpTo(page);
         }
 
@@ -369,10 +354,10 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     plh.setPreventLinkNavigation(getBoolean(settings, key));
                     break;
                 case "maxZoom":
-                    pdfView.setMaxZoom(getFloat(settings, key));
+                    pdfView.setMaxZoom(getFloat(settings, key, DEFAULT_MAX_ZOOM));
                     break;
                 case "minZoom":
-                    pdfView.setMinZoom(getFloat(settings, key));
+                    pdfView.setMinZoom(getFloat(settings, key, DEFAULT_MIN_ZOOM));
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown PDFView setting: " + key);
@@ -391,11 +376,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private boolean getBoolean(Map<String, Object> params, String key) {
         Boolean keyObj = (Boolean) params.get(key);
         boolean bKey;
-        if (keyObj != null) {
-            bKey = keyObj;
-        } else {
-            bKey = false;
-        }
+        bKey = Objects.requireNonNullElse(keyObj, false);
         return params.containsKey(key) && bKey;
     }
 
@@ -406,36 +387,25 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private int getInt(Map<String, Object> params, String key) {
         Integer keyObj = (Integer) params.get(key);
         int intKey;
-        if (keyObj != null) {
-            intKey = keyObj;
-        } else {
-            intKey = 0;
-        }
+        intKey = Objects.requireNonNullElse(keyObj, 0);
         return params.containsKey(key) ? intKey : 0;
     }
 
-    private Float getFloat(Map<String, Object> params, String key) {
-        if (!params.containsKey(key)) {
-            return null;
-        }
+    private float getFloat(Map<String, Object> params, String key, float defaultValue) {
         Object value = params.get(key);
         if (value instanceof Number) {
             return ((Number) value).floatValue();
         }
-        return null;
+        return defaultValue;
     }
 
     private FitPolicy getFitPolicy(Map<String, Object> params) {
         String fitPolicy = getString(params, "fitPolicy");
-        switch (fitPolicy) {
-            case "FitPolicy.WIDTH":
-                return FitPolicy.WIDTH;
-            case "FitPolicy.HEIGHT":
-                return FitPolicy.HEIGHT;
-            case "FitPolicy.BOTH":
-            default:
-                return FitPolicy.BOTH;
-        }
+        return switch (fitPolicy) {
+            case "FitPolicy.WIDTH" -> FitPolicy.WIDTH;
+            case "FitPolicy.HEIGHT" -> FitPolicy.HEIGHT;
+            default -> FitPolicy.BOTH;
+        };
     }
 
     private Uri getURI(final String uri) {
