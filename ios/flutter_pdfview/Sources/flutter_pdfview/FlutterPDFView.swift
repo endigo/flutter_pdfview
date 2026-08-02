@@ -199,6 +199,13 @@ final class PDFViewController: NSObject, FlutterPlatformView, PDFViewDelegate {
 final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
     UIGestureRecognizerDelegate, UIScrollViewDelegate
 {
+    /// How pages are scaled to the viewport (mirrors Dart [FitPolicy]).
+    private enum FitPolicy {
+        case width
+        case height
+        case both
+    }
+
     private weak var controller: PDFViewController?
 
     private let pdfView: PDFView
@@ -219,6 +226,14 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
     private var maxScaleFactor: CGFloat = 0
     private var minScaleFactor: CGFloat = 0
     private var hasSentInitialPage = false
+    private var fitPolicy: FitPolicy = .width
+    /// Last view size we laid out against — used to re-fit after the temporary
+    /// non-zero frame (#268) expands to the real Flutter bounds (#150).
+    private var lastLayoutSize: CGSize = .zero
+    /// Fit scale applied for `lastLayoutSize` (before user zoom multiplier).
+    private var lastFitScale: CGFloat = 0
+    /// Whether we have successfully applied an initial fit at a real size.
+    private var hasAppliedInitialFit = false
 
     init(frame: CGRect, arguments args: Any?, controller: PDFViewController) {
         self.controller = controller
@@ -288,6 +303,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
 
     private func loadDocument(arguments args: [String: Any]?) {
         autoSpacing = args?.bool("autoSpacing") ?? false
+        fitPolicy = Self.fitPolicy(fromArguments: args)
         let pageFling = args?.bool("pageFling") ?? false
         let enableSwipe = args?.bool("enableSwipe") ?? false
         preventLinkNavigation = args?.bool("preventLinkNavigation") ?? false
@@ -329,7 +345,10 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
 
         let showScrollIndicators = args?.bool("showScrollIndicators") ?? false
 
-        pdfView.autoScales = true
+        // Manage scale ourselves so fitPolicy and autoSpacing stay independent
+        // (#150). PDFKit's autoScales always does "fit both" and used to be
+        // incorrectly tied to autoSpacing.
+        pdfView.autoScales = false
 
         // UIPageViewController flips one page at a time — only match the API
         // for horizontal book-style paging. Vertical layouts scroll
@@ -339,9 +358,12 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         pdfView.displayMode = (enableSwipe && !useHorizontalPaging)
             ? .singlePageContinuous
             : .singlePage
+        // autoSpacing only controls gaps between pages — never zoom/fit (#150).
         pdfView.displaysPageBreaks = autoSpacing
         if autoSpacing {
             pdfView.pageBreakMargins = UIEdgeInsets(top: 4, left: 0, bottom: 4, right: 0)
+        } else {
+            pdfView.pageBreakMargins = .zero
         }
         pdfView.document = document
 
@@ -563,10 +585,71 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         currentPage = pdfView.currentPage
         pageCount = NSNumber(value: pdfView.document?.pageCount ?? 0)
         if let document = pdfView.document, let currentPage {
-            pageNo = Int32(truncatingIfNeeded: document.index(for: currentPage) + 1)
-        } else {
-            pageNo = 1
+            let pageIndex = document.index(for: currentPage)
+            if pageIndex != NSNotFound {
+                pageNo = Int32(truncatingIfNeeded: pageIndex + 1)
+            }
         }
+    }
+
+    /// Parses Dart's `FitPolicy.WIDTH|HEIGHT|BOTH` creation argument.
+    private static func fitPolicy(fromArguments args: [String: Any]?) -> FitPolicy {
+        guard let policy = args?["fitPolicy"] as? String else { return .width }
+        switch policy {
+        case "FitPolicy.HEIGHT":
+            return .height
+        case "FitPolicy.BOTH":
+            return .both
+        default:
+            // WIDTH and any unknown value → width (matches Dart default).
+            return .width
+        }
+    }
+
+    /// Scale that fits the current (or default) page per `fitPolicy`.
+    private func fitScaleForCurrentPolicy() -> CGFloat {
+        guard pdfView.document != nil else { return 0 }
+
+        var viewSize = pdfView.bounds.size
+        if viewSize.width <= 0 || viewSize.height <= 0 {
+            viewSize = bounds.size
+        }
+        guard viewSize.width > 0, viewSize.height > 0 else { return 0 }
+
+        var candidatePage = pdfView.currentPage ?? defaultPage
+        if candidatePage == nil, let document = pdfView.document, document.pageCount > 0 {
+            candidatePage = document.page(at: 0)
+        }
+        guard let page = candidatePage else { return 0 }
+
+        let pageRect = page.bounds(for: pdfView.displayBox)
+        guard pageRect.size.width > 0, pageRect.size.height > 0 else { return 0 }
+
+        // Account for page rotation so landscape pages fit correctly (#247).
+        var pageWidth = pageRect.size.width
+        var pageHeight = pageRect.size.height
+        if page.rotation == 90 || page.rotation == 270 {
+            swap(&pageWidth, &pageHeight)
+        }
+
+        let scaleWidth = viewSize.width / pageWidth
+        let scaleHeight = viewSize.height / pageHeight
+        let scale: CGFloat
+        switch fitPolicy {
+        case .height:
+            scale = scaleHeight
+        case .both:
+            // Prefer PDFKit's geometry (handles display mode / insets) when ready.
+            let pdfKitFit = pdfView.scaleFactorForSizeToFit
+            scale = (pdfKitFit.isFinite && pdfKitFit > 0)
+                ? pdfKitFit
+                : min(scaleWidth, scaleHeight)
+        case .width:
+            scale = scaleWidth
+        }
+
+        guard scale.isFinite, scale > 0 else { return 0 }
+        return scale
     }
 
     /// Body of the old `@try` block in `layoutSubviews`.
@@ -575,8 +658,16 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
     ///   `layoutSubviews` early, `true` when it fell through.
     private func applyLayoutUpdates() -> Bool {
         pdfView.frame = bounds
-        let fitScale = pdfView.scaleFactorForSizeToFit
-        // scaleFactorForSizeToFit can be 0/NaN before the document lays out.
+
+        // Need a page to compute WIDTH/HEIGHT fit; BOTH can use PDFKit helper.
+        guard pdfView.document != nil else { return false }
+        if !defaultPageSet, let defaultPage {
+            pdfView.go(to: defaultPage)
+            defaultPageSet = true
+        }
+
+        let fitScale = fitScaleForCurrentPolicy()
+        // Fit scale can be 0/NaN before the document lays out.
         guard fitScale.isFinite, fitScale > 0 else { return false }
         let minScale = fitScale * minScaleFactor
         let maxScale = fitScale * maxScaleFactor
@@ -584,16 +675,44 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         pdfView.minScaleFactor = minScale
         pdfView.maxScaleFactor = max(maxScale, minScale)
 
-        if autoSpacing || !defaultPageSet {
-            let clampedScale = min(max(fitScale, pdfView.minScaleFactor), pdfView.maxScaleFactor)
-            if clampedScale.isFinite, clampedScale > 0 {
-                pdfView.scaleFactor = clampedScale
+        // #150: Fit is independent of autoSpacing. Re-apply when:
+        //  - we have not yet applied a fit at a real size, or
+        //  - the view size changed (placeholder 100x100 → real bounds, or
+        //    rotation) and the user is still at the previous fit scale, or
+        //  - the view size changed and the user was zoomed — preserve relative
+        //    zoom against the new fit baseline.
+        let boundsSize = bounds.size
+        let sizeChanged = abs(boundsSize.width - lastLayoutSize.width) > 0.5 ||
+            abs(boundsSize.height - lastLayoutSize.height) > 0.5
+        let nearPreviousFit = lastFitScale > 0 &&
+            abs(pdfView.scaleFactor - lastFitScale) <= max(0.02, lastFitScale * 0.02)
+
+        var targetScale = fitScale
+        var shouldSetScale = false
+        if !hasAppliedInitialFit {
+            shouldSetScale = true
+        } else if sizeChanged {
+            shouldSetScale = true
+            if !nearPreviousFit, lastFitScale > 0 {
+                let relative = pdfView.scaleFactor / lastFitScale
+                if relative.isFinite, relative > 0 {
+                    targetScale = fitScale * relative
+                }
             }
         }
 
-        if !defaultPageSet, let defaultPage {
-            pdfView.go(to: defaultPage)
-            defaultPageSet = true
+        if shouldSetScale {
+            let clampedScale = min(max(targetScale, pdfView.minScaleFactor), pdfView.maxScaleFactor)
+            if clampedScale.isFinite, clampedScale > 0 {
+                pdfView.scaleFactor = clampedScale
+            }
+            lastFitScale = fitScale
+            lastLayoutSize = boundsSize
+            hasAppliedInitialFit = true
+        } else {
+            // Still track size so a later change is detected; keep fit baseline.
+            lastLayoutSize = boundsSize
+            lastFitScale = fitScale
         }
 
         if !hasSentInitialPage, defaultPageSet,
@@ -719,6 +838,9 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
 
     func reload(_: FlutterMethodCall, result: FlutterResult) {
         pdfView.document = document
+        hasAppliedInitialFit = false
+        lastFitScale = 0
+        lastLayoutSize = .zero
         if let document, document.pageCount > 0, let firstPage = document.page(at: 0) {
             pdfView.go(to: firstPage)
 
@@ -728,7 +850,13 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
                 on: firstPage
             )
 
-            pdfView.scaleFactor = pdfView.scaleFactorForSizeToFit
+            let fitScale = fitScaleForCurrentPolicy()
+            if fitScale.isFinite, fitScale > 0 {
+                pdfView.scaleFactor = fitScale
+                lastFitScale = fitScale
+                lastLayoutSize = bounds.size
+                hasAppliedInitialFit = true
+            }
         }
 
         result(NSNumber(value: true))
@@ -765,11 +893,16 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         let arguments = call.arguments as? [String: Any]
         let minZoom = arguments?.float("minZoom") ?? 0
         let maxZoom = arguments?.float("maxZoom") ?? 0
-        let fitScale = pdfView.scaleFactorForSizeToFit
+        var fitScale = fitScaleForCurrentPolicy()
+        if !fitScale.isFinite || fitScale <= 0 {
+            fitScale = pdfView.scaleFactorForSizeToFit
+        }
         let minScale = Float(Double(minZoom) * Double(fitScale))
         let maxScale = Float(Double(maxZoom) * Double(fitScale))
         pdfView.minScaleFactor = CGFloat(minScale != 0.0 ? minScale : minZoom)
         pdfView.maxScaleFactor = CGFloat(maxScale != 0.0 ? maxScale : maxZoom)
+        minScaleFactor = CGFloat(minZoom)
+        maxScaleFactor = CGFloat(maxZoom)
         result(NSNumber(value: true))
     }
 
@@ -842,7 +975,15 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         }
 
         catchingNSException {
-            if pdfView.scaleFactor == pdfView.scaleFactorForSizeToFit {
+            var fitScale = fitScaleForCurrentPolicy()
+            if !fitScale.isFinite || fitScale <= 0 {
+                fitScale = pdfView.scaleFactorForSizeToFit
+            }
+            guard fitScale.isFinite, fitScale > 0 else {
+                return
+            }
+            let atFit = abs(pdfView.scaleFactor - fitScale) <= max(0.02, fitScale * 0.02)
+            if atFit {
                 let point = recognizer.location(in: pdfView)
                 if let page = pdfView.page(for: point, nearest: true) {
                     let pdfPoint = pdfView.convert(point, to: page)
@@ -855,13 +996,14 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
                         )
                     )
                     UIView.animate(withDuration: 0.2) {
-                        self.pdfView.scaleFactor = self.pdfView.scaleFactorForSizeToFit * 2
+                        self.pdfView.scaleFactor = fitScale * 2
                         self.pdfView.go(to: destination)
                     }
                 }
             } else {
                 UIView.animate(withDuration: 0.2) {
-                    self.pdfView.scaleFactor = self.pdfView.scaleFactorForSizeToFit
+                    self.pdfView.scaleFactor = fitScale
+                    self.lastFitScale = fitScale
                 }
             }
         } onException: { error in
