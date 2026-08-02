@@ -1,6 +1,21 @@
 group 'io.endigo.plugins.pdfview'
 version '1.0-SNAPSHOT'
 
+buildscript {
+    // Matches the KGP that the Flutter tooling puts on the root build classpath,
+    // so an app build resolves a single Kotlin compiler.
+    ext.kotlin_version = '2.0.0'
+
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
 // Resolve Flutter SDK for standalone `./gradlew testDebugUnitTest` (not via an app).
 // When the plugin is built as a dependency of a Flutter app, the embedding is
 // provided by the host; compileOnly avoids packing flutter.jar into the AAR.
@@ -23,6 +38,7 @@ rootProject.allprojects {
 }
 
 apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
 
 android {
     compileSdk 36
@@ -30,6 +46,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
     }
 
     defaultConfig {

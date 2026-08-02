@@ -1,3 +1,15 @@
+## 1.5.0-beta.1
+
+- **Android**: migrate the plugin implementation from Java to Kotlin (KGP 2.0.0, JVM target 17).
+  Behavior verified by the existing 64-test native suite running against the Kotlin sources unchanged
+- **iOS**: migrate the plugin implementation from Objective-C to Swift 5.9. The registered
+  `FLTPDFViewFlutterPlugin` class name is preserved, `NSException` guards around PDFKit are kept via a
+  small Objective-C shim target, and scroll observation moved to block-based KVO. Verified on both
+  Swift Package Manager and CocoaPods (`pod lib lint`, dynamic + static)
+- Fix a platform-view remount race: late creation callbacks from a disposed or remounted view can no
+  longer complete the new controller with a stale instance
+- No public Dart API changes
+
 ## 1.4.5-beta.5
 
 - Fix #150: iOS initial page fit no longer depends on `autoSpacing` (spacing vs zoom decoupled); re-fit after placeholder→real bounds and on rotation while preserving user zoom

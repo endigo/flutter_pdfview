@@ -13,14 +13,18 @@ let package = Package(
     ],
     dependencies: [],
     targets: [
+        // Objective-C shim that turns NSException into NSError so the Swift
+        // sources can keep the @try/@catch guards the plugin has always had
+        // around PDFKit. SwiftPM does not allow mixed-language targets, so it
+        // has to be a target of its own.
+        .target(
+            name: "flutter_pdfview_objc"
+        ),
         .target(
             name: "flutter_pdfview",
-            dependencies: [],
+            dependencies: ["flutter_pdfview_objc"],
             resources: [
                 .process("PrivacyInfo.xcprivacy"),
-            ],
-            cSettings: [
-                .headerSearchPath("include/flutter_pdfview")
             ]
         )
     ]

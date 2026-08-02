@@ -14,11 +14,15 @@ Pod::Spec.new do |s|
   s.author           = { 'endigo' => 'endigo.18@gmail.com' }
   s.source           = { :http => 'https://github.com/endigo/flutter_pdfview' }
   s.documentation_url = 'https://pub.dev/packages/flutter_pdfview'
-  s.source_files = 'flutter_pdfview/Sources/flutter_pdfview/**/*.{h,m}'
-  s.public_header_files = 'flutter_pdfview/Sources/flutter_pdfview/include/**/*.h'
+  # CocoaPods, unlike SwiftPM, allows one target to mix Swift with the small
+  # Objective-C exception shim, so both source trees compile into this pod.
+  s.source_files = 'flutter_pdfview/Sources/flutter_pdfview/**/*.swift',
+                   'flutter_pdfview/Sources/flutter_pdfview_objc/**/*.{h,m}'
+  s.public_header_files = 'flutter_pdfview/Sources/flutter_pdfview_objc/include/**/*.h'
   s.dependency 'Flutter'
 
   s.ios.deployment_target = '13.0'
+  s.swift_version = '5.0'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'VALID_ARCHS' => 'armv7 arm64 x86_64' }
   s.resource_bundles = { 'flutter_pdfview_privacy' => ['flutter_pdfview/Sources/flutter_pdfview/PrivacyInfo.xcprivacy'] }
 end
