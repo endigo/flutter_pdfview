@@ -124,6 +124,13 @@
 
 @end
 
+/// How pages are scaled to the viewport (mirrors Dart [FitPolicy]).
+typedef NS_ENUM(NSInteger, FLTPDFFitPolicy) {
+    FLTPDFFitPolicyWidth = 0,
+    FLTPDFFitPolicyHeight = 1,
+    FLTPDFFitPolicyBoth = 2,
+};
+
 @implementation FLTPDFView {
     FLTPDFViewController *__weak _controller;
     PDFView *_pdfView;
@@ -134,6 +141,7 @@
     PDFDestination *_currentDestination;
     BOOL _preventLinkNavigation;
     BOOL _autoSpacing;
+    FLTPDFFitPolicy _fitPolicy;
     PDFPage *_defaultPage;
     PDFPage *_currentPage;
     int _pageNo;
@@ -145,6 +153,13 @@
     CGFloat _maxScaleFactor;
     CGFloat _minScaleFactor;
     BOOL _hasSentInitialPage;
+    /// Last view size we laid out against — used to re-fit after the temporary
+    /// non-zero frame (#268) expands to the real Flutter bounds (#150).
+    CGSize _lastLayoutSize;
+    /// Fit scale applied for `_lastLayoutSize` (before user zoom multiplier).
+    CGFloat _lastFitScale;
+    /// Whether we have successfully applied an initial fit at a real size.
+    BOOL _hasAppliedInitialFit;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
@@ -170,6 +185,10 @@
         _pdfView.delegate = self;
 
         _autoSpacing = [args[@"autoSpacing"] boolValue];
+        _fitPolicy = [self fitPolicyFromArguments:args];
+        _lastLayoutSize = CGSizeZero;
+        _lastFitScale = 0;
+        _hasAppliedInitialFit = NO;
         BOOL pageFling = [args[@"pageFling"] boolValue];
         BOOL enableSwipe = [args[@"enableSwipe"] boolValue];
         _preventLinkNavigation = [args[@"preventLinkNavigation"] boolValue];
@@ -234,7 +253,10 @@
 
             BOOL showScrollIndicators = [args[@"showScrollIndicators"] boolValue];
 
-            _pdfView.autoScales = YES;
+            // Manage scale ourselves so fitPolicy and autoSpacing stay independent
+            // (#150). PDFKit's autoScales always does "fit both" and used to be
+            // incorrectly tied to autoSpacing.
+            _pdfView.autoScales = NO;
 
             // UIPageViewController flips one page at a time — only match the API
             // for horizontal book-style paging. Vertical layouts scroll
@@ -246,9 +268,12 @@
             } else {
                 _pdfView.displayMode = kPDFDisplaySinglePage;
             }
+            // autoSpacing only controls gaps between pages — never zoom/fit (#150).
             _pdfView.displaysPageBreaks = _autoSpacing;
             if (_autoSpacing) {
                 _pdfView.pageBreakMargins = UIEdgeInsetsMake(4, 0, 4, 0);
+            } else {
+                _pdfView.pageBreakMargins = UIEdgeInsetsZero;
             }
             _pdfView.document = _document;
 
@@ -511,8 +536,18 @@
     // Wrap layout updates in try-catch for safety
     @try {
         _pdfView.frame = self.bounds;
-        CGFloat fitScale = _pdfView.scaleFactorForSizeToFit;
-        // scaleFactorForSizeToFit can be 0/NaN before the document lays out.
+
+        // Need a page to compute WIDTH/HEIGHT fit; BOTH can use PDFKit helper.
+        if (_pdfView.document == nil) {
+            return;
+        }
+        if (!_defaultPageSet && _defaultPage != nil) {
+            [_pdfView goToPage:_defaultPage];
+            _defaultPageSet = true;
+        }
+
+        CGFloat fitScale = [self fitScaleForCurrentPolicy];
+        // Fit scale can be 0/NaN before the document lays out.
         if (!isfinite(fitScale) || fitScale <= 0) {
             return;
         }
@@ -524,17 +559,49 @@
         _pdfView.minScaleFactor = minScale;
         _pdfView.maxScaleFactor = fmax(maxScale, minScale);
 
-        if (_autoSpacing || !_defaultPageSet) {
-            CGFloat clampedScale = fmin(fmax(fitScale, _pdfView.minScaleFactor),
-                                        _pdfView.maxScaleFactor);
-            if (isfinite(clampedScale) && clampedScale > 0) {
-                _pdfView.scaleFactor = clampedScale;
+        // #150: Fit is independent of autoSpacing. Re-apply when:
+        //  - we have not yet applied a fit at a real size, or
+        //  - the view size changed (placeholder 100x100 → real bounds, or
+        //    rotation) and the user is still at the previous fit scale, or
+        //  - the view size changed and the user was zoomed — preserve relative
+        //    zoom against the new fit baseline.
+        CGSize boundsSize = self.bounds.size;
+        BOOL sizeChanged =
+            fabs(boundsSize.width - _lastLayoutSize.width) > 0.5 ||
+            fabs(boundsSize.height - _lastLayoutSize.height) > 0.5;
+        BOOL nearPreviousFit =
+            _lastFitScale > 0 &&
+            fabs(_pdfView.scaleFactor - _lastFitScale) <=
+                fmax(0.02, _lastFitScale * 0.02);
+
+        CGFloat targetScale = fitScale;
+        BOOL shouldSetScale = NO;
+        if (!_hasAppliedInitialFit) {
+            shouldSetScale = YES;
+        } else if (sizeChanged) {
+            shouldSetScale = YES;
+            if (!nearPreviousFit && _lastFitScale > 0) {
+                CGFloat relative = _pdfView.scaleFactor / _lastFitScale;
+                if (isfinite(relative) && relative > 0) {
+                    targetScale = fitScale * relative;
+                }
             }
         }
 
-        if (!_defaultPageSet && _defaultPage != nil) {
-            [_pdfView goToPage:_defaultPage];
-            _defaultPageSet = true;
+        if (shouldSetScale) {
+            CGFloat clampedScale =
+                fmin(fmax(targetScale, _pdfView.minScaleFactor),
+                     _pdfView.maxScaleFactor);
+            if (isfinite(clampedScale) && clampedScale > 0) {
+                _pdfView.scaleFactor = clampedScale;
+            }
+            _lastFitScale = fitScale;
+            _lastLayoutSize = boundsSize;
+            _hasAppliedInitialFit = YES;
+        } else {
+            // Still track size so a later change is detected; keep fit baseline.
+            _lastLayoutSize = boundsSize;
+            _lastFitScale = fitScale;
         }
 
         if (!_hasSentInitialPage && _defaultPageSet &&
@@ -558,7 +625,98 @@
 
     _currentPage = _pdfView.currentPage;
     _pageCount = [NSNumber numberWithUnsignedLong:_pdfView.document.pageCount];
-    _pageNo = (int)[_pdfView.document indexForPage:_currentPage] + 1;
+    if (_currentPage != nil && _pdfView.document != nil) {
+        NSUInteger idx = [_pdfView.document indexForPage:_currentPage];
+        if (idx != NSNotFound) {
+            _pageNo = (int)idx + 1;
+        }
+    }
+}
+
+/// Parses Dart's `FitPolicy.WIDTH|HEIGHT|BOTH` creation argument.
+- (FLTPDFFitPolicy)fitPolicyFromArguments:(NSDictionary *)args {
+    id raw = args[@"fitPolicy"];
+    if (![raw isKindOfClass:[NSString class]]) {
+        return FLTPDFFitPolicyWidth;
+    }
+    NSString *policy = (NSString *)raw;
+    if ([policy isEqualToString:@"FitPolicy.HEIGHT"]) {
+        return FLTPDFFitPolicyHeight;
+    }
+    if ([policy isEqualToString:@"FitPolicy.BOTH"]) {
+        return FLTPDFFitPolicyBoth;
+    }
+    // WIDTH and any unknown value → width (matches Dart default).
+    return FLTPDFFitPolicyWidth;
+}
+
+/// Scale that fits the current (or default) page per `_fitPolicy`.
+- (CGFloat)fitScaleForCurrentPolicy {
+    if (_pdfView == nil || _pdfView.document == nil) {
+        return 0;
+    }
+
+    CGSize viewSize = _pdfView.bounds.size;
+    if (viewSize.width <= 0 || viewSize.height <= 0) {
+        viewSize = self.bounds.size;
+    }
+    if (viewSize.width <= 0 || viewSize.height <= 0) {
+        return 0;
+    }
+
+    PDFPage *page = _pdfView.currentPage;
+    if (page == nil) {
+        page = _defaultPage;
+    }
+    if (page == nil && _pdfView.document.pageCount > 0) {
+        page = [_pdfView.document pageAtIndex:0];
+    }
+    if (page == nil) {
+        return 0;
+    }
+
+    CGRect pageRect = [page boundsForBox:_pdfView.displayBox];
+    if (pageRect.size.width <= 0 || pageRect.size.height <= 0) {
+        return 0;
+    }
+
+    // Account for page rotation so landscape pages fit correctly (#247).
+    NSInteger rotation = page.rotation;
+    CGFloat pageWidth = pageRect.size.width;
+    CGFloat pageHeight = pageRect.size.height;
+    if (rotation == 90 || rotation == 270) {
+        CGFloat tmp = pageWidth;
+        pageWidth = pageHeight;
+        pageHeight = tmp;
+    }
+
+    CGFloat scaleWidth = viewSize.width / pageWidth;
+    CGFloat scaleHeight = viewSize.height / pageHeight;
+    CGFloat scale = 0;
+    switch (_fitPolicy) {
+    case FLTPDFFitPolicyHeight:
+        scale = scaleHeight;
+        break;
+    case FLTPDFFitPolicyBoth: {
+        // Prefer PDFKit's geometry (handles display mode / insets) when ready.
+        CGFloat pdfKitFit = _pdfView.scaleFactorForSizeToFit;
+        if (isfinite(pdfKitFit) && pdfKitFit > 0) {
+            scale = pdfKitFit;
+        } else {
+            scale = fmin(scaleWidth, scaleHeight);
+        }
+        break;
+    }
+    case FLTPDFFitPolicyWidth:
+    default:
+        scale = scaleWidth;
+        break;
+    }
+
+    if (!isfinite(scale) || scale <= 0) {
+        return 0;
+    }
+    return scale;
 }
 
 - (UIView *)view {
@@ -694,6 +852,9 @@
 
 - (void)reload:(FlutterMethodCall *)call result:(FlutterResult)result {
     _pdfView.document = _document;
+    _hasAppliedInitialFit = NO;
+    _lastFitScale = 0;
+    _lastLayoutSize = CGSizeZero;
     if (_document.pageCount > 0) {
         PDFPage *firstPage = [_document pageAtIndex:0];
         [_pdfView goToPage:firstPage];
@@ -702,7 +863,13 @@
         [self->_pdfView goToRect:CGRectMake(0, pageBounds.size.height, 1, 1)
                           onPage:firstPage];
 
-        _pdfView.scaleFactor = _pdfView.scaleFactorForSizeToFit;
+        CGFloat fitScale = [self fitScaleForCurrentPolicy];
+        if (isfinite(fitScale) && fitScale > 0) {
+            _pdfView.scaleFactor = fitScale;
+            _lastFitScale = fitScale;
+            _lastLayoutSize = self.bounds.size;
+            _hasAppliedInitialFit = YES;
+        }
     }
 
     result([NSNumber numberWithBool:YES]);
@@ -733,10 +900,16 @@
     NSDictionary<NSString *, NSNumber *> *arguments = [call arguments];
     NSNumber *minZoom = arguments[@"minZoom"];
     NSNumber *maxZoom = arguments[@"maxZoom"];
-    float minScale = minZoom.floatValue * _pdfView.scaleFactorForSizeToFit;
-    float maxScale = maxZoom.floatValue * _pdfView.scaleFactorForSizeToFit;
+    CGFloat fitScale = [self fitScaleForCurrentPolicy];
+    if (!isfinite(fitScale) || fitScale <= 0) {
+        fitScale = _pdfView.scaleFactorForSizeToFit;
+    }
+    float minScale = minZoom.floatValue * fitScale;
+    float maxScale = maxZoom.floatValue * fitScale;
     _pdfView.minScaleFactor = minScale != 0.0 ? minScale : minZoom.floatValue;
     _pdfView.maxScaleFactor = maxScale != 0.0 ? maxScale : maxZoom.floatValue;
+    _minScaleFactor = minZoom.floatValue;
+    _maxScaleFactor = maxZoom.floatValue;
     result([NSNumber numberWithBool:YES]);
 }
 
@@ -849,7 +1022,16 @@
         }
 
         @try {
-            if ([_pdfView scaleFactor] == _pdfView.scaleFactorForSizeToFit) {
+            CGFloat fitScale = [self fitScaleForCurrentPolicy];
+            if (!isfinite(fitScale) || fitScale <= 0) {
+                fitScale = _pdfView.scaleFactorForSizeToFit;
+            }
+            if (!isfinite(fitScale) || fitScale <= 0) {
+                return;
+            }
+            BOOL atFit = fabs([_pdfView scaleFactor] - fitScale) <=
+                         fmax(0.02, fitScale * 0.02);
+            if (atFit) {
                 CGPoint point = [recognizer locationInView:_pdfView];
                 PDFPage *page = [_pdfView pageForPoint:point nearest:YES];
                 if (page != nil) {
@@ -863,17 +1045,15 @@
                     [UIView
                         animateWithDuration:0.2
                                  animations:^{
-                                   self->_pdfView.scaleFactor =
-                                       self->_pdfView.scaleFactorForSizeToFit *
-                                       2;
+                                   self->_pdfView.scaleFactor = fitScale * 2;
                                    [self->_pdfView goToDestination:destination];
                                  }];
                 }
             } else {
                 [UIView animateWithDuration:0.2
                                  animations:^{
-                                   self->_pdfView.scaleFactor =
-                                       self->_pdfView.scaleFactorForSizeToFit;
+                                   self->_pdfView.scaleFactor = fitScale;
+                                   self->_lastFitScale = fitScale;
                                  }];
             }
         } @catch (NSException *exception) {

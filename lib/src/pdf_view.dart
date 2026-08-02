@@ -119,8 +119,10 @@ class PDFView extends StatefulWidget {
   /// night mode.
   final bool nightMode;
 
-  /// Indicates whether or not the PDF viewer automatically adds spacing between pages. If set to
-  /// true, spacing is added.
+  /// Whether the viewer adds spacing (page breaks) between pages.
+  ///
+  /// On both platforms this only controls gaps between pages. It does **not**
+  /// change initial zoom or [fitPolicy] — that was a historical iOS bug (#150).
   final bool autoSpacing;
 
   /// Indicates whether or not the user can "fling" pages in the PDF document. If set to true, page
@@ -149,11 +151,13 @@ class PDFView extends StatefulWidget {
   /// The page to display when the PDF document is loaded.
   final int defaultPage;
 
-  /// The [FitPolicy] that determines how the PDF pages are fit to the screen:
+  /// How each page is scaled to the viewport on load and when the view resizes.
   ///
-  /// - [FitPolicy.WIDTH]: the PDF pages are scaled to fit the width of the screen.
-  /// - [FitPolicy.HEIGHT]: the PDF pages are scaled to fit the height of the screen.
-  /// - [FitPolicy.BOTH]: the PDF pages are scaled to fit both the width and height of the screen.
+  /// - [FitPolicy.WIDTH]: scale so the page width fills the viewport width.
+  /// - [FitPolicy.HEIGHT]: scale so the page height fills the viewport height.
+  /// - [FitPolicy.BOTH]: scale so the entire page is visible (letterbox if needed).
+  ///
+  /// Supported on Android and iOS.
   final FitPolicy fitPolicy;
 
   /// Whether each page is fitted individually.

@@ -1,6 +1,19 @@
 group 'io.endigo.plugins.pdfview'
 version '1.0-SNAPSHOT'
 
+// Resolve Flutter SDK for standalone `./gradlew testDebugUnitTest` (not via an app).
+// When the plugin is built as a dependency of a Flutter app, the embedding is
+// provided by the host; compileOnly avoids packing flutter.jar into the AAR.
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+def flutterSdkPath = localProperties.getProperty('flutter.sdk')
+def flutterJar = flutterSdkPath != null
+        ? file("${flutterSdkPath}/bin/cache/artifacts/engine/android-x64/flutter.jar")
+        : null
+
 rootProject.allprojects {
     repositories {
         google()
@@ -55,6 +68,10 @@ android {
 }
 
 dependencies {
+    if (flutterJar != null && flutterJar.exists()) {
+        compileOnly files(flutterJar)
+        testImplementation files(flutterJar)
+    }
     implementation 'com.github.marain87:AndroidPdfViewer:3.2.8'
     implementation 'androidx.annotation:annotation-jvm:1.9.1'
 
