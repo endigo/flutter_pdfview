@@ -3,6 +3,9 @@ package io.endigo.plugins.pdfviewflutter;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.util.Log;
+
+import androidx.annotation.VisibleForTesting;
 
 import com.github.barteksc.pdfviewer.PDFView;
 import com.github.barteksc.pdfviewer.link.LinkHandler;
@@ -34,23 +37,43 @@ public class PDFLinkHandler implements LinkHandler {
         }
     }
 
-    private void handleUri(String uri) {
+    @VisibleForTesting
+    void handleUri(String uri) {
         // If the property is true just pass the link back to flutter
         if (!this.preventLinkNavigation) {
             Uri parsedUri = Uri.parse(uri);
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setData(parsedUri);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            String scheme = parsedUri.getScheme();
+            // Only auto-launch browser links. file:// throws FileUriExposedException
+            // on API 24+; intent:// and content:// can target host-app components.
+            // Non-http(s) schemes are still reported to Dart via onLinkHandler.
+            if (isBrowserScheme(scheme)) {
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setData(parsedUri);
+                intent.addCategory(Intent.CATEGORY_BROWSABLE);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
-            if (intent.resolveActivity(context.getPackageManager()) != null) {
-                context.startActivity(intent, null);
+                // Don't pre-check with resolveActivity(): on Android 11+ package
+                // visibility rules make it return null without a <queries> entry in
+                // the host app, silently breaking every external link.
+                try {
+                    context.startActivity(intent, null);
+                } catch (RuntimeException e) {
+                    // ActivityNotFoundException and FileUriExposedException (API 24+)
+                    // must not crash the host app for hostile or unresolvable PDF links.
+                    Log.w(FlutterPDFView.TAG, "Failed to open URI: " + uri, e);
+                }
             }
         }
         this.onLinkHandler(uri);
     }
 
-    private void handlePage(int page) {
+    private static boolean isBrowserScheme(String scheme) {
+        return scheme != null
+                && (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"));
+    }
+
+    @VisibleForTesting
+    void handlePage(int page) {
         pdfView.jumpTo(page);
     }
 
