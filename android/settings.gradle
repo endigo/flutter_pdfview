@@ -19,9 +19,10 @@ pluginManagement {
 
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-    id "com.android.application" version "8.13.2" apply false
+    // Library plugin module — AGP version used when running unit tests from android/.
+    id "com.android.library" version "8.13.2" apply false
 }
 
-include ":app"
-
+// This directory *is* the plugin library (root build.gradle). There is no :app
+// subproject here; the example app lives under example/android/.
 rootProject.name = 'flutter_pdfview'
