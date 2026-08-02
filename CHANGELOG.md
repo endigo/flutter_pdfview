@@ -2,6 +2,7 @@
 
 - Fix #150: iOS initial page fit no longer depends on `autoSpacing` (spacing vs zoom decoupled); re-fit after placeholder→real bounds and on rotation while preserving user zoom
 - Implement `fitPolicy` (WIDTH / HEIGHT / BOTH) on iOS for parity with Android (iOS previously ignored the flag and always auto-fit the full page; default `FitPolicy.WIDTH` now matches Android)
+- Add regression tests for #150 creation-param independence (Dart iOS/Android + Android Robolectric) and iOS fit-scale formula oracle
 
 ## 1.4.5-beta.4
 

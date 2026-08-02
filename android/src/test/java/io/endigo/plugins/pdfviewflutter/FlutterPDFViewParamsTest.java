@@ -185,4 +185,50 @@ public class FlutterPDFViewParamsTest {
     public void getFitPolicy_missingKey_fallsBackToBoth() {
         assertEquals(FitPolicy.BOTH, FlutterPDFView.getFitPolicy(empty()));
     }
+
+    // ---------------------------------------------------- issue #150 independence
+
+    /**
+     * #150: autoSpacing and fitPolicy must be readable from the same creation
+     * map without one key forcing or clearing the other. Spacing is only
+     * page gaps; fit is pageFitPolicy.
+     */
+    @Test
+    public void issue150_autoSpacingFalse_withFitPolicyBoth() {
+        Map<String, Object> params = new HashMap<>();
+        params.put("autoSpacing", false);
+        params.put("fitPolicy", "FitPolicy.BOTH");
+        params.put("enableSwipe", true);
+        params.put("swipeHorizontal", false);
+
+        assertFalse(FlutterPDFView.getBoolean(params, "autoSpacing"));
+        assertEquals(FitPolicy.BOTH, FlutterPDFView.getFitPolicy(params));
+        assertTrue(FlutterPDFView.getBoolean(params, "enableSwipe"));
+        assertFalse(FlutterPDFView.getBoolean(params, "swipeHorizontal"));
+    }
+
+    @Test
+    public void issue150_autoSpacingAndFitPolicy_allCombinationsIndependent() {
+        String[] policies = {
+            "FitPolicy.WIDTH", "FitPolicy.HEIGHT", "FitPolicy.BOTH"
+        };
+        FitPolicy[] expected = {
+            FitPolicy.WIDTH, FitPolicy.HEIGHT, FitPolicy.BOTH
+        };
+        for (boolean autoSpacing : new boolean[] {true, false}) {
+            for (int i = 0; i < policies.length; i++) {
+                Map<String, Object> params = new HashMap<>();
+                params.put("autoSpacing", autoSpacing);
+                params.put("fitPolicy", policies[i]);
+                assertEquals(
+                        "autoSpacing=" + autoSpacing + " policy=" + policies[i],
+                        autoSpacing,
+                        FlutterPDFView.getBoolean(params, "autoSpacing"));
+                assertEquals(
+                        "autoSpacing=" + autoSpacing + " policy=" + policies[i],
+                        expected[i],
+                        FlutterPDFView.getFitPolicy(params));
+            }
+        }
+    }
 }
