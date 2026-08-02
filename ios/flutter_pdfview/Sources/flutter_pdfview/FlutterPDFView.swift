@@ -891,18 +891,38 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
 
     func setZoomLimits(_ call: FlutterMethodCall, result: FlutterResult) {
         let arguments = call.arguments as? [String: Any]
-        let minZoom = arguments?.float("minZoom") ?? 0
-        let maxZoom = arguments?.float("maxZoom") ?? 0
+        let minZoom = CGFloat(arguments?.double("minZoom") ?? 0)
+        let maxZoom = CGFloat(arguments?.double("maxZoom") ?? 0)
+        // Match Android's validation (INVALID_ARGS) instead of silently
+        // accepting zero/inverted limits.
+        guard minZoom > 0, maxZoom > 0, maxZoom >= minZoom else {
+            result(
+                FlutterError(
+                    code: "INVALID_ARGS",
+                    message: "Expected 0 < minZoom \u{2264} maxZoom",
+                    details: nil
+                )
+            )
+            return
+        }
+        // Persist the multipliers — applyLayoutUpdates re-derives PDFKit's
+        // min/max from these on every layout pass, so writing only the PDFKit
+        // values would be reverted by the next rotation/resize.
+        minScaleFactor = minZoom
+        maxScaleFactor = maxZoom
         var fitScale = fitScaleForCurrentPolicy()
         if !fitScale.isFinite || fitScale <= 0 {
             fitScale = pdfView.scaleFactorForSizeToFit
         }
-        let minScale = Float(Double(minZoom) * Double(fitScale))
-        let maxScale = Float(Double(maxZoom) * Double(fitScale))
-        pdfView.minScaleFactor = CGFloat(minScale != 0.0 ? minScale : minZoom)
-        pdfView.maxScaleFactor = CGFloat(maxScale != 0.0 ? maxScale : maxZoom)
-        minScaleFactor = CGFloat(minZoom)
-        maxScaleFactor = CGFloat(maxZoom)
+        // Before the document lays out, fitScale can still be 0/NaN — skip the
+        // immediate application and let the next layout pass apply the stored
+        // multipliers instead of feeding NaN into PDFKit (#268).
+        if fitScale.isFinite, fitScale > 0 {
+            let minScale = fitScale * minZoom
+            let maxScale = fitScale * maxZoom
+            pdfView.minScaleFactor = minScale
+            pdfView.maxScaleFactor = max(maxScale, minScale)
+        }
         result(NSNumber(value: true))
     }
 

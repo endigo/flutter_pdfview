@@ -22,7 +22,7 @@ Pod::Spec.new do |s|
   s.dependency 'Flutter'
 
   s.ios.deployment_target = '13.0'
-  s.swift_version = '5.0'
+  s.swift_version = '5.9'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'VALID_ARCHS' => 'armv7 arm64 x86_64' }
   s.resource_bundles = { 'flutter_pdfview_privacy' => ['flutter_pdfview/Sources/flutter_pdfview/PrivacyInfo.xcprivacy'] }
 end
