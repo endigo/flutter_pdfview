@@ -1,3 +1,18 @@
+## 1.4.5-beta.4
+
+- **Android**: switch platform views from texture hybrid composition (`initSurfaceAndroidView`) to true hybrid composition (`initExpensiveAndroidView`) — fixes `Surface was already locked!` [#263](https://github.com/endigo/flutter_pdfview/issues/263), `EGL_NO_DISPLAY` quick-open crash [#280](https://github.com/endigo/flutter_pdfview/issues/280), blank on rotation [#9](https://github.com/endigo/flutter_pdfview/issues/9), blank after dialogs [#182](https://github.com/endigo/flutter_pdfview/issues/182), blank on load [#298](https://github.com/endigo/flutter_pdfview/issues/298), and GPU glitches [#306](https://github.com/endigo/flutter_pdfview/issues/306)
+- Fix Android layout direction to follow ambient `Directionality` (was hardcoded RTL)
+- Fix #181: remount platform view when `filePath` / `pdfData` changes so a new PDF can load
+- Fix #261: release Pdfium/PDFKit resources on dispose (Android recycle race + iOS observers/document/channel)
+- Fix #268: avoid NaN CoreGraphics errors by initializing iOS `PDFView` with a non-zero frame
+- Fix #204: iOS white background (not grey) and continuous vertical page scroll parity with Android
+- Fix #266: load absolute filesystem paths via `fromFile` on Android (No content provider)
+- Fix #287: `pickFirst` packaging for `libc++_shared.so` native merge conflicts
+- Defer Android PDF load until the view has non-zero size; safer dispose before surface draw races
+- Propagate `nightMode` setting updates to native Android view
+- Document `EagerGestureRecognizer` for PDFView inside scrollables [#265](https://github.com/endigo/flutter_pdfview/issues/265)
+- Fix Android external PDF links silently failing on API 30+ package visibility (`resolveActivity` pre-check)
+
 ## 1.4.5-beta.3
 
 - Fixed issue #337: Added showScrollIndicators option to control native scroll indicator visibility.

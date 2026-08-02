@@ -1,8 +1,10 @@
 package io.endigo.plugins.pdfviewflutter;
 
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.util.Log;
 
 import com.github.barteksc.pdfviewer.PDFView;
 import com.github.barteksc.pdfviewer.link.LinkHandler;
@@ -41,10 +43,14 @@ public class PDFLinkHandler implements LinkHandler {
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setData(parsedUri);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
 
-            if (intent.resolveActivity(context.getPackageManager()) != null) {
+            // Don't pre-check with resolveActivity(): on Android 11+ package
+            // visibility rules make it return null without a <queries> entry in
+            // the host app, silently breaking every external link.
+            try {
                 context.startActivity(intent, null);
+            } catch (ActivityNotFoundException e) {
+                Log.w(FlutterPDFView.TAG, "No activity found to open URI: " + uri);
             }
         }
         this.onLinkHandler(uri);

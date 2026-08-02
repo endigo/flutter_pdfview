@@ -54,6 +54,8 @@ class PDFView extends StatefulWidget {
         assert(maxZoom > 0, 'maxZoom must be greater than 0'),
         assert(minZoom > 0, 'minZoom must be greater than 0'),
         assert(maxZoom >= minZoom, 'maxZoom must be >= minZoom'),
+        assert(thumbnailRatio == null || (thumbnailRatio > 0 && thumbnailRatio <= 1),
+            'thumbnailRatio must be within (0, 1]'),
         super(key: key);
 
   @override
@@ -161,12 +163,51 @@ class PDFView extends StatefulWidget {
 }
 
 class _PDFViewState extends State<PDFView> {
-  final Completer<PDFViewController> _controller = Completer<PDFViewController>();
+  Completer<PDFViewController> _controller = Completer<PDFViewController>();
+
+  /// Bumped when the native platform view must be recreated (new document).
+  int _viewGeneration = 0;
+
+  bool _documentChanged(PDFView oldWidget) {
+    if (widget.filePath != oldWidget.filePath) {
+      return true;
+    }
+    final Uint8List? a = widget.pdfData;
+    final Uint8List? b = oldWidget.pdfData;
+    if (identical(a, b)) {
+      return false;
+    }
+    if (a == null || b == null || a.length != b.length) {
+      return true;
+    }
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _remountPlatformView() {
+    if (!mounted) {
+      return;
+    }
+    // Dispose the previous controller so native resources are released (#261).
+    if (_controller.isCompleted) {
+      _controller.future.then((PDFViewController c) => c.dispose());
+    }
+    setState(() {
+      _viewGeneration++;
+      _controller = Completer<PDFViewController>();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final Key viewKey = ValueKey<int>(_viewGeneration);
     if (defaultTargetPlatform == TargetPlatform.android) {
       return PlatformViewLink(
+        key: viewKey,
         viewType: 'plugins.endigo.io/pdfview',
         surfaceFactory: (
           BuildContext context,
@@ -180,10 +221,15 @@ class _PDFViewState extends State<PDFView> {
           );
         },
         onCreatePlatformView: (PlatformViewCreationParams params) {
-          return PlatformViewsService.initSurfaceAndroidView(
+          // True hybrid composition embeds the real android.view.View instead of
+          // mirroring via SurfaceTexture. Texture mode (initSurfaceAndroidView)
+          // crashes under load ("Surface was already locked!", EGL_NO_DISPLAY)
+          // and blanks/glitches on rotation, dialogs, and some GPUs
+          // (#9, #182, #263, #280, #298, #306).
+          return PlatformViewsService.initExpensiveAndroidView(
             id: params.id,
             viewType: 'plugins.endigo.io/pdfview',
-            layoutDirection: TextDirection.rtl,
+            layoutDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
             creationParams: _CreationParams.fromWidget(widget).toMap(),
             creationParamsCodec: const StandardMessageCodec(),
           )
@@ -196,6 +242,7 @@ class _PDFViewState extends State<PDFView> {
       );
     } else if (defaultTargetPlatform == TargetPlatform.iOS) {
       return UiKitView(
+        key: viewKey,
         viewType: 'plugins.endigo.io/pdfview',
         onPlatformViewCreated: _onPlatformViewCreated,
         gestureRecognizers: widget.gestureRecognizers,
@@ -208,21 +255,29 @@ class _PDFViewState extends State<PDFView> {
 
   void _onPlatformViewCreated(int id) {
     final PDFViewController controller = PDFViewController._(id, widget);
-    _controller.complete(controller);
-    if (widget.onViewCreated != null) {
-      widget.onViewCreated!(controller);
+    if (!_controller.isCompleted) {
+      _controller.complete(controller);
     }
+    widget.onViewCreated?.call(controller);
   }
 
   @override
   void didUpdateWidget(PDFView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // #181: filePath / pdfData changes must load a new document. Settings-only
+    // updates go through the method channel; document changes remount the view.
+    if (_documentChanged(oldWidget)) {
+      _remountPlatformView();
+      return;
+    }
     _controller.future.then((PDFViewController controller) => controller._updateWidget(widget));
   }
 
   @override
   void dispose() {
-    _controller.future.then((PDFViewController controller) => controller.dispose());
+    if (_controller.isCompleted) {
+      _controller.future.then((PDFViewController controller) => controller.dispose());
+    }
     super.dispose();
   }
 }
@@ -353,6 +408,9 @@ class _PDFViewSettings {
     if (enableSwipe != newSettings.enableSwipe) {
       updates['enableSwipe'] = newSettings.enableSwipe;
     }
+    if (nightMode != newSettings.nightMode) {
+      updates['nightMode'] = newSettings.nightMode;
+    }
     if (pageFling != newSettings.pageFling) {
       updates['pageFling'] = newSettings.pageFling;
     }
@@ -463,29 +521,35 @@ class PDFViewController {
     if (_setPositionCompleter != null && !_setPositionCompleter!.isCompleted) {
       await _setPositionCompleter!.future;
     }
-    _setPositionCompleter = Completer<void>();
-    final bool isSet = await _channel.invokeMethod('setPosition', <String, double>{
-      'xPos': position.dx,
-      'yPos': position.dy,
-    });
-    if (!_setPositionCompleter!.isCompleted) {
-      _setPositionCompleter!.complete();
+    final Completer<void> completer = _setPositionCompleter = Completer<void>();
+    try {
+      final bool isSet = await _channel.invokeMethod('setPosition', <String, double>{
+        'xPos': position.dx,
+        'yPos': position.dy,
+      });
+      return isSet;
+    } finally {
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
     }
-    return isSet;
   }
 
   Future<bool> setScale(double scale) async {
     if (_setScaleCompleter != null && !_setScaleCompleter!.isCompleted) {
       await _setScaleCompleter!.future;
     }
-    _setScaleCompleter = Completer<void>();
-    final bool isSet = await _channel.invokeMethod('setScale', <String, double>{
-      'scale': scale,
-    });
-    if (!_setScaleCompleter!.isCompleted) {
-      _setScaleCompleter!.complete();
+    final Completer<void> completer = _setScaleCompleter = Completer<void>();
+    try {
+      final bool isSet = await _channel.invokeMethod('setScale', <String, double>{
+        'scale': scale,
+      });
+      return isSet;
+    } finally {
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
     }
-    return isSet;
   }
 
   Future<bool> setZoomLimits(double minZoom, double midZoom, double maxZoom) async {

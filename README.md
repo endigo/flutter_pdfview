@@ -68,7 +68,27 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | maxZoom               |   ✅    | ✅  |        4.0        |
 | showScrollIndicators* |   ✅    | ✅  |      `false`      |
 
-*`showScrollIndicators` is ignored in iOS if `pageFling` is set to true
+*`showScrollIndicators` is ignored on iOS while horizontal page-flipping is active (`pageFling: true` together with `swipeHorizontal: true`)
+
+### Using PDFView inside a scrollable widget
+
+When a `PDFView` is embedded in a scrollable parent (`SingleChildScrollView`,
+`ListView`, `PageView`, ...), the parent can claim drag gestures before they
+reach the native view, so swiping inside the PDF does not work — most notably
+on iOS ([#265](https://github.com/endigo/flutter_pdfview/issues/265)). Pass an
+`EagerGestureRecognizer` to let the PDF view consume gestures within its bounds:
+
+```dart
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+
+PDFView(
+  filePath: path,
+  gestureRecognizers: {
+    Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
+  },
+)
+```
 
 ## Controller Options
 

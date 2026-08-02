@@ -188,4 +188,83 @@ void main() {
       );
     });
   });
+
+  group('Document change / remount (#181)', () {
+    testWidgets('PDFView rebuilds when filePath changes', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: PDFView(filePath: 'first.pdf'),
+          ),
+        ),
+      );
+      expect(find.byType(PDFView), findsOneWidget);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: PDFView(filePath: 'second.pdf'),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(PDFView), findsOneWidget);
+    });
+
+    testWidgets('PDFView rebuilds when pdfData changes', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: PDFView(pdfData: Uint8List.fromList(const [1, 2, 3])),
+          ),
+        ),
+      );
+      expect(find.byType(PDFView), findsOneWidget);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: PDFView(pdfData: Uint8List.fromList(const [4, 5, 6])),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(PDFView), findsOneWidget);
+    });
+  });
+
+  group('Zoom validation', () {
+    test('rejects invalid maxZoom/minZoom', () {
+      expect(
+        () => PDFView(filePath: 'test.pdf', maxZoom: 0),
+        throwsAssertionError,
+      );
+      expect(
+        () => PDFView(filePath: 'test.pdf', minZoom: 2, maxZoom: 1),
+        throwsAssertionError,
+      );
+    });
+  });
+
+  group('thumbnailRatio validation', () {
+    test('rejects out-of-range thumbnailRatio', () {
+      expect(
+        () => PDFView(filePath: 'test.pdf', thumbnailRatio: 0),
+        throwsAssertionError,
+      );
+      expect(
+        () => PDFView(filePath: 'test.pdf', thumbnailRatio: -0.5),
+        throwsAssertionError,
+      );
+      expect(
+        () => PDFView(filePath: 'test.pdf', thumbnailRatio: 1.5),
+        throwsAssertionError,
+      );
+    });
+
+    test('accepts thumbnailRatio within (0, 1]', () {
+      expect(PDFView(filePath: 'test.pdf', thumbnailRatio: 0.5).thumbnailRatio, 0.5);
+      expect(PDFView(filePath: 'test.pdf', thumbnailRatio: 1.0).thumbnailRatio, 1.0);
+    });
+  });
 }

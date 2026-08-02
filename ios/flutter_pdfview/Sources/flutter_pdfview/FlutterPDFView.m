@@ -116,6 +116,12 @@
     return _pdfView;
 }
 
+- (void)dealloc {
+    // Unregister from the messenger; otherwise the engine keeps one dead
+    // handler per created platform view for the app's lifetime (#261).
+    [_channel setMethodCallHandler:nil];
+}
+
 @end
 
 @implementation FLTPDFView {
@@ -153,7 +159,14 @@
         _isIPad = ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad);
         _isScrolling = NO;
 
-        _pdfView = [[PDFView alloc] initWithFrame:frame];
+        // #268: PDFKit emits NaN CoreGraphics errors when PDFView is created with a
+        // zero / empty frame (common for Flutter platform views before first layout).
+        // Use a temporary non-zero frame; layoutSubviews will size it correctly.
+        CGRect pdfFrame = frame;
+        if (CGRectIsEmpty(pdfFrame) || pdfFrame.size.width <= 0 || pdfFrame.size.height <= 0) {
+            pdfFrame = CGRectMake(0, 0, 100, 100);
+        }
+        _pdfView = [[PDFView alloc] initWithFrame:pdfFrame];
         _pdfView.delegate = self;
 
         _autoSpacing = [args[@"autoSpacing"] boolValue];
@@ -167,7 +180,14 @@
         FlutterStandardTypedData *pdfData = args[@"pdfData"];
 
         if ([filePath isKindOfClass:[NSString class]]) {
-            NSURL *sourcePDFUrl = [NSURL fileURLWithPath:filePath];
+            // Support plain paths and file:// URIs (#266 parity with Android).
+            NSURL *sourcePDFUrl = nil;
+            if ([filePath hasPrefix:@"file:"]) {
+                sourcePDFUrl = [NSURL URLWithString:filePath];
+            }
+            if (sourcePDFUrl == nil) {
+                sourcePDFUrl = [NSURL fileURLWithPath:filePath];
+            }
             _document = [[PDFDocument alloc] initWithURL:sourcePDFUrl];
         } else if ([pdfData isKindOfClass:[FlutterStandardTypedData class]]) {
             NSData *sourcePDFdata = [pdfData data];
@@ -190,8 +210,24 @@
             });
         } else {
             _pdfView.autoresizesSubviews = YES;
-            _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-            _pdfView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+            _pdfView.autoresizingMask = UIViewAutoresizingFlexibleWidth |
+                                        UIViewAutoresizingFlexibleHeight;
+            // #204: Prefer explicit backgroundColor from Flutter; otherwise white
+            // (grey 0.95 made continuous pages look non-continuous vs Android).
+            NSNumber *bgColorNum = args[@"backgroundColor"];
+            if ([bgColorNum isKindOfClass:[NSNumber class]]) {
+                unsigned int argb = [bgColorNum unsignedIntValue];
+                CGFloat a = ((argb & 0xFF000000) >> 24) / 255.0;
+                CGFloat r = ((argb & 0x00FF0000) >> 16) / 255.0;
+                CGFloat g = ((argb & 0x0000FF00) >> 8) / 255.0;
+                CGFloat b = (argb & 0x000000FF) / 255.0;
+                UIColor *bg = [UIColor colorWithRed:r green:g blue:b alpha:a];
+                _pdfView.backgroundColor = bg;
+                self.backgroundColor = bg;
+            } else {
+                _pdfView.backgroundColor = [UIColor whiteColor];
+                self.backgroundColor = [UIColor whiteColor];
+            }
 
             BOOL swipeHorizontal = [args[@"swipeHorizontal"] boolValue];
             if (swipeHorizontal) {
@@ -201,20 +237,23 @@
             }
 
             BOOL showScrollIndicators = [args[@"showScrollIndicators"] boolValue];
-            NSLog(@"show scroll %d", showScrollIndicators);
 
             _pdfView.autoScales = YES;
 
-            // On iPad, avoid conflicting display modes with page view controller
-            if (_isIPad && pageFling && enableSwipe) {
-                // For iPad with both pageFling and enableSwipe, prefer page-based navigation
-                [_pdfView usePageViewController:YES withViewOptions:nil];
-                _pdfView.displayMode = kPDFDisplaySinglePage;
+            // UIPageViewController flips one page at a time — only match the API
+            // for horizontal book-style paging. Vertical layouts scroll
+            // continuously so iOS behaves like Android (#204).
+            BOOL useHorizontalPaging = pageFling && swipeHorizontal && enableSwipe;
+            [_pdfView usePageViewController:useHorizontalPaging withViewOptions:nil];
+            if (enableSwipe && !useHorizontalPaging) {
+                _pdfView.displayMode = kPDFDisplaySinglePageContinuous;
             } else {
-                [_pdfView usePageViewController:pageFling withViewOptions:nil];
-                _pdfView.displayMode = enableSwipe ? kPDFDisplaySinglePageContinuous : kPDFDisplaySinglePage;
+                _pdfView.displayMode = kPDFDisplaySinglePage;
             }
-            _pdfView.displaysPageBreaks = NO;
+            _pdfView.displaysPageBreaks = _autoSpacing;
+            if (_autoSpacing) {
+                _pdfView.pageBreakMargins = UIEdgeInsetsMake(4, 0, 4, 0);
+            }
             _pdfView.document = _document;
 
             double maxZoomArg = [args[@"maxZoom"] doubleValue];
@@ -229,9 +268,27 @@
             _minScaleFactor = minZoomArg;
 
             NSString *password = args[@"password"];
-            if ([password isKindOfClass:[NSString class]] &&
-                [_pdfView.document isEncrypted]) {
-                [_pdfView.document unlockWithPassword:password];
+            if ([_pdfView.document isEncrypted]) {
+                if ([password isKindOfClass:[NSString class]]) {
+                    [_pdfView.document unlockWithPassword:password];
+                }
+                if ([_pdfView.document isLocked]) {
+                    // Android reports a PdfPasswordException through onError;
+                    // without this the iOS view just stays blank.
+                    __weak __typeof__(self) weakSelf = self;
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                      __strong __typeof__(weakSelf) strongSelf = weakSelf;
+                      if (strongSelf == nil) {
+                          return;
+                      }
+                      [strongSelf->_controller
+                          invokeChannelMethod:@"onError"
+                                    arguments:@{
+                                        @"error" : @"Password required or "
+                                                   @"incorrect password."
+                                    }];
+                    });
+                }
             }
 
             UITapGestureRecognizer *tapGestureRecognizer =
@@ -247,9 +304,18 @@
 
             NSUInteger pageCount = [_document pageCount];
             if (pageCount == 0) {
-                [_controller
-                    invokeChannelMethod:@"onError"
-                              arguments:@{@"error" : @"PDF has no pages."}];
+                // Defer like the nil-document path: the Dart handler is only
+                // attached after the platform view is created.
+                __weak __typeof__(self) weakSelf = self;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                  __strong __typeof__(weakSelf) strongSelf = weakSelf;
+                  if (strongSelf == nil) {
+                      return;
+                  }
+                  [strongSelf->_controller
+                      invokeChannelMethod:@"onError"
+                                arguments:@{@"error" : @"PDF has no pages."}];
+                });
                 return self;
             }
             if (pageCount <= defaultPage) {
@@ -261,49 +327,55 @@
             // Configure scroll view with defensive handling for iPad
             if (@available(iOS 11.0, *)) {
                 // Delay scroll view configuration to avoid conflicts during
-                // initialization
+                // initialization. Capture weakly so a disposed view is not
+                // reconfigured (#261).
+                __weak __typeof__(self) weakSelf = self;
                 dispatch_after(
                     dispatch_time(DISPATCH_TIME_NOW,
                                   (int64_t)(0.1 * NSEC_PER_SEC)),
                     dispatch_get_main_queue(), ^{
+                      __strong __typeof__(weakSelf) strongSelf = weakSelf;
+                      if (strongSelf == nil) {
+                          return;
+                      }
                       @try {
-                          UIScrollView *scrollView = [self findScrollView:self->_pdfView];
+                          UIScrollView *scrollView =
+                              [strongSelf findScrollView:strongSelf->_pdfView];
 
                           if (scrollView != nil) {
-                              // On iPad, use more conservative scroll configuration
-                              if (self->_isIPad) {
-                                  // Allow system to manage insets on iPad for better compatibility
-                                  scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAutomatic;
-
-                                  // Set delegate to monitor scroll events
+                              if (strongSelf->_isIPad) {
+                                  scrollView.contentInsetAdjustmentBehavior =
+                                      UIScrollViewContentInsetAdjustmentAutomatic;
                                   if (scrollView.delegate == nil) {
-                                      scrollView.delegate = (id<UIScrollViewDelegate>)self;
+                                      scrollView.delegate =
+                                          (id<UIScrollViewDelegate>)strongSelf;
                                   }
                               } else {
-                                  // iPhone keeps existing behavior
-                                  scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+                                  scrollView.contentInsetAdjustmentBehavior =
+                                      UIScrollViewContentInsetAdjustmentNever;
                                   if (@available(iOS 13.0, *)) {
                                       scrollView.automaticallyAdjustsScrollIndicatorInsets = NO;
                                   }
                               }
 
-                              // Ensure scroll view recognizes gestures properly
                               scrollView.delaysContentTouches = YES;
                               scrollView.canCancelContentTouches = YES;
-                              BOOL shouldShow = showScrollIndicators && !pageFling;
+                              // Indicators cannot be shown while the page-view
+                              // controller manages paging (swaps scroll views).
+                              BOOL shouldShow =
+                                  showScrollIndicators && !useHorizontalPaging;
                               scrollView.showsHorizontalScrollIndicator = shouldShow;
                               scrollView.showsVerticalScrollIndicator = shouldShow;
-                              self->_scrollView = scrollView;
+                              strongSelf->_scrollView = scrollView;
                           }
-                          __weak __typeof__(self) weakSelf = self;
                           dispatch_async(dispatch_get_main_queue(), ^{
-                            __strong __typeof__(weakSelf) strongSelf = weakSelf;
-                            if (strongSelf == nil) {
+                            __strong __typeof__(weakSelf) innerSelf = weakSelf;
+                            if (innerSelf == nil || innerSelf->_document == nil) {
                                 return;
                             }
-                            [strongSelf handleRenderCompleted:
-                             [NSNumber numberWithUnsignedLong: [strongSelf->_document pageCount]]
-                            ];
+                            [innerSelf handleRenderCompleted:
+                             [NSNumber numberWithUnsignedLong:
+                                  [innerSelf->_document pageCount]]];
                           });
                       } @catch (NSException *exception) {
                           NSLog(@"Warning: Failed to configure PDF scroll  view: %@", exception.reason);
@@ -323,7 +395,25 @@
 }
 
 - (void)dealloc {
+    // #261: Tear down observers/document so PdfKit resources are released when
+    // the Flutter platform view is disposed (e.g. user presses back).
     [self stopObserving];
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    if (_scrollView != nil &&
+        _scrollView.delegate == (id<UIScrollViewDelegate>)self) {
+        _scrollView.delegate = nil;
+    }
+    if (_pdfView != nil) {
+        _pdfView.delegate = nil;
+        _pdfView.document = nil;
+        [_pdfView removeFromSuperview];
+        _pdfView = nil;
+    }
+    _document = nil;
+    _scrollView = nil;
+    _defaultPage = nil;
+    _currentPage = nil;
+    _currentDestination = nil;
 }
 
 - (UIScrollView *)findScrollView:(UIView *)view {
@@ -388,19 +478,34 @@
         return;
     }
 
+    // Guard against zero bounds — PDFKit NaN paths (#268).
+    if (self.bounds.size.width <= 0 || self.bounds.size.height <= 0 ||
+        _pdfView == nil) {
+        return;
+    }
+
     // Wrap layout updates in try-catch for safety
     @try {
-        _pdfView.frame = self.frame;
+        _pdfView.frame = self.bounds;
         CGFloat fitScale = _pdfView.scaleFactorForSizeToFit;
+        // scaleFactorForSizeToFit can be 0/NaN before the document lays out.
+        if (!isfinite(fitScale) || fitScale <= 0) {
+            return;
+        }
         CGFloat minScale = fitScale * _minScaleFactor;
         CGFloat maxScale = fitScale * _maxScaleFactor;
+        if (!isfinite(minScale) || !isfinite(maxScale)) {
+            return;
+        }
         _pdfView.minScaleFactor = minScale;
         _pdfView.maxScaleFactor = fmax(maxScale, minScale);
 
         if (_autoSpacing || !_defaultPageSet) {
             CGFloat clampedScale = fmin(fmax(fitScale, _pdfView.minScaleFactor),
                                         _pdfView.maxScaleFactor);
-            _pdfView.scaleFactor = clampedScale;
+            if (isfinite(clampedScale) && clampedScale > 0) {
+                _pdfView.scaleFactor = clampedScale;
+            }
         }
 
         if (!_defaultPageSet && _defaultPage != nil) {
@@ -549,9 +654,17 @@
 }
 
 - (void)getCurrentPage:(FlutterMethodCall *)call result:(FlutterResult)result {
-    _currentPageIndex = [NSNumber
-        numberWithUnsignedLong:[_pdfView.document
-                                   indexForPage:_pdfView.currentPage]];
+    PDFPage *currentPage = _pdfView.currentPage;
+    if (_pdfView.document == nil || currentPage == nil) {
+        result(nil);
+        return;
+    }
+    NSUInteger pageIndex = [_pdfView.document indexForPage:currentPage];
+    if (pageIndex == NSNotFound) {
+        result(nil);
+        return;
+    }
+    _currentPageIndex = [NSNumber numberWithUnsignedLong:pageIndex];
     result(_currentPageIndex);
 }
 
@@ -604,15 +717,24 @@
 }
 
 - (void)handlePageChanged:(NSNotification *)notification {
+    PDFDocument *document = _pdfView.document;
+    PDFPage *currentPage = _pdfView.currentPage;
+    if (document == nil || currentPage == nil) {
+        return;
+    }
+    NSUInteger pageIndex = [document indexForPage:currentPage];
+    if (pageIndex == NSNotFound) {
+        return;
+    }
     _hasSentInitialPage = YES;
-    _currentPage = _pdfView.currentPage;
-    _pageNo = (int)[_pdfView.document indexForPage:_currentPage] + 1;
+    _currentPage = currentPage;
+    _pageNo = (int)pageIndex + 1;
     [_controller
         invokeChannelMethod:@"onPageChanged"
                   arguments:@{
-                      @"page" : [NSNumber numberWithUnsignedLong:_pageNo - 1],
-                      @"total" : [NSNumber
-                          numberWithUnsignedLong:[_pdfView.document pageCount]]
+                      @"page" : [NSNumber numberWithUnsignedLong:pageIndex],
+                      @"total" :
+                          [NSNumber numberWithUnsignedLong:[document pageCount]]
                   }];
 }
 
@@ -700,8 +822,14 @@
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
     shouldRecognizeSimultaneouslyWithGestureRecognizer:
         (UIGestureRecognizer *)otherGestureRecognizer {
-    // Allow double-tap to work with scroll gestures
+    // Allow double-tap to work with scroll gestures. Also allow PDF scroll
+    // gestures to compete with a parent Flutter ScrollView (#265) — the
+    // Flutter-side EagerGestureRecognizer (if set) still owns claim priority.
     if ([gestureRecognizer isKindOfClass:[UITapGestureRecognizer class]]) {
+        return YES;
+    }
+    if ([gestureRecognizer isKindOfClass:[UIPanGestureRecognizer class]] ||
+        [otherGestureRecognizer isKindOfClass:[UIPanGestureRecognizer class]]) {
         return YES;
     }
     return NO;

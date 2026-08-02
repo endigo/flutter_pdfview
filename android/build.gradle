@@ -45,6 +45,14 @@ android {
         }
     }
     if (project.android.hasProperty("namespace")) { namespace 'io.endigo.plugins.pdfviewflutter' }
+
+    // #287: pdfium-android ships libc++_shared.so; apps that also pull another
+    // native lib (ffmpeg-kit, etc.) hit mergeDebugNativeLibs conflicts.
+    packaging {
+        jniLibs {
+            pickFirsts += ['**/libc++_shared.so']
+        }
+    }
 }
 
 dependencies {
