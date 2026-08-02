@@ -21,6 +21,7 @@
 - Expand unit tests: controller method channel, native→Dart callbacks, document remount, creation settings
 - Add 64 Android native unit tests (Robolectric/JUnit): URI handling, param parsing, link handler, thumbnail clamp
 - Replace broken example widget test with home-screen / PDFScreen chrome coverage
+- Fix Android `setPage` resolving before the jump executes; reload pages when `nightMode` changes; handle unescaped `file:` URIs on iOS
 
 ## 1.4.5-beta.3
 
