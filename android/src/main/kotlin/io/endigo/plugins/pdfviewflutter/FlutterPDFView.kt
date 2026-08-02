@@ -242,7 +242,11 @@ class FlutterPDFView(
 
     fun getCurrentPageSize(result: Result) {
         val view = pdfView
-        if (disposed || view == null || view.pageCount == 0) {
+        if (disposed || view == null) {
+            result.error("INVALID_STATE", "PDFView disposed", null)
+            return
+        }
+        if (view.pageCount == 0) {
             result.error("INVALID_STATE", "No pages loaded", null)
             return
         }
@@ -493,18 +497,16 @@ class FlutterPDFView(
                 view.visibility = View.GONE
             } catch (ignored: Exception) {
             }
-            val recycle = Runnable {
+            // Defer one frame so an in-flight PlatformViewWrapper.draw can finish.
+            // Always use the main-thread handler: View.post() is dropped when the
+            // view is already detached from a window, which would leak Pdfium (#261).
+            // removeCallbacksAndMessages above already ran, so this post is not cancelled.
+            mainHandler.post {
                 try {
                     view.recycle()
                 } catch (e: Exception) {
                     Log.w(TAG, "dispose recycle", e)
                 }
-            }
-            if (Looper.myLooper() == Looper.getMainLooper()) {
-                // Defer one frame so an in-flight PlatformViewWrapper.draw can finish.
-                view.post(recycle)
-            } else {
-                mainHandler.post(recycle)
             }
         }
     }

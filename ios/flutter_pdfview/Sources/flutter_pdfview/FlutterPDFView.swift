@@ -406,13 +406,30 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
 
         defaultPage = document.page(at: defaultPageIndex)
 
-        // Delay scroll view configuration to avoid conflicts during
-        // initialization. Capture weakly so a disposed view is not
-        // reconfigured (#261).
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let strongSelf = self else { return }
+        // Configure scroll view with defensive handling for iPad.
+        // PDFKit may not expose its scroll view immediately; retry a few
+        // times instead of a single fixed delay. Capture weakly so a
+        // disposed view is not reconfigured (#261).
+        let maxAttempts = 5
+        let retryDelay: TimeInterval = 0.05
+        var configureScrollView: ((Int) -> Void)!
+        configureScrollView = { [weak self] attempt in
+            guard let strongSelf = self else {
+                configureScrollView = nil
+                return
+            }
+            var retryScheduled = false
             catchingNSException {
-                if let scrollView = strongSelf.findScrollView(strongSelf.pdfView) {
+                let scrollView = strongSelf.findScrollView(strongSelf.pdfView)
+                if scrollView == nil, attempt + 1 < maxAttempts {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + retryDelay) {
+                        configureScrollView(attempt + 1)
+                    }
+                    retryScheduled = true
+                    return
+                }
+
+                if let scrollView {
                     if strongSelf.isIPad {
                         scrollView.contentInsetAdjustmentBehavior = .automatic
                         if scrollView.delegate == nil {
@@ -432,18 +449,30 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
                     scrollView.showsVerticalScrollIndicator = shouldShow
                     strongSelf.scrollView = scrollView
                 }
-                DispatchQueue.main.async { [weak strongSelf] in
-                    guard let innerSelf = strongSelf, let document = innerSelf.document else {
-                        return
-                    }
-                    innerSelf.handleRenderCompleted(NSNumber(value: document.pageCount))
-                }
             } onException: { error in
                 NSLog(
-                    "Warning: Failed to configure PDF scroll  view: %@",
+                    "Warning: Failed to configure PDF scroll view: %@",
                     error.pdfExceptionReason
                 )
             }
+            if retryScheduled {
+                return
+            }
+            // Always report render completion after the configure path
+            // finishes (even if the scroll view was never found or the
+            // configuration raised).
+            DispatchQueue.main.async { [weak strongSelf] in
+                guard let innerSelf = strongSelf, let document = innerSelf.document else {
+                    return
+                }
+                innerSelf.handleRenderCompleted(NSNumber(value: document.pageCount))
+            }
+            configureScrollView = nil
+        }
+        // Defer the first attempt one run-loop turn so PDFKit can finish
+        // installing its internal hierarchy after addSubview.
+        DispatchQueue.main.async {
+            configureScrollView(0)
         }
 
         NotificationCenter.default.addObserver(
