@@ -181,13 +181,9 @@
 
         if ([filePath isKindOfClass:[NSString class]]) {
             // Support plain paths and file:// URIs (#266 parity with Android).
-            NSURL *sourcePDFUrl = nil;
-            if ([filePath hasPrefix:@"file:"]) {
-                sourcePDFUrl = [NSURL URLWithString:filePath];
-            }
-            if (sourcePDFUrl == nil) {
-                sourcePDFUrl = [NSURL fileURLWithPath:filePath];
-            }
+            // URLWithString returns nil for unescaped characters (spaces, etc.);
+            // never fall back to fileURLWithPath on a full "file://..." string.
+            NSURL *sourcePDFUrl = [self pdfURLFromFilePath:filePath];
             _document = [[PDFDocument alloc] initWithURL:sourcePDFUrl];
         } else if ([pdfData isKindOfClass:[FlutterStandardTypedData class]]) {
             NSData *sourcePDFdata = [pdfData data];
@@ -714,6 +710,47 @@
     _pdfView.minScaleFactor = minScale != 0.0 ? minScale : minZoom.floatValue;
     _pdfView.maxScaleFactor = maxScale != 0.0 ? maxScale : maxZoom.floatValue;
     result([NSNumber numberWithBool:YES]);
+}
+
+/// Resolves a Flutter-provided path or `file:` / `file://` URI to a file URL.
+///
+/// `URLWithString` returns nil for unescaped characters (spaces, etc.). Falling
+/// back to `fileURLWithPath:` on the full `file://...` string would treat the
+/// scheme as part of the filesystem path and fail to open the document.
+- (NSURL *)pdfURLFromFilePath:(NSString *)filePath {
+    if (![filePath hasPrefix:@"file:"]) {
+        return [NSURL fileURLWithPath:filePath];
+    }
+
+    NSURL *url = [NSURL URLWithString:filePath];
+    if (url != nil && url.isFileURL && url.path.length > 0) {
+        return url;
+    }
+
+    // Strip file: / file:// and optional host, then treat the remainder as a path.
+    NSString *path = filePath;
+    if ([path hasPrefix:@"file://"]) {
+        path = [path substringFromIndex:7];
+    } else {
+        path = [path substringFromIndex:5];
+    }
+
+    // file://localhost/Users/... → /Users/...
+    if ([path hasPrefix:@"localhost/"]) {
+        path = [path substringFromIndex:9];
+    } else if (path.length > 0 && [path characterAtIndex:0] != '/') {
+        // file://hostname/path → /path
+        NSRange slash = [path rangeOfString:@"/"];
+        if (slash.location != NSNotFound) {
+            path = [path substringFromIndex:slash.location];
+        }
+    }
+
+    NSString *decoded = [path stringByRemovingPercentEncoding];
+    if (decoded != nil) {
+        path = decoded;
+    }
+    return [NSURL fileURLWithPath:path];
 }
 
 - (void)handlePageChanged:(NSNotification *)notification {

@@ -423,31 +423,36 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
             result.success(false);
             return;
         }
-        if (call.argument("page") != null) {
-            Integer pageObj = call.argument("page");
-            final int page = Objects.requireNonNullElse(pageObj, 0);
-            // #182: After an AlertDialog the Hybrid Composition surface may still
-            // be reattaching; jump on the next frame so the page change sticks.
-            Runnable jump = () -> {
-                if (disposed || pdfView == null) {
-                    return;
-                }
-                try {
-                    pdfView.jumpTo(page);
-                    pdfView.loadPages();
-                    pdfView.invalidate();
-                } catch (Exception e) {
-                    Log.w(TAG, "setPage failed", e);
-                }
-            };
-            if (pdfView.getWidth() > 0 && pdfView.getHeight() > 0) {
-                pdfView.post(jump);
-            } else {
-                mainHandler.post(jump);
-            }
+        if (call.argument("page") == null) {
+            result.success(false);
+            return;
         }
-
-        result.success(true);
+        Integer pageObj = call.argument("page");
+        final int page = Objects.requireNonNullElse(pageObj, 0);
+        // #182: After an AlertDialog the Hybrid Composition surface may still
+        // be reattaching; jump on the next frame so the page change sticks.
+        // Complete the method channel only after jumpTo so await setPage()
+        // followed by getCurrentPage() observes the new page.
+        Runnable jump = () -> {
+            if (disposed || pdfView == null) {
+                result.success(false);
+                return;
+            }
+            try {
+                pdfView.jumpTo(page);
+                pdfView.loadPages();
+                pdfView.invalidate();
+                result.success(true);
+            } catch (Exception e) {
+                Log.w(TAG, "setPage failed", e);
+                result.success(false);
+            }
+        };
+        if (pdfView.getWidth() > 0 && pdfView.getHeight() > 0) {
+            pdfView.post(jump);
+        } else {
+            mainHandler.post(jump);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -467,7 +472,9 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     break;
                 case "nightMode":
                     pdfView.setNightMode(getBoolean(settings, key));
-                    // Night mode paints inverted bitmaps; force redraw so the change is visible.
+                    // Night mode is applied when pages are (re)rendered; AndroidPdfViewer
+                    // caches page bitmaps so invalidate() alone is not enough.
+                    pdfView.loadPages();
                     pdfView.invalidate();
                     break;
                 case "pageFling":

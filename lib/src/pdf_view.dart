@@ -206,18 +206,25 @@ class _PDFViewState extends State<PDFView> {
       return;
     }
     // Dispose the previous controller so native resources are released (#261).
-    if (_controller.isCompleted) {
-      _controller.future.then((PDFViewController c) => c.dispose());
+    // Bump generation first so any late creation callback from the old platform
+    // view is ignored and disposes its controller instead of completing the
+    // new Completer (stale onPlatformViewCreated race).
+    final Completer<PDFViewController> previous = _controller;
+    _viewGeneration++;
+    if (previous.isCompleted) {
+      previous.future.then((PDFViewController c) => c.dispose());
     }
     setState(() {
-      _viewGeneration++;
       _controller = Completer<PDFViewController>();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final Key viewKey = ValueKey<int>(_viewGeneration);
+    // Capture generation at build time so platform-view creation callbacks
+    // from a previous mount cannot complete the current Completer.
+    final int generation = _viewGeneration;
+    final Key viewKey = ValueKey<int>(generation);
     if (defaultTargetPlatform == TargetPlatform.android) {
       return PlatformViewLink(
         key: viewKey,
@@ -248,7 +255,7 @@ class _PDFViewState extends State<PDFView> {
           )
             ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
             ..addOnPlatformViewCreatedListener((int id) {
-              _onPlatformViewCreated(id);
+              _onPlatformViewCreated(id, generation: generation);
             })
             ..create();
         },
@@ -257,7 +264,9 @@ class _PDFViewState extends State<PDFView> {
       return UiKitView(
         key: viewKey,
         viewType: _viewType,
-        onPlatformViewCreated: _onPlatformViewCreated,
+        onPlatformViewCreated: (int id) {
+          _onPlatformViewCreated(id, generation: generation);
+        },
         gestureRecognizers: widget.gestureRecognizers,
         creationParams: _CreationParams.fromWidget(widget).toMap(),
         creationParamsCodec: const StandardMessageCodec(),
@@ -266,11 +275,19 @@ class _PDFViewState extends State<PDFView> {
     return Text('$defaultTargetPlatform is not yet supported by the pdfview_flutter plugin');
   }
 
-  void _onPlatformViewCreated(int id) {
+  void _onPlatformViewCreated(int id, {required int generation}) {
     final PDFViewController controller = PDFViewController._(id, widget);
-    if (!_controller.isCompleted) {
-      _controller.complete(controller);
+    // Ignore late callbacks from a remounted/disposed platform view so they
+    // cannot complete the new Completer with a stale controller.
+    if (!mounted || generation != _viewGeneration) {
+      controller.dispose();
+      return;
     }
+    if (_controller.isCompleted) {
+      controller.dispose();
+      return;
+    }
+    _controller.complete(controller);
     widget.onViewCreated?.call(controller);
   }
 
@@ -288,6 +305,8 @@ class _PDFViewState extends State<PDFView> {
 
   @override
   void dispose() {
+    // Invalidate in-flight creation callbacks before tearing down the controller.
+    _viewGeneration++;
     if (_controller.isCompleted) {
       _controller.future.then((PDFViewController controller) => controller.dispose());
     }
