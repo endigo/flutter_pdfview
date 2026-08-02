@@ -248,6 +248,44 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// Resolves a Flutter-provided path or `file:` / `file://` URI to a file URL.
+    ///
+    /// `URL(string:)` returns nil for unescaped characters (spaces, etc.). Falling
+    /// back to `URL(fileURLWithPath:)` on the full `file://...` string would treat
+    /// the scheme as part of the filesystem path and fail to open the document.
+    private static func pdfURL(fromFilePath filePath: String) -> URL {
+        guard filePath.hasPrefix("file:") else {
+            return URL(fileURLWithPath: filePath)
+        }
+
+        if let url = URL(string: filePath), url.isFileURL, !url.path.isEmpty {
+            return url
+        }
+
+        // Strip file: / file:// and optional host, then treat the remainder as a path.
+        var path = filePath
+        if path.hasPrefix("file://") {
+            path = String(path.dropFirst(7))
+        } else {
+            path = String(path.dropFirst(5))
+        }
+
+        // file://localhost/Users/... → /Users/...
+        if path.hasPrefix("localhost/") {
+            path = String(path.dropFirst(9))
+        } else if !path.isEmpty, !path.hasPrefix("/") {
+            // file://hostname/path → /path
+            if let slash = path.firstIndex(of: "/") {
+                path = String(path[slash...])
+            }
+        }
+
+        if let decoded = path.removingPercentEncoding {
+            path = decoded
+        }
+        return URL(fileURLWithPath: path)
+    }
+
     private func loadDocument(arguments args: [String: Any]?) {
         autoSpacing = args?.bool("autoSpacing") ?? false
         let pageFling = args?.bool("pageFling") ?? false
@@ -258,16 +296,9 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
 
         if let filePath = args?["filePath"] as? String {
             // Support plain paths and file:// URIs (#266 parity with Android).
-            var sourcePDFUrl: URL?
-            if filePath.hasPrefix("file:") {
-                sourcePDFUrl = URL(string: filePath)
-            }
-            if sourcePDFUrl == nil {
-                sourcePDFUrl = URL(fileURLWithPath: filePath)
-            }
-            if let sourcePDFUrl {
-                document = PDFDocument(url: sourcePDFUrl)
-            }
+            // URL(string:) returns nil for unescaped characters (spaces, etc.);
+            // never fall back to fileURLWithPath on a full "file://..." string.
+            document = PDFDocument(url: Self.pdfURL(fromFilePath: filePath))
         } else if let pdfData = args?["pdfData"] as? FlutterStandardTypedData {
             document = PDFDocument(data: pdfData.data)
         }
