@@ -15,7 +15,7 @@ Add this to your package's pubspec.yaml file:
 
 ```
 dependencies:
-  flutter_pdfview: 1.4.5-beta.4
+  flutter_pdfview: 1.4.5-beta.5
 ```
 
 ### 2. Install it
@@ -54,12 +54,12 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | gestureRecognizers    |   ✅    | ✅  |      `null`       |
 | filePath              |   ✅    | ✅  |                   |
 | pdfData               |   ✅    | ✅  |                   |
-| fitPolicy             |   ✅    | ❌  | `FitPolicy.WIDTH` |
+| fitPolicy             |   ✅    | ✅  | `FitPolicy.WIDTH` |
 | enableSwipe           |   ✅    | ✅  |      `true`       |
 | swipeHorizontal       |   ✅    | ✅  |      `false`      |
 | password              |   ✅    | ✅  |      `null`       |
 | nightMode             |   ✅    | ❌  |      `false`      |
-| autoSpacing           |   ✅    | ✅  |      `true`       |
+| autoSpacing*          |   ✅    | ✅  |      `true`       |
 | pageFling             |   ✅    | ✅  |      `true`       |
 | pageSnap              |   ✅    | ❌  |      `true`       |
 | preventLinkNavigation |   ✅    | ✅  |      `false`      |
@@ -68,7 +68,9 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | maxZoom               |   ✅    | ✅  |        4.0        |
 | showScrollIndicators* |   ✅    | ✅  |      `false`      |
 
-*`showScrollIndicators` is ignored on iOS while horizontal page-flipping is active (`pageFling: true` together with `swipeHorizontal: true`)
+Notes:
+- `showScrollIndicators` is ignored on iOS while horizontal page-flipping is active (`pageFling: true` together with `swipeHorizontal: true`).
+- `autoSpacing` only adds gaps between pages. It does not change initial zoom or `fitPolicy` (fixed in [#150](https://github.com/endigo/flutter_pdfview/issues/150)).
 
 ### Using PDFView inside a scrollable widget
 
