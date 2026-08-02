@@ -10,6 +10,7 @@ import android.util.Log;
 import android.view.View;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.VisibleForTesting;
 
 import com.github.barteksc.pdfviewer.PDFView;
 import com.github.barteksc.pdfviewer.PDFView.Configurator;
@@ -523,25 +524,29 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         }
     }
 
-    private boolean getBoolean(Map<String, Object> params, String key) {
+    @VisibleForTesting
+    static boolean getBoolean(Map<String, Object> params, String key) {
         Boolean keyObj = (Boolean) params.get(key);
         boolean bKey;
         bKey = Objects.requireNonNullElse(keyObj, false);
         return params.containsKey(key) && bKey;
     }
 
-    private String getString(Map<String, Object> params, String key) {
+    @VisibleForTesting
+    static String getString(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (String) params.get(key) : "";
     }
 
-    private int getInt(Map<String, Object> params, String key) {
+    @VisibleForTesting
+    static int getInt(Map<String, Object> params, String key) {
         Integer keyObj = (Integer) params.get(key);
         int intKey;
         intKey = Objects.requireNonNullElse(keyObj, 0);
         return params.containsKey(key) ? intKey : 0;
     }
 
-    private float getFloat(Map<String, Object> params, String key, float defaultValue) {
+    @VisibleForTesting
+    static float getFloat(Map<String, Object> params, String key, float defaultValue) {
         Object value = params.get(key);
         if (value instanceof Number) {
             return ((Number) value).floatValue();
@@ -549,7 +554,8 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         return defaultValue;
     }
 
-    private FitPolicy getFitPolicy(Map<String, Object> params) {
+    @VisibleForTesting
+    static FitPolicy getFitPolicy(Map<String, Object> params) {
         String fitPolicy = getString(params, "fitPolicy");
         return switch (fitPolicy) {
             case "FitPolicy.WIDTH" -> FitPolicy.WIDTH;
@@ -558,7 +564,8 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         };
     }
 
-    private Uri getURI(final String uri) {
+    @VisibleForTesting
+    static Uri getURI(final String uri) {
         if (uri == null || uri.isEmpty()) {
             return Uri.EMPTY;
         }

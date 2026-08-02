@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.net.Uri;
 import android.util.Log;
 
+import androidx.annotation.VisibleForTesting;
+
 import com.github.barteksc.pdfviewer.PDFView;
 import com.github.barteksc.pdfviewer.link.LinkHandler;
 import com.github.barteksc.pdfviewer.model.LinkTapEvent;
@@ -36,7 +38,8 @@ public class PDFLinkHandler implements LinkHandler {
         }
     }
 
-    private void handleUri(String uri) {
+    @VisibleForTesting
+    void handleUri(String uri) {
         // If the property is true just pass the link back to flutter
         if (!this.preventLinkNavigation) {
             Uri parsedUri = Uri.parse(uri);
@@ -56,7 +59,8 @@ public class PDFLinkHandler implements LinkHandler {
         this.onLinkHandler(uri);
     }
 
-    private void handlePage(int page) {
+    @VisibleForTesting
+    void handlePage(int page) {
         pdfView.jumpTo(page);
     }
 

@@ -16,12 +16,18 @@ dependencies:
   cupertino_icons: ^1.0.8
   path_provider: ^2.1.5
 
+  # The plugin under test. It is a regular dependency (not a dev dependency)
+  # because `lib/main.dart` imports it.
+  flutter_pdfview:
+    path: ../
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  flutter_pdfview:
-    path: ../
+  # Needed so that the shared `../analysis_options.yaml` (and therefore
+  # `dart format`'s page width) resolves from inside the example package.
+  flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://www.dartlang.org/tools/pub/pubspec

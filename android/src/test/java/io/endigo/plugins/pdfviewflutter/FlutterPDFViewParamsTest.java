@@ -1,0 +1,188 @@
+package io.endigo.plugins.pdfviewflutter;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
+
+import com.github.barteksc.pdfviewer.util.FitPolicy;
+
+import org.junit.Test;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Coverage for the creation-param getters on {@link FlutterPDFView}. These are
+ * the single point where the loosely typed Dart creation params are coerced, so
+ * missing / null / wrong-typed values all need pinned behaviour.
+ */
+public class FlutterPDFViewParamsTest {
+
+    private static Map<String, Object> params(String key, Object value) {
+        Map<String, Object> params = new HashMap<>();
+        params.put(key, value);
+        return params;
+    }
+
+    private static Map<String, Object> empty() {
+        return new HashMap<>();
+    }
+
+    // ---------------------------------------------------------------- getBoolean
+
+    @Test
+    public void getBoolean_presentTrue() {
+        assertTrue(FlutterPDFView.getBoolean(params("nightMode", true), "nightMode"));
+    }
+
+    @Test
+    public void getBoolean_presentFalse() {
+        assertFalse(FlutterPDFView.getBoolean(params("nightMode", false), "nightMode"));
+    }
+
+    @Test
+    public void getBoolean_missingKey_isFalse() {
+        assertFalse(FlutterPDFView.getBoolean(empty(), "nightMode"));
+    }
+
+    @Test
+    public void getBoolean_nullValue_isFalse() {
+        assertFalse(FlutterPDFView.getBoolean(params("nightMode", null), "nightMode"));
+    }
+
+    @Test
+    public void getBoolean_wrongType_throwsClassCastException() {
+        Map<String, Object> params = params("nightMode", "true");
+        assertThrows(ClassCastException.class, () -> FlutterPDFView.getBoolean(params, "nightMode"));
+    }
+
+    // ----------------------------------------------------------------- getString
+
+    @Test
+    public void getString_presentValue() {
+        assertEquals("hunter2", FlutterPDFView.getString(params("password", "hunter2"), "password"));
+    }
+
+    @Test
+    public void getString_presentEmptyValue() {
+        assertEquals("", FlutterPDFView.getString(params("password", ""), "password"));
+    }
+
+    @Test
+    public void getString_missingKey_isEmptyString() {
+        assertEquals("", FlutterPDFView.getString(empty(), "password"));
+    }
+
+    @Test
+    public void getString_nullValue_isNull() {
+        // containsKey() wins over the null, so an explicit null is passed through
+        // rather than defaulted. Configurator.password(null) means "no password".
+        assertNull(FlutterPDFView.getString(params("password", null), "password"));
+    }
+
+    @Test
+    public void getString_wrongType_throwsClassCastException() {
+        Map<String, Object> params = params("password", 42);
+        assertThrows(ClassCastException.class, () -> FlutterPDFView.getString(params, "password"));
+    }
+
+    // -------------------------------------------------------------------- getInt
+
+    @Test
+    public void getInt_presentValue() {
+        assertEquals(7, FlutterPDFView.getInt(params("defaultPage", 7), "defaultPage"));
+    }
+
+    @Test
+    public void getInt_presentZero() {
+        assertEquals(0, FlutterPDFView.getInt(params("defaultPage", 0), "defaultPage"));
+    }
+
+    @Test
+    public void getInt_missingKey_isZero() {
+        assertEquals(0, FlutterPDFView.getInt(empty(), "defaultPage"));
+    }
+
+    @Test
+    public void getInt_nullValue_isZero() {
+        assertEquals(0, FlutterPDFView.getInt(params("defaultPage", null), "defaultPage"));
+    }
+
+    @Test
+    public void getInt_wrongType_throwsClassCastException() {
+        Map<String, Object> params = params("defaultPage", 7L);
+        assertThrows(ClassCastException.class, () -> FlutterPDFView.getInt(params, "defaultPage"));
+    }
+
+    // ------------------------------------------------------------------ getFloat
+
+    @Test
+    public void getFloat_presentDouble() {
+        // Dart doubles arrive as java.lang.Double over the method channel.
+        assertEquals(2.5f, FlutterPDFView.getFloat(params("maxZoom", 2.5d), "maxZoom", 4.0f), 0f);
+    }
+
+    @Test
+    public void getFloat_presentInteger_isWidened() {
+        assertEquals(3.0f, FlutterPDFView.getFloat(params("maxZoom", 3), "maxZoom", 4.0f), 0f);
+    }
+
+    @Test
+    public void getFloat_presentFloat() {
+        assertEquals(1.5f, FlutterPDFView.getFloat(params("minZoom", 1.5f), "minZoom", 1.0f), 0f);
+    }
+
+    @Test
+    public void getFloat_missingKey_isDefault() {
+        assertEquals(4.0f, FlutterPDFView.getFloat(empty(), "maxZoom", 4.0f), 0f);
+    }
+
+    @Test
+    public void getFloat_nullValue_isDefault() {
+        assertEquals(4.0f, FlutterPDFView.getFloat(params("maxZoom", null), "maxZoom", 4.0f), 0f);
+    }
+
+    @Test
+    public void getFloat_wrongType_isDefaultRatherThanThrowing() {
+        assertEquals(4.0f, FlutterPDFView.getFloat(params("maxZoom", "2.5"), "maxZoom", 4.0f), 0f);
+    }
+
+    // -------------------------------------------------------------- getFitPolicy
+
+    @Test
+    public void getFitPolicy_width() {
+        assertEquals(FitPolicy.WIDTH,
+                FlutterPDFView.getFitPolicy(params("fitPolicy", "FitPolicy.WIDTH")));
+    }
+
+    @Test
+    public void getFitPolicy_height() {
+        assertEquals(FitPolicy.HEIGHT,
+                FlutterPDFView.getFitPolicy(params("fitPolicy", "FitPolicy.HEIGHT")));
+    }
+
+    @Test
+    public void getFitPolicy_both() {
+        assertEquals(FitPolicy.BOTH,
+                FlutterPDFView.getFitPolicy(params("fitPolicy", "FitPolicy.BOTH")));
+    }
+
+    @Test
+    public void getFitPolicy_unknownValue_fallsBackToBoth() {
+        assertEquals(FitPolicy.BOTH,
+                FlutterPDFView.getFitPolicy(params("fitPolicy", "FitPolicy.DIAGONAL")));
+    }
+
+    @Test
+    public void getFitPolicy_wrongCase_fallsBackToBoth() {
+        assertEquals(FitPolicy.BOTH,
+                FlutterPDFView.getFitPolicy(params("fitPolicy", "fitpolicy.width")));
+    }
+
+    @Test
+    public void getFitPolicy_missingKey_fallsBackToBoth() {
+        assertEquals(FitPolicy.BOTH, FlutterPDFView.getFitPolicy(empty()));
+    }
+}

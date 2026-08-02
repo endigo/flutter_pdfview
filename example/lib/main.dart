@@ -7,18 +7,23 @@ import 'package:flutter/services.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:path_provider/path_provider.dart';
 
-void main() => runApp(MyApp());
+void main() => runApp(const MyApp());
 
+/// Home screen of the example app: copies the bundled sample documents to disk
+/// and offers a button per document.
 class MyApp extends StatefulWidget {
+  /// Creates the example app.
+  const MyApp({super.key});
+
   @override
-  _MyAppState createState() => _MyAppState();
+  State<MyApp> createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
-  String pathPDF = "";
-  String landscapePathPdf = "";
-  String remotePDFpath = "";
-  String corruptedPathPDF = "";
+  String pathPDF = '';
+  String landscapePathPdf = '';
+  String remotePDFpath = '';
+  String corruptedPathPDF = '';
 
   @override
   void initState() {
@@ -47,20 +52,20 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<File> createFileOfPdfUrl() async {
-    Completer<File> completer = Completer();
-    print("Start download file from internet!");
+    final Completer<File> completer = Completer();
+    debugPrint('Start download file from internet!');
     try {
-      // "https://berlin2017.droidcon.cod.newthinking.net/sites/global.droidcon.cod.newthinking.net/files/media/documents/Flutter%20-%2060FPS%20UI%20of%20the%20future%20%20-%20DroidconDE%2017.pdf";
-      // final url = "https://pdfkit.org/docs/guide.pdf";
-      final url = "http://www.pdf995.com/samples/pdf.pdf";
-      final filename = url.substring(url.lastIndexOf("/") + 1);
-      var request = await HttpClient().getUrl(Uri.parse(url));
-      var response = await request.close();
-      var bytes = await consolidateHttpClientResponseBytes(response);
-      var dir = await getApplicationDocumentsDirectory();
-      print("Download files");
-      print("${dir.path}/$filename");
-      File file = File("${dir.path}/$filename");
+      // 'https://berlin2017.droidcon.cod.newthinking.net/sites/global.droidcon.cod.newthinking.net/files/media/documents/Flutter%20-%2060FPS%20UI%20of%20the%20future%20%20-%20DroidconDE%2017.pdf';
+      // final url = 'https://pdfkit.org/docs/guide.pdf';
+      final url = 'http://www.pdf995.com/samples/pdf.pdf';
+      final filename = url.substring(url.lastIndexOf('/') + 1);
+      final request = await HttpClient().getUrl(Uri.parse(url));
+      final response = await request.close();
+      final bytes = await consolidateHttpClientResponseBytes(response);
+      final dir = await getApplicationDocumentsDirectory();
+      debugPrint('Download files');
+      debugPrint('${dir.path}/$filename');
+      final File file = File('${dir.path}/$filename');
 
       await file.writeAsBytes(bytes, flush: true);
       completer.complete(file);
@@ -73,13 +78,13 @@ class _MyAppState extends State<MyApp> {
 
   Future<File> fromAsset(String asset, String filename) async {
     // To open from assets, you can copy them to the app storage folder, and the access them "locally"
-    Completer<File> completer = Completer();
+    final Completer<File> completer = Completer();
 
     try {
-      var dir = await getApplicationDocumentsDirectory();
-      File file = File("${dir.path}/$filename");
-      var data = await rootBundle.load(asset);
-      var bytes = data.buffer.asUint8List();
+      final dir = await getApplicationDocumentsDirectory();
+      final File file = File('${dir.path}/$filename');
+      final data = await rootBundle.load(asset);
+      final bytes = data.buffer.asUint8List();
       await file.writeAsBytes(bytes, flush: true);
       completer.complete(file);
     } catch (e) {
@@ -101,7 +106,7 @@ class _MyAppState extends State<MyApp> {
             return Column(
               children: <Widget>[
                 TextButton(
-                  child: Text("Open PDF"),
+                  child: const Text('Open PDF'),
                   onPressed: () {
                     if (pathPDF.isNotEmpty) {
                       Navigator.push(
@@ -114,7 +119,7 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
                 TextButton(
-                  child: Text("Open Landscape PDF"),
+                  child: const Text('Open Landscape PDF'),
                   onPressed: () {
                     if (landscapePathPdf.isNotEmpty) {
                       Navigator.push(
@@ -127,7 +132,7 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
                 TextButton(
-                  child: Text("Remote PDF"),
+                  child: const Text('Remote PDF'),
                   onPressed: () {
                     if (remotePDFpath.isNotEmpty) {
                       Navigator.push(
@@ -140,7 +145,7 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
                 TextButton(
-                  child: Text("Open PDF (iPad Safe Mode)"),
+                  child: const Text('Open PDF (iPad Safe Mode)'),
                   onPressed: () {
                     if (pathPDF.isNotEmpty) {
                       Navigator.push(
@@ -156,7 +161,7 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
                 TextButton(
-                  child: Text("Open Corrupted PDF"),
+                  child: const Text('Open Corrupted PDF'),
                   onPressed: () {
                     if (pathPDF.isNotEmpty) {
                       Navigator.push(
@@ -177,13 +182,20 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
+/// Full-screen viewer that renders a single document with [PDFView].
 class PDFScreen extends StatefulWidget {
+  /// Path of the document to display.
   final String? path;
+
+  /// Whether to use the conservative scroll configuration that behaves best on
+  /// iPad.
   final bool isIPadSafe;
 
-  PDFScreen({Key? key, this.path, this.isIPadSafe = false}) : super(key: key);
+  /// Creates a viewer for the document at [path].
+  const PDFScreen({super.key, this.path, this.isIPadSafe = false});
 
-  _PDFScreenState createState() => _PDFScreenState();
+  @override
+  State<PDFScreen> createState() => _PDFScreenState();
 }
 
 class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
@@ -201,10 +213,10 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Document"),
+        title: const Text('Document'),
         actions: <Widget>[
           IconButton(
-            icon: Icon(Icons.share),
+            icon: const Icon(Icons.share),
             onPressed: () {},
           ),
         ],
@@ -224,13 +236,13 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
             defaultPage: _currentPage!,
             fitPolicy: FitPolicy.BOTH,
             preventLinkNavigation: false, // if set to true the link is handled in flutter
-            backgroundColor: Color(0xFFFEF7FF),
+            backgroundColor: const Color(0xFFFEF7FF),
             nightMode: true,
             maxZoom: 4.0,
             minZoom: 1.0,
-            onRender: (_pages) {
+            onRender: (pages) {
               setState(() {
-                this._pages = _pages;
+                _pages = pages;
                 _isReady = true;
               });
             },
@@ -238,22 +250,22 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
               setState(() {
                 _errorMessage = error.toString();
               });
-              print(error.toString());
+              debugPrint(error.toString());
             },
             onPageError: (page, error) {
               setState(() {
                 _errorMessage = '$page: ${error.toString()}';
               });
-              print('$page: ${error.toString()}');
+              debugPrint('$page: ${error.toString()}');
             },
             onViewCreated: (PDFViewController pdfViewController) {
               _controller.complete(pdfViewController);
             },
             onLinkHandler: (String? uri) {
-              print('goto uri: $uri');
+              debugPrint('goto uri: $uri');
             },
             onPageChanged: (int? page, int? total) {
-              print('page change: ${(page ?? 0) + 1}/$total');
+              debugPrint('page change: ${(page ?? 0) + 1}/$total');
               setState(() {
                 _currentPage = page;
               });
@@ -262,7 +274,7 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
               final pagesText = '# of pages: $pages';
               final snackBar = SnackBar(content: Text(pagesText));
               ScaffoldMessenger.of(context).showSnackBar(snackBar);
-              print(pagesText);
+              debugPrint(pagesText);
             },
             onDraw: (double pdfXOffset, double pdfYOffset, double pdfScale) {
               setState(() {
@@ -270,12 +282,12 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
                 _yOffset = pdfYOffset;
                 _scale = pdfScale;
               });
-              print('onDraw - x offset: $pdfXOffset, y offset: $pdfYOffset scale: $pdfScale');
+              debugPrint('onDraw - x offset: $pdfXOffset, y offset: $pdfYOffset scale: $pdfScale');
             },
           ),
           _errorMessage.isEmpty
               ? !_isReady
-                  ? Center(child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator())
                   : Container()
               : Center(child: Text(_errorMessage)),
           Positioned(
@@ -283,7 +295,7 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
               top: 10,
               child: Container(
                 color: Colors.orange,
-                padding: EdgeInsets.all(10),
+                padding: const EdgeInsets.all(10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -300,9 +312,9 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
         builder: (context, AsyncSnapshot<PDFViewController> snapshot) {
           if (snapshot.hasData) {
             return FloatingActionButton.extended(
-              label: Text("Go to ${this._pages! ~/ 2}"),
+              label: Text('Go to ${_pages! ~/ 2}'),
               onPressed: () async {
-                await snapshot.data!.setPage(this._pages! ~/ 2);
+                await snapshot.data!.setPage(_pages! ~/ 2);
               },
             );
           }

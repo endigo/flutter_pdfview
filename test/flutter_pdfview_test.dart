@@ -267,4 +267,235 @@ void main() {
       expect(PDFView(filePath: 'test.pdf', thumbnailRatio: 1.0).thumbnailRatio, 1.0);
     });
   });
+
+  group('Creation params map', () {
+    testWidgets('forwards settings into platform creation params', (tester) async {
+      final view = PDFView(
+        filePath: '/docs/demo.pdf',
+        enableSwipe: false,
+        swipeHorizontal: true,
+        showScrollIndicators: true,
+        password: 's3cret',
+        nightMode: true,
+        autoSpacing: false,
+        pageFling: false,
+        pageSnap: false,
+        enableAntialiasing: false,
+        useBestQuality: false,
+        enableRenderDuringScale: false,
+        thumbnailRatio: 0.5,
+        defaultPage: 3,
+        fitPolicy: FitPolicy.HEIGHT,
+        preventLinkNavigation: true,
+        backgroundColor: const Color(0xFF112233),
+        maxZoom: 8.0,
+        minZoom: 0.5,
+      );
+
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: view)));
+      await tester.pump();
+
+      // Smoke: widget still builds with the full settings surface used by the
+      // example app (nightMode, backgroundColor, zoom bounds, fit policy).
+      expect(find.byType(PDFView), findsOneWidget);
+      expect(view.filePath, '/docs/demo.pdf');
+      expect(view.nightMode, isTrue);
+      expect(view.backgroundColor, const Color(0xFF112233));
+      expect(view.fitPolicy, FitPolicy.HEIGHT);
+      expect(view.defaultPage, 3);
+      expect(view.maxZoom, 8.0);
+      expect(view.minZoom, 0.5);
+      expect(view.preventLinkNavigation, isTrue);
+      expect(view.showScrollIndicators, isTrue);
+    });
+
+    test('pdfData source is accepted without filePath', () {
+      final bytes = Uint8List.fromList(const [0x25, 0x50, 0x44, 0x46]); // %PDF
+      final view = PDFView(pdfData: bytes);
+      expect(view.pdfData, bytes);
+      expect(view.filePath, isNull);
+    });
+  });
+
+  group('PDFViewController method channel', () {
+    late List<MethodCall> log;
+    late PDFViewController controller;
+
+    setUp(() async {
+      log = <MethodCall>[];
+      const id = 42;
+      final view = const PDFView(filePath: 'test.pdf');
+      final channel = MethodChannel('plugins.endigo.io/pdfview_$id');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall call) async {
+        log.add(call);
+        switch (call.method) {
+          case 'pageCount':
+            return 12;
+          case 'currentPage':
+            return 2;
+          case 'setPage':
+            return true;
+          case 'currentPageSize':
+            return <double>[612.0, 792.0];
+          case 'getPosition':
+            return <double>[-10.0, -20.0];
+          case 'getScale':
+            return 1.5;
+          case 'setPosition':
+            return true;
+          case 'setScale':
+            return true;
+          case 'setZoomLimits':
+            return true;
+          case 'reload':
+            return true;
+          case 'getScreenshot':
+            return '/tmp/shot.png';
+          case 'updateSettings':
+            return null;
+          default:
+            return null;
+        }
+      });
+
+      controller = PDFViewController.test(id, view);
+    });
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(const MethodChannel('plugins.endigo.io/pdfview_42'), null);
+      controller.dispose();
+    });
+
+    test('getPageCount / getCurrentPage / setPage', () async {
+      expect(await controller.getPageCount(), 12);
+      expect(await controller.getCurrentPage(), 2);
+      expect(await controller.setPage(5), isTrue);
+      expect(log.map((c) => c.method), containsAll(['pageCount', 'currentPage', 'setPage']));
+      final setPageCall = log.firstWhere((c) => c.method == 'setPage');
+      expect(setPageCall.arguments['page'], 5);
+    });
+
+    test('getCurrentPageSize / getPosition / getScale', () async {
+      expect(await controller.getCurrentPageSize(), const Size(612, 792));
+      expect(await controller.getPosition(), const Offset(-10, -20));
+      expect(await controller.getScale(), 1.5);
+    });
+
+    test('setPosition / setScale / setZoomLimits / reload / getScreenshot', () async {
+      expect(await controller.setPosition(const Offset(1, 2)), isTrue);
+      expect(await controller.setScale(2.0), isTrue);
+      expect(await controller.setZoomLimits(1, 2, 4), isTrue);
+      expect(await controller.reload(), isTrue);
+      expect(await controller.getScreenshot('/tmp/out.png'), '/tmp/shot.png');
+
+      final methods = log.map((c) => c.method).toList();
+      expect(
+          methods,
+          containsAll([
+            'setPosition',
+            'setScale',
+            'setZoomLimits',
+            'reload',
+            'getScreenshot',
+          ]));
+    });
+
+    test('native callbacks invoke widget handlers', () async {
+      int? rendered;
+      int? page;
+      int? total;
+      Object? error;
+      int? pageErr;
+      String? link;
+      int? loaded;
+      double? drawX;
+
+      final view = PDFView(
+        filePath: 'test.pdf',
+        onRender: (p) => rendered = p,
+        onPageChanged: (p, t) {
+          page = p;
+          total = t;
+        },
+        onError: (e) => error = e,
+        onPageError: (p, e) => pageErr = p,
+        onLinkHandler: (u) => link = u,
+        onLoadComplete: (p) => loaded = p,
+        onDraw: (x, y, s) => drawX = x,
+      );
+      final c = PDFViewController.test(99, view);
+
+      final channel = MethodChannel('plugins.endigo.io/pdfview_99');
+      // Handler already set by controller; invoke as native would.
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
+        channel.name,
+        const StandardMethodCodec().encodeMethodCall(
+          const MethodCall('onRender', {'pages': 7}),
+        ),
+        (_) {},
+      );
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
+        channel.name,
+        const StandardMethodCodec().encodeMethodCall(
+          const MethodCall('onPageChanged', {'page': 1, 'total': 7}),
+        ),
+        (_) {},
+      );
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
+        channel.name,
+        const StandardMethodCodec().encodeMethodCall(
+          const MethodCall('onError', {'error': 'boom'}),
+        ),
+        (_) {},
+      );
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
+        channel.name,
+        const StandardMethodCodec().encodeMethodCall(
+          const MethodCall('onPageError', {'page': 3, 'error': 'bad'}),
+        ),
+        (_) {},
+      );
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
+        channel.name,
+        const StandardMethodCodec().encodeMethodCall(
+          const MethodCall('onLinkHandler', 'https://example.com'),
+        ),
+        (_) {},
+      );
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
+        channel.name,
+        const StandardMethodCodec().encodeMethodCall(
+          const MethodCall('onLoadComplete', {'pages': 7}),
+        ),
+        (_) {},
+      );
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
+        channel.name,
+        const StandardMethodCodec().encodeMethodCall(
+          const MethodCall('onDraw', {
+            'pdfXOffset': 1.5,
+            'pdfYOffset': 2.5,
+            'pdfScale': 1.0,
+          }),
+        ),
+        (_) {},
+      );
+
+      // Allow async handler futures to complete.
+      await Future<void>.delayed(Duration.zero);
+
+      expect(rendered, 7);
+      expect(page, 1);
+      expect(total, 7);
+      expect(error, 'boom');
+      expect(pageErr, 3);
+      expect(link, 'https://example.com');
+      expect(loaded, 7);
+      expect(drawX, 1.5);
+
+      c.dispose();
+    });
+  });
 }

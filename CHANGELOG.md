@@ -12,6 +12,8 @@
 - Propagate `nightMode` setting updates to native Android view
 - Document `EagerGestureRecognizer` for PDFView inside scrollables [#265](https://github.com/endigo/flutter_pdfview/issues/265)
 - Fix Android external PDF links silently failing on API 30+ package visibility (`resolveActivity` pre-check)
+- Expand unit tests: controller method channel, native→Dart callbacks, document remount, creation settings
+- Replace broken example widget test with home-screen / PDFScreen chrome coverage
 
 ## 1.4.5-beta.3
 
