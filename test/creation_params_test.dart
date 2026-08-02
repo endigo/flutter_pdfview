@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,6 +28,9 @@ const Set<String> _expectedKeys = <String>{
   'minZoom',
 };
 
+/// Runs a body on iOS, where `PDFView` uses the simplest platform view path.
+final TargetPlatformVariant _iOS = TargetPlatformVariant.only(TargetPlatform.iOS);
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -40,7 +43,11 @@ void main() {
   /// Ids handed out by `PlatformViewsService` during the current test.
   late List<int> viewIds;
 
-  void installPlatformViewsMock() {
+  setUp(() {
+    created = <Map<Object?, Object?>>[];
+    viewCalls = <MethodCall>[];
+    viewIds = <int>[];
+
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
       SystemChannels.platform_views,
       (MethodCall call) async {
@@ -70,17 +77,10 @@ void main() {
           },
         );
 
-        // Texture id for the (unused) texture based path; harmless otherwise.
+        // Texture id for the texture based path; harmless for the others.
         return 0;
       },
     );
-  }
-
-  setUp(() {
-    created = <Map<Object?, Object?>>[];
-    viewCalls = <MethodCall>[];
-    viewIds = <int>[];
-    installPlatformViewsMock();
   });
 
   tearDown(() {
@@ -90,12 +90,10 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(MethodChannel('plugins.endigo.io/pdfview_$id'), null);
     }
-    debugDefaultTargetPlatformOverride = null;
   });
 
-  /// Pumps [view] as an iOS platform view and returns its creation params.
+  /// Pumps [view] and returns the creation params of the single platform view.
   Future<Map<Object?, Object?>> pumpAndCapture(WidgetTester tester, PDFView view) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: view)));
     await tester.pumpAndSettle();
     expect(created, hasLength(1));
@@ -109,7 +107,7 @@ void main() {
         const PDFView(filePath: 'a.pdf'),
       );
       expect(params.keys.cast<String>().toSet(), _expectedKeys);
-    });
+    }, variant: _iOS);
 
     testWidgets('serializes the default settings', (WidgetTester tester) async {
       final Map<Object?, Object?> params = await pumpAndCapture(
@@ -137,7 +135,7 @@ void main() {
       expect(params['preventLinkNavigation'], isFalse);
       expect(params['maxZoom'], 4.0);
       expect(params['minZoom'], 1.0);
-    });
+    }, variant: _iOS);
 
     testWidgets('serializes a fully customised widget', (WidgetTester tester) async {
       final Map<Object?, Object?> params = await pumpAndCapture(
@@ -184,7 +182,7 @@ void main() {
       expect(params['backgroundColor'], 0xFF112233);
       expect(params['maxZoom'], 8.0);
       expect(params['minZoom'], 0.5);
-    });
+    }, variant: _iOS);
 
     testWidgets('serializes FitPolicy.BOTH', (WidgetTester tester) async {
       final Map<Object?, Object?> params = await pumpAndCapture(
@@ -192,7 +190,7 @@ void main() {
         const PDFView(filePath: 'a.pdf', fitPolicy: FitPolicy.BOTH),
       );
       expect(params['fitPolicy'], 'FitPolicy.BOTH');
-    });
+    }, variant: _iOS);
 
     testWidgets('serializes backgroundColor as an ARGB32 int', (WidgetTester tester) async {
       final Map<Object?, Object?> params = await pumpAndCapture(
@@ -200,42 +198,31 @@ void main() {
         const PDFView(filePath: 'a.pdf', backgroundColor: Color(0x80123456)),
       );
       expect(params['backgroundColor'], 0x80123456);
-    });
+    }, variant: _iOS);
 
     testWidgets('passes pdfData through and leaves filePath null', (WidgetTester tester) async {
       final Uint8List bytes = Uint8List.fromList(const <int>[0x25, 0x50, 0x44, 0x46]);
-      final Map<Object?, Object?> params = await pumpAndCapture(
-        tester,
-        PDFView(pdfData: bytes),
-      );
+      final Map<Object?, Object?> params = await pumpAndCapture(tester, PDFView(pdfData: bytes));
       expect(params['filePath'], isNull);
       expect(params['pdfData'], isA<Uint8List>());
       expect(params['pdfData'], bytes);
-    });
+    }, variant: _iOS);
 
     testWidgets('android uses the same creation params', (WidgetTester tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(body: PDFView(filePath: 'android.pdf', nightMode: true)),
-        ),
+      final Map<Object?, Object?> params = await pumpAndCapture(
+        tester,
+        const PDFView(filePath: 'android.pdf', nightMode: true),
       );
-      await tester.pumpAndSettle();
-
-      expect(created, hasLength(1));
-      expect(created.single.keys.cast<String>().toSet(), _expectedKeys);
-      expect(created.single['filePath'], 'android.pdf');
-      expect(created.single['nightMode'], isTrue);
-    });
+      expect(params.keys.cast<String>().toSet(), _expectedKeys);
+      expect(params['filePath'], 'android.pdf');
+      expect(params['nightMode'], isTrue);
+    }, variant: TargetPlatformVariant.only(TargetPlatform.android));
   });
 
   group('Settings updates over the method channel', () {
     testWidgets('pushes only the changed, updatable settings', (WidgetTester tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(body: PDFView(filePath: 'a.pdf')),
-        ),
+        const MaterialApp(home: Scaffold(body: PDFView(filePath: 'a.pdf'))),
       );
       await tester.pumpAndSettle();
       expect(created, hasLength(1));
@@ -258,46 +245,33 @@ void main() {
 
       expect(created, hasLength(1), reason: 'settings-only change must not remount the view');
       expect(viewCalls.map((MethodCall c) => c.method), <String>['updateSettings']);
-      expect(
-        viewCalls.single.arguments,
-        <String, Object?>{'nightMode': true, 'maxZoom': 6.0},
-      );
-    });
+      expect(viewCalls.single.arguments, <String, Object?>{'nightMode': true, 'maxZoom': 6.0});
+    }, variant: _iOS);
 
     testWidgets('sends nothing when no updatable setting changed', (WidgetTester tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(body: PDFView(filePath: 'a.pdf', defaultPage: 0)),
-        ),
+        const MaterialApp(home: Scaffold(body: PDFView(filePath: 'a.pdf', defaultPage: 0))),
       );
       await tester.pumpAndSettle();
       viewCalls.clear();
 
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(body: PDFView(filePath: 'a.pdf', defaultPage: 4)),
-        ),
+        const MaterialApp(home: Scaffold(body: PDFView(filePath: 'a.pdf', defaultPage: 4))),
       );
       await tester.pumpAndSettle();
 
       expect(viewCalls, isEmpty);
-    });
+    }, variant: _iOS);
 
     testWidgets('a new document recreates the platform view', (WidgetTester tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(body: PDFView(filePath: 'first.pdf')),
-        ),
+        const MaterialApp(home: Scaffold(body: PDFView(filePath: 'first.pdf'))),
       );
       await tester.pumpAndSettle();
       expect(created, hasLength(1));
 
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(body: PDFView(filePath: 'second.pdf')),
-        ),
+        const MaterialApp(home: Scaffold(body: PDFView(filePath: 'second.pdf'))),
       );
       await tester.pumpAndSettle();
 
@@ -309,34 +283,83 @@ void main() {
         isNot(contains('updateSettings')),
         reason: 'a document change remounts instead of diffing settings',
       );
-    });
+    }, variant: _iOS);
+  });
+
+  group('pdfData change detection (#181)', () {
+    Future<void> pumpBytes(WidgetTester tester, Uint8List bytes) async {
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: PDFView(pdfData: bytes))));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('equal bytes in a new list do not remount', (WidgetTester tester) async {
+      await pumpBytes(tester, Uint8List.fromList(const <int>[1, 2, 3]));
+      expect(created, hasLength(1));
+
+      await pumpBytes(tester, Uint8List.fromList(const <int>[1, 2, 3]));
+      expect(created, hasLength(1));
+    }, variant: _iOS);
+
+    testWidgets('a single differing byte remounts', (WidgetTester tester) async {
+      await pumpBytes(tester, Uint8List.fromList(const <int>[1, 2, 3]));
+      expect(created, hasLength(1));
+
+      await pumpBytes(tester, Uint8List.fromList(const <int>[1, 2, 4]));
+      expect(created, hasLength(2));
+      expect(created.last['pdfData'], Uint8List.fromList(const <int>[1, 2, 4]));
+    }, variant: _iOS);
+
+    testWidgets('a different length remounts', (WidgetTester tester) async {
+      await pumpBytes(tester, Uint8List.fromList(const <int>[1, 2, 3]));
+      await pumpBytes(tester, Uint8List.fromList(const <int>[1, 2, 3, 4]));
+      expect(created, hasLength(2));
+    }, variant: _iOS);
+
+    testWidgets('the identical list instance does not remount', (WidgetTester tester) async {
+      final Uint8List bytes = Uint8List.fromList(const <int>[9, 9, 9]);
+      await pumpBytes(tester, bytes);
+      await pumpBytes(tester, bytes);
+      expect(created, hasLength(1));
+    }, variant: _iOS);
+
+    testWidgets('switching from pdfData to filePath remounts', (WidgetTester tester) async {
+      await pumpBytes(tester, Uint8List.fromList(const <int>[1, 2, 3]));
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: PDFView(filePath: 'a.pdf'))),
+      );
+      await tester.pumpAndSettle();
+
+      expect(created, hasLength(2));
+      expect(created.last['filePath'], 'a.pdf');
+      expect(created.last['pdfData'], isNull);
+    }, variant: _iOS);
   });
 
   group('Unsupported platform fallback', () {
     testWidgets('renders an explanatory Text instead of a platform view', (
       WidgetTester tester,
     ) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(body: PDFView(filePath: 'a.pdf')),
-        ),
+        const MaterialApp(home: Scaffold(body: PDFView(filePath: 'a.pdf'))),
       );
       await tester.pump();
 
       expect(
-        find.text(
-          'TargetPlatform.linux is not yet supported by the pdfview_flutter plugin',
-        ),
+        find.text('$defaultTargetPlatform is not yet supported by the pdfview_flutter plugin'),
         findsOneWidget,
       );
       expect(created, isEmpty);
-    });
+    },
+        variant: TargetPlatformVariant(<TargetPlatform>{
+          TargetPlatform.linux,
+          TargetPlatform.windows,
+          TargetPlatform.macOS,
+          TargetPlatform.fuchsia,
+        }));
 
     testWidgets('onViewCreated is never called on an unsupported platform', (
       WidgetTester tester,
     ) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
       PDFViewController? controller;
       await tester.pumpWidget(
         MaterialApp(
@@ -352,14 +375,13 @@ void main() {
 
       expect(controller, isNull);
       expect(find.textContaining('is not yet supported'), findsOneWidget);
-    });
+    }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
   });
 
   group('onViewCreated', () {
     testWidgets('receives a working controller for the created view', (
       WidgetTester tester,
     ) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       PDFViewController? controller;
       await tester.pumpWidget(
         MaterialApp(
@@ -378,6 +400,6 @@ void main() {
       await controller!.setPage(2);
       expect(viewCalls.single.method, 'setPage');
       expect(viewCalls.single.arguments, <String, Object?>{'page': 2});
-    });
+    }, variant: _iOS);
   });
 }

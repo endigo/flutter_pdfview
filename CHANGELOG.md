@@ -12,7 +12,14 @@
 - Propagate `nightMode` setting updates to native Android view
 - Document `EagerGestureRecognizer` for PDFView inside scrollables [#265](https://github.com/endigo/flutter_pdfview/issues/265)
 - Fix Android external PDF links silently failing on API 30+ package visibility (`resolveActivity` pre-check)
+- Fix controller deadlock: a failed `setPosition`/`setScale` call permanently hung all later position/scale calls
+- Fix iOS silently showing a blank view for wrong/missing passwords — now fires `onError` (parity with Android)
+- Fix iOS `getCurrentPage`/`onPageChanged` reporting a garbage index (`NSNotFound`) before a page is loaded
+- Validate `thumbnailRatio` to (0, 1] (Dart assert + Android clamp) — out-of-range values crashed rendering
+- Restructure Dart library into `lib/src/` part files; public API unchanged
+- Adopt `flutter_lints` 6.0 with zero analyzer issues; dartdoc for the entire public API
 - Expand unit tests: controller method channel, native→Dart callbacks, document remount, creation settings
+- Add 64 Android native unit tests (Robolectric/JUnit): URI handling, param parsing, link handler, thumbnail clamp
 - Replace broken example widget test with home-screen / PDFScreen chrome coverage
 
 ## 1.4.5-beta.3
