@@ -62,8 +62,9 @@ void main() {
         if (raw != null) {
           created.add(
             const StandardMessageCodec().decodeMessage(
-              ByteData.view(raw.buffer, raw.offsetInBytes, raw.lengthInBytes),
-            )! as Map<Object?, Object?>,
+                  ByteData.view(raw.buffer, raw.offsetInBytes, raw.lengthInBytes),
+                )!
+                as Map<Object?, Object?>,
           );
         }
 
@@ -84,11 +85,15 @@ void main() {
   });
 
   tearDown(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform_views, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform_views,
+      null,
+    );
     for (final int id in viewIds) {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(MethodChannel('plugins.endigo.io/pdfview_$id'), null);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        MethodChannel('plugins.endigo.io/pdfview_$id'),
+        null,
+      );
     }
   });
 
@@ -208,21 +213,27 @@ void main() {
       expect(params['pdfData'], bytes);
     }, variant: _iOS);
 
-    testWidgets('android uses the same creation params', (WidgetTester tester) async {
-      final Map<Object?, Object?> params = await pumpAndCapture(
-        tester,
-        const PDFView(filePath: 'android.pdf', nightMode: true),
-      );
-      expect(params.keys.cast<String>().toSet(), _expectedKeys);
-      expect(params['filePath'], 'android.pdf');
-      expect(params['nightMode'], isTrue);
-    }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+    testWidgets(
+      'android uses the same creation params',
+      (WidgetTester tester) async {
+        final Map<Object?, Object?> params = await pumpAndCapture(
+          tester,
+          const PDFView(filePath: 'android.pdf', nightMode: true),
+        );
+        expect(params.keys.cast<String>().toSet(), _expectedKeys);
+        expect(params['filePath'], 'android.pdf');
+        expect(params['nightMode'], isTrue);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+    );
   });
 
   group('Settings updates over the method channel', () {
     testWidgets('pushes only the changed, updatable settings', (WidgetTester tester) async {
       await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: PDFView(filePath: 'a.pdf'))),
+        const MaterialApp(
+          home: Scaffold(body: PDFView(filePath: 'a.pdf')),
+        ),
       );
       await tester.pumpAndSettle();
       expect(created, hasLength(1));
@@ -250,13 +261,17 @@ void main() {
 
     testWidgets('sends nothing when no updatable setting changed', (WidgetTester tester) async {
       await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: PDFView(filePath: 'a.pdf', defaultPage: 0))),
+        const MaterialApp(
+          home: Scaffold(body: PDFView(filePath: 'a.pdf', defaultPage: 0)),
+        ),
       );
       await tester.pumpAndSettle();
       viewCalls.clear();
 
       await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: PDFView(filePath: 'a.pdf', defaultPage: 4))),
+        const MaterialApp(
+          home: Scaffold(body: PDFView(filePath: 'a.pdf', defaultPage: 4)),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -265,13 +280,17 @@ void main() {
 
     testWidgets('a new document recreates the platform view', (WidgetTester tester) async {
       await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: PDFView(filePath: 'first.pdf'))),
+        const MaterialApp(
+          home: Scaffold(body: PDFView(filePath: 'first.pdf')),
+        ),
       );
       await tester.pumpAndSettle();
       expect(created, hasLength(1));
 
       await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: PDFView(filePath: 'second.pdf'))),
+        const MaterialApp(
+          home: Scaffold(body: PDFView(filePath: 'second.pdf')),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -288,7 +307,11 @@ void main() {
 
   group('pdfData change detection (#181)', () {
     Future<void> pumpBytes(WidgetTester tester, Uint8List bytes) async {
-      await tester.pumpWidget(MaterialApp(home: Scaffold(body: PDFView(pdfData: bytes))));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: PDFView(pdfData: bytes)),
+        ),
+      );
       await tester.pumpAndSettle();
     }
 
@@ -325,7 +348,9 @@ void main() {
     testWidgets('switching from pdfData to filePath remounts', (WidgetTester tester) async {
       await pumpBytes(tester, Uint8List.fromList(const <int>[1, 2, 3]));
       await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: PDFView(filePath: 'a.pdf'))),
+        const MaterialApp(
+          home: Scaffold(body: PDFView(filePath: 'a.pdf')),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -336,52 +361,55 @@ void main() {
   });
 
   group('Unsupported platform fallback', () {
-    testWidgets('renders an explanatory Text instead of a platform view', (
-      WidgetTester tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: PDFView(filePath: 'a.pdf'))),
-      );
-      await tester.pump();
+    testWidgets(
+      'renders an explanatory Text instead of a platform view',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(body: PDFView(filePath: 'a.pdf')),
+          ),
+        );
+        await tester.pump();
 
-      expect(
-        find.text('$defaultTargetPlatform is not yet supported by the pdfview_flutter plugin'),
-        findsOneWidget,
-      );
-      expect(created, isEmpty);
-    },
-        variant: TargetPlatformVariant(<TargetPlatform>{
-          TargetPlatform.linux,
-          TargetPlatform.windows,
-          TargetPlatform.macOS,
-          TargetPlatform.fuchsia,
-        }));
+        expect(
+          find.text('$defaultTargetPlatform is not yet supported by the pdfview_flutter plugin'),
+          findsOneWidget,
+        );
+        expect(created, isEmpty);
+      },
+      variant: TargetPlatformVariant(<TargetPlatform>{
+        TargetPlatform.linux,
+        TargetPlatform.windows,
+        TargetPlatform.macOS,
+        TargetPlatform.fuchsia,
+      }),
+    );
 
-    testWidgets('onViewCreated is never called on an unsupported platform', (
-      WidgetTester tester,
-    ) async {
-      PDFViewController? controller;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: PDFView(
-              filePath: 'a.pdf',
-              onViewCreated: (PDFViewController c) => controller = c,
+    testWidgets(
+      'onViewCreated is never called on an unsupported platform',
+      (WidgetTester tester) async {
+        PDFViewController? controller;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: PDFView(
+                filePath: 'a.pdf',
+                onViewCreated: (PDFViewController c) => controller = c,
+              ),
             ),
           ),
-        ),
-      );
-      await tester.pump();
+        );
+        await tester.pump();
 
-      expect(controller, isNull);
-      expect(find.textContaining('is not yet supported'), findsOneWidget);
-    }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+        expect(controller, isNull);
+        expect(find.textContaining('is not yet supported'), findsOneWidget);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.windows),
+    );
   });
 
   group('onViewCreated', () {
-    testWidgets('receives a working controller for the created view', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('receives a working controller for the created view', (WidgetTester tester) async {
       PDFViewController? controller;
       await tester.pumpWidget(
         MaterialApp(

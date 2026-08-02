@@ -106,6 +106,9 @@ public class PDFLinkHandlerTest {
         assertEquals("FLAG_ACTIVITY_NEW_TASK is required to launch from a non-activity context",
                 Intent.FLAG_ACTIVITY_NEW_TASK,
                 started.getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK);
+        assertEquals("browser links must be marked CATEGORY_BROWSABLE",
+                true,
+                started.hasCategory(Intent.CATEGORY_BROWSABLE));
     }
 
     @Test
@@ -151,9 +154,45 @@ public class PDFLinkHandlerTest {
         doThrow(new ActivityNotFoundException("no handler"))
                 .when(context).startActivity(any(Intent.class), any());
 
-        new PDFLinkHandler(context, pdfView, methodChannel, false).handleUri("mailto:nobody@example.com");
+        new PDFLinkHandler(context, pdfView, methodChannel, false).handleUri(LINK);
 
+        verify(context).startActivity(any(Intent.class), any());
+        verify(methodChannel).invokeMethod("onLinkHandler", LINK);
+    }
+
+    @Test
+    public void allowNavigation_doesNotLaunchMailtoAndStillNotifiesFlutter() {
+        Context context = mock(Context.class);
+
+        new PDFLinkHandler(context, pdfView, methodChannel, false)
+                .handleUri("mailto:nobody@example.com");
+
+        verify(context, never()).startActivity(any(Intent.class), any());
         verify(methodChannel).invokeMethod("onLinkHandler", "mailto:nobody@example.com");
+    }
+
+    @Test
+    public void allowNavigation_doesNotLaunchFileUriAndStillNotifiesFlutter() {
+        Context context = mock(Context.class);
+        // file:// would throw FileUriExposedException on API 24+ if launched.
+        doThrow(new RuntimeException("FileUriExposedException"))
+                .when(context).startActivity(any(Intent.class), any());
+
+        new PDFLinkHandler(context, pdfView, methodChannel, false)
+                .handleUri("file:///data/local/tmp/secret.pdf");
+
+        verify(context, never()).startActivity(any(Intent.class), any());
+        verify(methodChannel).invokeMethod("onLinkHandler", "file:///data/local/tmp/secret.pdf");
+    }
+
+    @Test
+    public void allowNavigation_launchesHttpAsWellAsHttps() {
+        handler(false).handleUri("http://example.com/doc.pdf");
+
+        Intent started = shadowApplication().getNextStartedActivity();
+        assertNotNull(started);
+        assertEquals(Uri.parse("http://example.com/doc.pdf"), started.getData());
+        verify(methodChannel).invokeMethod("onLinkHandler", "http://example.com/doc.pdf");
     }
 
     @Test

@@ -10,8 +10,8 @@ void main() {
 
   group('MyApp home screen', () {
     testWidgets('shows plugin title and PDF entry buttons', (tester) async {
-      await tester.pumpWidget(MyApp());
-      // Allow async asset copy futures to schedule without waiting forever.
+      // Skip asset/network loading so the test stays deterministic.
+      await tester.pumpWidget(const MyApp(loadDocuments: false));
       await tester.pump();
 
       expect(find.text('Plugin example app'), findsOneWidget);
@@ -23,7 +23,7 @@ void main() {
     });
 
     testWidgets('Open PDF is a tappable TextButton', (tester) async {
-      await tester.pumpWidget(MyApp());
+      await tester.pumpWidget(const MyApp(loadDocuments: false));
       await tester.pump();
 
       final openPdf = find.widgetWithText(TextButton, 'Open PDF');
@@ -39,11 +39,7 @@ void main() {
 
   group('PDFScreen', () {
     testWidgets('shows Document app bar and loading indicator', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: PDFScreen(path: '/tmp/does-not-exist-yet.pdf'),
-        ),
-      );
+      await tester.pumpWidget(MaterialApp(home: PDFScreen(path: '/tmp/does-not-exist-yet.pdf')));
       await tester.pump();
 
       expect(find.text('Document'), findsOneWidget);
@@ -66,9 +62,7 @@ void main() {
     });
 
     testWidgets('renders offset overlay labels with defaults', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(home: PDFScreen(path: 'demo.pdf')),
-      );
+      await tester.pumpWidget(MaterialApp(home: PDFScreen(path: 'demo.pdf')));
       await tester.pump();
 
       expect(find.text('X Offset: 0.00'), findsOneWidget);

@@ -320,63 +320,91 @@
 
             _defaultPage = [_document pageAtIndex:defaultPage];
 
-            // Configure scroll view with defensive handling for iPad
+            // Configure scroll view with defensive handling for iPad.
+            // PDFKit may not expose its scroll view immediately; retry a few
+            // times instead of a single fixed delay. Capture weakly so a
+            // disposed view is not reconfigured (#261).
             if (@available(iOS 11.0, *)) {
-                // Delay scroll view configuration to avoid conflicts during
-                // initialization. Capture weakly so a disposed view is not
-                // reconfigured (#261).
                 __weak __typeof__(self) weakSelf = self;
-                dispatch_after(
-                    dispatch_time(DISPATCH_TIME_NOW,
-                                  (int64_t)(0.1 * NSEC_PER_SEC)),
-                    dispatch_get_main_queue(), ^{
-                      __strong __typeof__(weakSelf) strongSelf = weakSelf;
-                      if (strongSelf == nil) {
+                const NSInteger maxAttempts = 5;
+                const NSTimeInterval retryDelay = 0.05;
+                __block void (^configureScrollView)(NSInteger) = nil;
+                configureScrollView = ^(NSInteger attempt) {
+                  __strong __typeof__(weakSelf) strongSelf = weakSelf;
+                  if (strongSelf == nil) {
+                      configureScrollView = nil;
+                      return;
+                  }
+                  @try {
+                      UIScrollView *scrollView =
+                          [strongSelf findScrollView:strongSelf->_pdfView];
+                      if (scrollView == nil && attempt + 1 < maxAttempts) {
+                          dispatch_after(
+                              dispatch_time(DISPATCH_TIME_NOW,
+                                            (int64_t)(retryDelay * NSEC_PER_SEC)),
+                              dispatch_get_main_queue(), ^{
+                                configureScrollView(attempt + 1);
+                              });
                           return;
                       }
-                      @try {
-                          UIScrollView *scrollView =
-                              [strongSelf findScrollView:strongSelf->_pdfView];
 
-                          if (scrollView != nil) {
-                              if (strongSelf->_isIPad) {
-                                  scrollView.contentInsetAdjustmentBehavior =
-                                      UIScrollViewContentInsetAdjustmentAutomatic;
-                                  if (scrollView.delegate == nil) {
-                                      scrollView.delegate =
-                                          (id<UIScrollViewDelegate>)strongSelf;
-                                  }
-                              } else {
-                                  scrollView.contentInsetAdjustmentBehavior =
-                                      UIScrollViewContentInsetAdjustmentNever;
-                                  if (@available(iOS 13.0, *)) {
-                                      scrollView.automaticallyAdjustsScrollIndicatorInsets = NO;
-                                  }
+                      if (scrollView != nil) {
+                          if (strongSelf->_isIPad) {
+                              scrollView.contentInsetAdjustmentBehavior =
+                                  UIScrollViewContentInsetAdjustmentAutomatic;
+                              if (scrollView.delegate == nil) {
+                                  scrollView.delegate =
+                                      (id<UIScrollViewDelegate>)strongSelf;
                               }
-
-                              scrollView.delaysContentTouches = YES;
-                              scrollView.canCancelContentTouches = YES;
-                              // Indicators cannot be shown while the page-view
-                              // controller manages paging (swaps scroll views).
-                              BOOL shouldShow =
-                                  showScrollIndicators && !useHorizontalPaging;
-                              scrollView.showsHorizontalScrollIndicator = shouldShow;
-                              scrollView.showsVerticalScrollIndicator = shouldShow;
-                              strongSelf->_scrollView = scrollView;
+                          } else {
+                              scrollView.contentInsetAdjustmentBehavior =
+                                  UIScrollViewContentInsetAdjustmentNever;
+                              if (@available(iOS 13.0, *)) {
+                                  scrollView.automaticallyAdjustsScrollIndicatorInsets = NO;
+                              }
                           }
-                          dispatch_async(dispatch_get_main_queue(), ^{
-                            __strong __typeof__(weakSelf) innerSelf = weakSelf;
-                            if (innerSelf == nil || innerSelf->_document == nil) {
-                                return;
-                            }
-                            [innerSelf handleRenderCompleted:
-                             [NSNumber numberWithUnsignedLong:
-                                  [innerSelf->_document pageCount]]];
-                          });
-                      } @catch (NSException *exception) {
-                          NSLog(@"Warning: Failed to configure PDF scroll  view: %@", exception.reason);
+
+                          scrollView.delaysContentTouches = YES;
+                          scrollView.canCancelContentTouches = YES;
+                          // Indicators cannot be shown while the page-view
+                          // controller manages paging (swaps scroll views).
+                          BOOL shouldShow =
+                              showScrollIndicators && !useHorizontalPaging;
+                          scrollView.showsHorizontalScrollIndicator = shouldShow;
+                          scrollView.showsVerticalScrollIndicator = shouldShow;
+                          strongSelf->_scrollView = scrollView;
                       }
-                    });
+                      // Always report render completion after the configure path
+                      // finishes (even if the scroll view was never found).
+                      dispatch_async(dispatch_get_main_queue(), ^{
+                        __strong __typeof__(weakSelf) innerSelf = weakSelf;
+                        if (innerSelf == nil || innerSelf->_document == nil) {
+                            return;
+                        }
+                        [innerSelf handleRenderCompleted:
+                         [NSNumber numberWithUnsignedLong:
+                              [innerSelf->_document pageCount]]];
+                      });
+                  } @catch (NSException *exception) {
+                      NSLog(@"Warning: Failed to configure PDF scroll view: %@",
+                            exception.reason);
+                      dispatch_async(dispatch_get_main_queue(), ^{
+                        __strong __typeof__(weakSelf) innerSelf = weakSelf;
+                        if (innerSelf == nil || innerSelf->_document == nil) {
+                            return;
+                        }
+                        [innerSelf handleRenderCompleted:
+                         [NSNumber numberWithUnsignedLong:
+                              [innerSelf->_document pageCount]]];
+                      });
+                  }
+                  configureScrollView = nil;
+                };
+                // Defer the first attempt one run-loop turn so PDFKit can finish
+                // installing its internal hierarchy after addSubview.
+                dispatch_async(dispatch_get_main_queue(), ^{
+                  configureScrollView(0);
+                });
             }
 
             [[NSNotificationCenter defaultCenter]

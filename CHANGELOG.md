@@ -1,9 +1,13 @@
 ## 1.4.5-beta.4
 
+- **BREAKING**: Raise minimum Flutter version to 3.32.0 and Dart SDK to 3.8.0 (aligns with `flutter_lints` 6 and `formatter.page_width`)
 - **Android**: switch platform views from texture hybrid composition (`initSurfaceAndroidView`) to true hybrid composition (`initExpensiveAndroidView`) — fixes `Surface was already locked!` [#263](https://github.com/endigo/flutter_pdfview/issues/263), `EGL_NO_DISPLAY` quick-open crash [#280](https://github.com/endigo/flutter_pdfview/issues/280), blank on rotation [#9](https://github.com/endigo/flutter_pdfview/issues/9), blank after dialogs [#182](https://github.com/endigo/flutter_pdfview/issues/182), blank on load [#298](https://github.com/endigo/flutter_pdfview/issues/298), and GPU glitches [#306](https://github.com/endigo/flutter_pdfview/issues/306)
 - Fix Android layout direction to follow ambient `Directionality` (was hardcoded RTL)
 - Fix #181: remount platform view when `filePath` / `pdfData` changes so a new PDF can load
 - Fix #261: release Pdfium/PDFKit resources on dispose (Android recycle race + iOS observers/document/channel)
+- Restrict Android external PDF link auto-launch to `http`/`https` (avoids `file://` crashes and unsafe schemes); still reports all schemes via `onLinkHandler`
+- Serialize concurrent `setPosition`/`setScale` through a queue for any number of overlapping callers; null platform replies return `false`
+- Compare `pdfData` via cached digests instead of a full per-byte scan on every rebuild
 - Fix #268: avoid NaN CoreGraphics errors by initializing iOS `PDFView` with a non-zero frame
 - Fix #204: iOS white background (not grey) and continuous vertical page scroll parity with Android
 - Fix #266: load absolute filesystem paths via `fromFile` on Android (No content provider)

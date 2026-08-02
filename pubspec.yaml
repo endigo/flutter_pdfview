@@ -9,8 +9,11 @@ topics:
   - native
 
 environment:
-  sdk: ">=3.6.0 <4.0.0"
-  flutter: ">=3.27.0"
+  # flutter_lints ^6 requires Dart >=3.8; formatter.page_width needs Dart >=3.7;
+  # Color.toARGB32() is used for backgroundColor serialization (Flutter >=3.27,
+  # raised here with the lints toolchain).
+  sdk: ">=3.8.0 <4.0.0"
+  flutter: ">=3.32.0"
 
 dependencies:
   flutter:

@@ -10,21 +10,23 @@ void main() {
   late PDFView pdfView;
 
   setUp(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-      switch (methodCall.method) {
-        case 'pageCount':
-          return 10;
-        case 'currentPage':
-          return 1;
-        case 'setPage':
-          return true;
-        case 'onRender':
-          return 10;
-        default:
-          return null;
-      }
-    });
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      (MethodCall methodCall) async {
+        switch (methodCall.method) {
+          case 'pageCount':
+            return 10;
+          case 'currentPage':
+            return 1;
+          case 'setPage':
+            return true;
+          case 'onRender':
+            return 10;
+          default:
+            return null;
+        }
+      },
+    );
 
     pdfView = const PDFView(
       filePath: 'test.pdf',
@@ -44,49 +46,27 @@ void main() {
   });
 
   tearDown(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      null,
+    );
   });
 
   group('PDFView Widget Tests', () {
     testWidgets('PDFView builds without crashing', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: pdfView,
-          ),
-        ),
-      );
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: pdfView)));
     });
 
     testWidgets('PDFView with custom background color', (WidgetTester tester) async {
-      final customPdfView = PDFView(
-        filePath: 'test.pdf',
-        backgroundColor: Colors.blue,
-      );
+      final customPdfView = PDFView(filePath: 'test.pdf', backgroundColor: Colors.blue);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: customPdfView,
-          ),
-        ),
-      );
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: customPdfView)));
     });
 
     testWidgets('PDFView with password protection', (WidgetTester tester) async {
-      final protectedPdfView = PDFView(
-        filePath: 'test.pdf',
-        password: 'test123',
-      );
+      final protectedPdfView = PDFView(filePath: 'test.pdf', password: 'test123');
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: protectedPdfView,
-          ),
-        ),
-      );
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: protectedPdfView)));
     });
 
     testWidgets('PDFView with onViewCreated callback', (WidgetTester tester) async {
@@ -99,13 +79,7 @@ void main() {
       );
       expect(controller, isNull);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: pdfViewWithCallback,
-          ),
-        ),
-      );
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: pdfViewWithCallback)));
 
       // Wait for the widget to be fully built
       await tester.pumpAndSettle();
@@ -124,13 +98,7 @@ void main() {
       );
       expect(pageCount, isNull);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: pdfViewWithCallback,
-          ),
-        ),
-      );
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: pdfViewWithCallback)));
 
       // Wait for the widget to be fully built
       await tester.pumpAndSettle();
@@ -142,22 +110,13 @@ void main() {
 
   group('PDFView Settings Tests', () {
     test('PDFView with different fit policies', () {
-      final widthFit = PDFView(
-        filePath: 'test.pdf',
-        fitPolicy: FitPolicy.WIDTH,
-      );
+      final widthFit = PDFView(filePath: 'test.pdf', fitPolicy: FitPolicy.WIDTH);
       expect(widthFit.fitPolicy, FitPolicy.WIDTH);
 
-      final heightFit = PDFView(
-        filePath: 'test.pdf',
-        fitPolicy: FitPolicy.HEIGHT,
-      );
+      final heightFit = PDFView(filePath: 'test.pdf', fitPolicy: FitPolicy.HEIGHT);
       expect(heightFit.fitPolicy, FitPolicy.HEIGHT);
 
-      final bothFit = PDFView(
-        filePath: 'test.pdf',
-        fitPolicy: FitPolicy.BOTH,
-      );
+      final bothFit = PDFView(filePath: 'test.pdf', fitPolicy: FitPolicy.BOTH);
       expect(bothFit.fitPolicy, FitPolicy.BOTH);
     });
 
@@ -179,13 +138,7 @@ void main() {
 
   group('Error Handling Tests', () {
     test('PDFView handles missing file path and pdf data', () {
-      expect(
-        () => PDFView(
-          filePath: null,
-          pdfData: null,
-        ),
-        throwsAssertionError,
-      );
+      expect(() => PDFView(filePath: null, pdfData: null), throwsAssertionError);
     });
   });
 
@@ -193,18 +146,14 @@ void main() {
     testWidgets('PDFView rebuilds when filePath changes', (WidgetTester tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(
-            body: PDFView(filePath: 'first.pdf'),
-          ),
+          home: Scaffold(body: PDFView(filePath: 'first.pdf')),
         ),
       );
       expect(find.byType(PDFView), findsOneWidget);
 
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(
-            body: PDFView(filePath: 'second.pdf'),
-          ),
+          home: Scaffold(body: PDFView(filePath: 'second.pdf')),
         ),
       );
       await tester.pump();
@@ -214,18 +163,14 @@ void main() {
     testWidgets('PDFView rebuilds when pdfData changes', (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: PDFView(pdfData: Uint8List.fromList(const [1, 2, 3])),
-          ),
+          home: Scaffold(body: PDFView(pdfData: Uint8List.fromList(const [1, 2, 3]))),
         ),
       );
       expect(find.byType(PDFView), findsOneWidget);
 
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: PDFView(pdfData: Uint8List.fromList(const [4, 5, 6])),
-          ),
+          home: Scaffold(body: PDFView(pdfData: Uint8List.fromList(const [4, 5, 6]))),
         ),
       );
       await tester.pump();
@@ -235,31 +180,16 @@ void main() {
 
   group('Zoom validation', () {
     test('rejects invalid maxZoom/minZoom', () {
-      expect(
-        () => PDFView(filePath: 'test.pdf', maxZoom: 0),
-        throwsAssertionError,
-      );
-      expect(
-        () => PDFView(filePath: 'test.pdf', minZoom: 2, maxZoom: 1),
-        throwsAssertionError,
-      );
+      expect(() => PDFView(filePath: 'test.pdf', maxZoom: 0), throwsAssertionError);
+      expect(() => PDFView(filePath: 'test.pdf', minZoom: 2, maxZoom: 1), throwsAssertionError);
     });
   });
 
   group('thumbnailRatio validation', () {
     test('rejects out-of-range thumbnailRatio', () {
-      expect(
-        () => PDFView(filePath: 'test.pdf', thumbnailRatio: 0),
-        throwsAssertionError,
-      );
-      expect(
-        () => PDFView(filePath: 'test.pdf', thumbnailRatio: -0.5),
-        throwsAssertionError,
-      );
-      expect(
-        () => PDFView(filePath: 'test.pdf', thumbnailRatio: 1.5),
-        throwsAssertionError,
-      );
+      expect(() => PDFView(filePath: 'test.pdf', thumbnailRatio: 0), throwsAssertionError);
+      expect(() => PDFView(filePath: 'test.pdf', thumbnailRatio: -0.5), throwsAssertionError);
+      expect(() => PDFView(filePath: 'test.pdf', thumbnailRatio: 1.5), throwsAssertionError);
     });
 
     test('accepts thumbnailRatio within (0, 1]', () {
@@ -326,45 +256,49 @@ void main() {
       const id = 42;
       final view = const PDFView(filePath: 'test.pdf');
       final channel = MethodChannel('plugins.endigo.io/pdfview_$id');
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (MethodCall call) async {
-        log.add(call);
-        switch (call.method) {
-          case 'pageCount':
-            return 12;
-          case 'currentPage':
-            return 2;
-          case 'setPage':
-            return true;
-          case 'currentPageSize':
-            return <double>[612.0, 792.0];
-          case 'getPosition':
-            return <double>[-10.0, -20.0];
-          case 'getScale':
-            return 1.5;
-          case 'setPosition':
-            return true;
-          case 'setScale':
-            return true;
-          case 'setZoomLimits':
-            return true;
-          case 'reload':
-            return true;
-          case 'getScreenshot':
-            return '/tmp/shot.png';
-          case 'updateSettings':
-            return null;
-          default:
-            return null;
-        }
-      });
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        (MethodCall call) async {
+          log.add(call);
+          switch (call.method) {
+            case 'pageCount':
+              return 12;
+            case 'currentPage':
+              return 2;
+            case 'setPage':
+              return true;
+            case 'currentPageSize':
+              return <double>[612.0, 792.0];
+            case 'getPosition':
+              return <double>[-10.0, -20.0];
+            case 'getScale':
+              return 1.5;
+            case 'setPosition':
+              return true;
+            case 'setScale':
+              return true;
+            case 'setZoomLimits':
+              return true;
+            case 'reload':
+              return true;
+            case 'getScreenshot':
+              return '/tmp/shot.png';
+            case 'updateSettings':
+              return null;
+            default:
+              return null;
+          }
+        },
+      );
 
       controller = PDFViewController.test(id, view);
     });
 
     tearDown(() {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(const MethodChannel('plugins.endigo.io/pdfview_42'), null);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('plugins.endigo.io/pdfview_42'),
+        null,
+      );
       controller.dispose();
     });
 
@@ -392,110 +326,11 @@ void main() {
 
       final methods = log.map((c) => c.method).toList();
       expect(
-          methods,
-          containsAll([
-            'setPosition',
-            'setScale',
-            'setZoomLimits',
-            'reload',
-            'getScreenshot',
-          ]));
+        methods,
+        containsAll(['setPosition', 'setScale', 'setZoomLimits', 'reload', 'getScreenshot']),
+      );
     });
 
-    test('native callbacks invoke widget handlers', () async {
-      int? rendered;
-      int? page;
-      int? total;
-      Object? error;
-      int? pageErr;
-      String? link;
-      int? loaded;
-      double? drawX;
-
-      final view = PDFView(
-        filePath: 'test.pdf',
-        onRender: (p) => rendered = p,
-        onPageChanged: (p, t) {
-          page = p;
-          total = t;
-        },
-        onError: (e) => error = e,
-        onPageError: (p, e) => pageErr = p,
-        onLinkHandler: (u) => link = u,
-        onLoadComplete: (p) => loaded = p,
-        onDraw: (x, y, s) => drawX = x,
-      );
-      final c = PDFViewController.test(99, view);
-
-      final channel = MethodChannel('plugins.endigo.io/pdfview_99');
-      // Handler already set by controller; invoke as native would.
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
-        channel.name,
-        const StandardMethodCodec().encodeMethodCall(
-          const MethodCall('onRender', {'pages': 7}),
-        ),
-        (_) {},
-      );
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
-        channel.name,
-        const StandardMethodCodec().encodeMethodCall(
-          const MethodCall('onPageChanged', {'page': 1, 'total': 7}),
-        ),
-        (_) {},
-      );
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
-        channel.name,
-        const StandardMethodCodec().encodeMethodCall(
-          const MethodCall('onError', {'error': 'boom'}),
-        ),
-        (_) {},
-      );
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
-        channel.name,
-        const StandardMethodCodec().encodeMethodCall(
-          const MethodCall('onPageError', {'page': 3, 'error': 'bad'}),
-        ),
-        (_) {},
-      );
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
-        channel.name,
-        const StandardMethodCodec().encodeMethodCall(
-          const MethodCall('onLinkHandler', 'https://example.com'),
-        ),
-        (_) {},
-      );
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
-        channel.name,
-        const StandardMethodCodec().encodeMethodCall(
-          const MethodCall('onLoadComplete', {'pages': 7}),
-        ),
-        (_) {},
-      );
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
-        channel.name,
-        const StandardMethodCodec().encodeMethodCall(
-          const MethodCall('onDraw', {
-            'pdfXOffset': 1.5,
-            'pdfYOffset': 2.5,
-            'pdfScale': 1.0,
-          }),
-        ),
-        (_) {},
-      );
-
-      // Allow async handler futures to complete.
-      await Future<void>.delayed(Duration.zero);
-
-      expect(rendered, 7);
-      expect(page, 1);
-      expect(total, 7);
-      expect(error, 'boom');
-      expect(pageErr, 3);
-      expect(link, 'https://example.com');
-      expect(loaded, 7);
-      expect(drawX, 1.5);
-
-      c.dispose();
-    });
+    // Native callback coverage lives in test/pdf_view_controller_test.dart.
   });
 }

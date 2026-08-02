@@ -12,14 +12,19 @@ const StandardMethodCodec _codec = StandardMethodCodec();
 /// Installs (or clears, when [handler] is null) the mock platform side of the
 /// controller's per-view method channel.
 void _mock(Future<Object?>? Function(MethodCall call)? handler) {
-  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-      .setMockMethodCallHandler(_channel, handler);
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+    _channel,
+    handler,
+  );
 }
 
 /// Pushes [call] into Dart the way the native side does.
 Future<void> _emit(MethodCall call, {String channel = _channelName}) {
-  return TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-      .handlePlatformMessage(channel, _codec.encodeMethodCall(call), (ByteData? _) {});
+  return TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
+    channel,
+    _codec.encodeMethodCall(call),
+    (ByteData? _) {},
+  );
 }
 
 void main() {
@@ -106,10 +111,11 @@ void main() {
     test('setZoomLimits sends {minZoom, midZoom, maxZoom}', () async {
       expect(await controller.setZoomLimits(1, 2, 4), isTrue);
       expect(log.single.method, 'setZoomLimits');
-      expect(
-        log.single.arguments,
-        <String, Object?>{'minZoom': 1.0, 'midZoom': 2.0, 'maxZoom': 4.0},
-      );
+      expect(log.single.arguments, <String, Object?>{
+        'minZoom': 1.0,
+        'midZoom': 2.0,
+        'maxZoom': 4.0,
+      });
     });
 
     test('getScreenshot sends {fileName} and returns the native path', () async {
@@ -157,6 +163,14 @@ void main() {
 
     test('setZoomLimits falls back to false', () async {
       expect(await controller.setZoomLimits(1, 2, 4), isFalse);
+    });
+
+    test('setPosition falls back to false', () async {
+      expect(await controller.setPosition(const Offset(1, 2)), isFalse);
+    });
+
+    test('setScale falls back to false', () async {
+      expect(await controller.setScale(2), isFalse);
     });
 
     test('getScreenshot falls back to an empty string', () async {
@@ -220,10 +234,7 @@ void main() {
         throw PlatformException(code: 'boom', message: 'native failure');
       });
 
-      await expectLater(
-        controller.setScale(2),
-        throwsA(isA<PlatformException>()),
-      );
+      await expectLater(controller.setScale(2), throwsA(isA<PlatformException>()));
 
       final List<String> after = <String>[];
       _mock((MethodCall call) async {
@@ -231,14 +242,8 @@ void main() {
         return call.method == 'getScale' ? 3.0 : true;
       });
 
-      expect(
-        await controller.setScale(3).timeout(const Duration(seconds: 2)),
-        isTrue,
-      );
-      expect(
-        await controller.getScale().timeout(const Duration(seconds: 2)),
-        3.0,
-      );
+      expect(await controller.setScale(3).timeout(const Duration(seconds: 2)), isTrue);
+      expect(await controller.getScale().timeout(const Duration(seconds: 2)), 3.0);
       expect(after, <String>['setScale', 'getScale']);
     });
   });
@@ -285,6 +290,38 @@ void main() {
       expect(await first.timeout(const Duration(seconds: 2)), isTrue);
       expect(await second.timeout(const Duration(seconds: 2)), isTrue);
       expect(order, <String>['platform:1', 'gate-released', 'platform:2']);
+    });
+
+    test('three concurrent setPosition calls reach the platform in order', () async {
+      final List<String> order = <String>[];
+      final Completer<void> gate = Completer<void>();
+      int calls = 0;
+
+      _mock((MethodCall call) async {
+        if (call.method != 'setPosition') {
+          return null;
+        }
+        calls += 1;
+        final int index = calls;
+        order.add('platform:$index');
+        if (index == 1) {
+          await gate.future;
+        }
+        return true;
+      });
+
+      final Future<bool> first = controller.setPosition(const Offset(1, 1));
+      final Future<bool> second = controller.setPosition(const Offset(2, 2));
+      final Future<bool> third = controller.setPosition(const Offset(3, 3));
+
+      await pumpEventQueue();
+      expect(order, <String>['platform:1'], reason: 'later calls must wait for the first');
+
+      gate.complete();
+      expect(await first.timeout(const Duration(seconds: 2)), isTrue);
+      expect(await second.timeout(const Duration(seconds: 2)), isTrue);
+      expect(await third.timeout(const Duration(seconds: 2)), isTrue);
+      expect(order, <String>['platform:1', 'platform:2', 'platform:3']);
     });
 
     test('getPosition waits for a pending setPosition', () async {
@@ -412,11 +449,13 @@ void main() {
     });
 
     test('onDraw receives offsets and scale', () async {
-      await _emit(const MethodCall('onDraw', <String, Object?>{
-        'pdfXOffset': 1.5,
-        'pdfYOffset': 2.5,
-        'pdfScale': 3.5,
-      }));
+      await _emit(
+        const MethodCall('onDraw', <String, Object?>{
+          'pdfXOffset': 1.5,
+          'pdfYOffset': 2.5,
+          'pdfScale': 3.5,
+        }),
+      );
       expect(events, <String>['onDraw(1.5,2.5,3.5)']);
     });
 

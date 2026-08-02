@@ -265,7 +265,11 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     }
 
     void getCurrentPageSize(Result result) {
-        if (disposed || pdfView == null || pdfView.getPageCount() == 0) {
+        if (disposed || pdfView == null) {
+            result.error("INVALID_STATE", "PDFView disposed", null);
+            return;
+        }
+        if (pdfView.getPageCount() == 0) {
             result.error("INVALID_STATE", "No pages loaded", null);
             return;
         }
@@ -515,19 +519,17 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                 view.setVisibility(View.GONE);
             } catch (Exception ignored) {
             }
-            Runnable recycle = () -> {
+            // Defer one frame so an in-flight PlatformViewWrapper.draw can finish.
+            // Always use the main-thread handler: View.post() is dropped when the
+            // view is already detached from a window, which would leak Pdfium (#261).
+            // removeCallbacksAndMessages above already ran, so this post is not cancelled.
+            mainHandler.post(() -> {
                 try {
                     view.recycle();
                 } catch (Exception e) {
                     Log.w(TAG, "dispose recycle", e);
                 }
-            };
-            if (Looper.myLooper() == Looper.getMainLooper()) {
-                // Defer one frame so an in-flight PlatformViewWrapper.draw can finish.
-                view.post(recycle);
-            } else {
-                mainHandler.post(recycle);
-            }
+            });
         }
     }
 

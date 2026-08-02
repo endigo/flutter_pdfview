@@ -13,7 +13,14 @@ void main() => runApp(const MyApp());
 /// and offers a button per document.
 class MyApp extends StatefulWidget {
   /// Creates the example app.
-  const MyApp({super.key});
+  ///
+  /// When [loadDocuments] is false, asset copies and the remote PDF download are
+  /// skipped. Widget tests use this so the home screen stays deterministic and
+  /// does not hit the network or file system.
+  const MyApp({super.key, this.loadDocuments = true});
+
+  /// Whether [initState] should copy sample assets and download the remote PDF.
+  final bool loadDocuments;
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -28,6 +35,9 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    if (!widget.loadDocuments) {
+      return;
+    }
     fromAsset('assets/corrupted.pdf', 'corrupted.pdf').then((f) {
       setState(() {
         corruptedPathPDF = f.path;
@@ -101,82 +111,77 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       home: Scaffold(
         appBar: AppBar(title: const Text('Plugin example app')),
-        body: Center(child: Builder(
-          builder: (BuildContext context) {
-            return Column(
-              children: <Widget>[
-                TextButton(
-                  child: const Text('Open PDF'),
-                  onPressed: () {
-                    if (pathPDF.isNotEmpty) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PDFScreen(path: pathPDF),
-                        ),
-                      );
-                    }
-                  },
-                ),
-                TextButton(
-                  child: const Text('Open Landscape PDF'),
-                  onPressed: () {
-                    if (landscapePathPdf.isNotEmpty) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PDFScreen(path: landscapePathPdf),
-                        ),
-                      );
-                    }
-                  },
-                ),
-                TextButton(
-                  child: const Text('Remote PDF'),
-                  onPressed: () {
-                    if (remotePDFpath.isNotEmpty) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PDFScreen(path: remotePDFpath),
-                        ),
-                      );
-                    }
-                  },
-                ),
-                TextButton(
-                  child: const Text('Open PDF (iPad Safe Mode)'),
-                  onPressed: () {
-                    if (pathPDF.isNotEmpty) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PDFScreen(
-                            path: pathPDF,
-                            isIPadSafe: true,
+        body: Center(
+          child: Builder(
+            builder: (BuildContext context) {
+              return Column(
+                children: <Widget>[
+                  TextButton(
+                    child: const Text('Open PDF'),
+                    onPressed: () {
+                      if (pathPDF.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => PDFScreen(path: pathPDF)),
+                        );
+                      }
+                    },
+                  ),
+                  TextButton(
+                    child: const Text('Open Landscape PDF'),
+                    onPressed: () {
+                      if (landscapePathPdf.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PDFScreen(path: landscapePathPdf),
                           ),
-                        ),
-                      );
-                    }
-                  },
-                ),
-                TextButton(
-                  child: const Text('Open Corrupted PDF'),
-                  onPressed: () {
-                    if (pathPDF.isNotEmpty) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PDFScreen(path: corruptedPathPDF),
-                        ),
-                      );
-                    }
-                  },
-                )
-              ],
-            );
-          },
-        )),
+                        );
+                      }
+                    },
+                  ),
+                  TextButton(
+                    child: const Text('Remote PDF'),
+                    onPressed: () {
+                      if (remotePDFpath.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => PDFScreen(path: remotePDFpath)),
+                        );
+                      }
+                    },
+                  ),
+                  TextButton(
+                    child: const Text('Open PDF (iPad Safe Mode)'),
+                    onPressed: () {
+                      if (pathPDF.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PDFScreen(path: pathPDF, isIPadSafe: true),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  TextButton(
+                    child: const Text('Open Corrupted PDF'),
+                    onPressed: () {
+                      if (pathPDF.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PDFScreen(path: corruptedPathPDF),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -214,12 +219,7 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Document'),
-        actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () {},
-          ),
-        ],
+        actions: <Widget>[IconButton(icon: const Icon(Icons.share), onPressed: () {})],
       ),
       body: Stack(
         children: <Widget>[
@@ -227,8 +227,9 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
             filePath: widget.path,
             enableSwipe: true,
             // iPad Safe Mode: Avoid conflicting scroll configurations
-            swipeHorizontal:
-                widget.isIPadSafe ? false : true, // Vertical scrolling is safer on iPad
+            swipeHorizontal: widget.isIPadSafe
+                ? false
+                : true, // Vertical scrolling is safer on iPad
             autoSpacing: widget.isIPadSafe ? true : false, // Let PDFKit handle spacing
             pageFling: widget.isIPadSafe ? false : true, // Disable page fling to avoid conflicts
             pageSnap: false, // Disable page snap for smoother scrolling
@@ -287,34 +288,37 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
           ),
           _errorMessage.isEmpty
               ? !_isReady
-                  ? const Center(child: CircularProgressIndicator())
-                  : Container()
+                    ? const Center(child: CircularProgressIndicator())
+                    : Container()
               : Center(child: Text(_errorMessage)),
           Positioned(
-              left: 10,
-              top: 10,
-              child: Container(
-                color: Colors.orange,
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text('X Offset: ${_xOffset.toStringAsFixed(2)}'),
-                    Text('Y Offset: ${_yOffset.toStringAsFixed(2)}'),
-                    Text('Scale: ${_scale.toStringAsFixed(2)}')
-                  ],
-                ),
-              ))
+            left: 10,
+            top: 10,
+            child: Container(
+              color: Colors.orange,
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text('X Offset: ${_xOffset.toStringAsFixed(2)}'),
+                  Text('Y Offset: ${_yOffset.toStringAsFixed(2)}'),
+                  Text('Scale: ${_scale.toStringAsFixed(2)}'),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
       floatingActionButton: FutureBuilder<PDFViewController>(
         future: _controller.future,
         builder: (context, AsyncSnapshot<PDFViewController> snapshot) {
-          if (snapshot.hasData) {
+          final int? pages = _pages;
+          if (snapshot.hasData && pages != null) {
+            final int targetPage = pages ~/ 2;
             return FloatingActionButton.extended(
-              label: Text('Go to ${_pages! ~/ 2}'),
+              label: Text('Go to $targetPage'),
               onPressed: () async {
-                await snapshot.data!.setPage(_pages! ~/ 2);
+                await snapshot.data!.setPage(targetPage);
               },
             );
           }

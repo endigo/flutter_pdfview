@@ -4,8 +4,8 @@ description: Demonstrates how to use the flutter_pdfview plugin.
 publish_to: "none"
 
 environment:
-  sdk: ">=3.6.0 <4.0.0"
-  flutter: ">=3.27.0"
+  sdk: ">=3.8.0 <4.0.0"
+  flutter: ">=3.32.0"
 
 dependencies:
   flutter:

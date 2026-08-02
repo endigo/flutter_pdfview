@@ -47,12 +47,14 @@ class PDFView extends StatefulWidget {
     this.backgroundColor,
     this.maxZoom = 4.0,
     this.minZoom = 1.0,
-  })  : assert(filePath != null || pdfData != null),
-        assert(maxZoom > 0, 'maxZoom must be greater than 0'),
-        assert(minZoom > 0, 'minZoom must be greater than 0'),
-        assert(maxZoom >= minZoom, 'maxZoom must be >= minZoom'),
-        assert(thumbnailRatio == null || (thumbnailRatio > 0 && thumbnailRatio <= 1),
-            'thumbnailRatio must be within (0, 1]');
+  }) : assert(filePath != null || pdfData != null),
+       assert(maxZoom > 0, 'maxZoom must be greater than 0'),
+       assert(minZoom > 0, 'minZoom must be greater than 0'),
+       assert(maxZoom >= minZoom, 'maxZoom must be >= minZoom'),
+       assert(
+         thumbnailRatio == null || (thumbnailRatio > 0 && thumbnailRatio <= 1),
+         'thumbnailRatio must be within (0, 1]',
+       );
 
   /// If not null invoked once the PDFView is created.
   final PDFViewCreatedCallback? onViewCreated;
@@ -181,6 +183,50 @@ class _PDFViewState extends State<PDFView> {
   /// Bumped when the native platform view must be recreated (new document).
   int _viewGeneration = 0;
 
+  /// Identity / FNV-1a digest of the last accepted [PDFView.pdfData], so rebuilds
+  /// with a new [Uint8List] of equal content avoid a full per-byte scan after the
+  /// first hash of each instance.
+  Object? _pdfDataIdentity;
+  int? _pdfDataDigest;
+
+  @override
+  void initState() {
+    super.initState();
+    _cachePdfData(widget.pdfData);
+  }
+
+  /// FNV-1a 32-bit content digest used as a constant-time document identity key
+  /// once computed for a given [Uint8List] instance.
+  static int _digestPdfData(Uint8List data) {
+    int hash = 0x811c9dc5;
+    for (int i = 0; i < data.length; i++) {
+      hash ^= data[i];
+      // Keep within 32 bits without depending on platform int width.
+      hash = (hash * 0x01000193) & 0xFFFFFFFF;
+    }
+    return hash;
+  }
+
+  int _digestFor(Uint8List data) {
+    if (identical(data, _pdfDataIdentity) && _pdfDataDigest != null) {
+      return _pdfDataDigest!;
+    }
+    return _digestPdfData(data);
+  }
+
+  void _cachePdfData(Uint8List? data) {
+    if (data == null) {
+      _pdfDataIdentity = null;
+      _pdfDataDigest = null;
+      return;
+    }
+    if (identical(data, _pdfDataIdentity) && _pdfDataDigest != null) {
+      return;
+    }
+    _pdfDataIdentity = data;
+    _pdfDataDigest = _digestPdfData(data);
+  }
+
   bool _documentChanged(PDFView oldWidget) {
     if (widget.filePath != oldWidget.filePath) {
       return true;
@@ -193,12 +239,9 @@ class _PDFViewState extends State<PDFView> {
     if (a == null || b == null || a.length != b.length) {
       return true;
     }
-    for (int i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) {
-        return true;
-      }
-    }
-    return false;
+    // Same length, different instances: compare cached digests (O(1) when the
+    // previous list is still the cached identity; O(n) once to hash a new list).
+    return _digestFor(a) != _digestFor(b);
   }
 
   void _remountPlatformView() {
@@ -229,10 +272,7 @@ class _PDFViewState extends State<PDFView> {
       return PlatformViewLink(
         key: viewKey,
         viewType: _viewType,
-        surfaceFactory: (
-          BuildContext context,
-          PlatformViewController controller,
-        ) {
+        surfaceFactory: (BuildContext context, PlatformViewController controller) {
           return AndroidViewSurface(
             controller: controller as AndroidViewController,
             gestureRecognizers:
@@ -247,12 +287,12 @@ class _PDFViewState extends State<PDFView> {
           // and blanks/glitches on rotation, dialogs, and some GPUs
           // (#9, #182, #263, #280, #298, #306).
           return PlatformViewsService.initExpensiveAndroidView(
-            id: params.id,
-            viewType: _viewType,
-            layoutDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
-            creationParams: _CreationParams.fromWidget(widget).toMap(),
-            creationParamsCodec: const StandardMessageCodec(),
-          )
+              id: params.id,
+              viewType: _viewType,
+              layoutDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
+              creationParams: _CreationParams.fromWidget(widget).toMap(),
+              creationParamsCodec: const StandardMessageCodec(),
+            )
             ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
             ..addOnPlatformViewCreatedListener((int id) {
               _onPlatformViewCreated(id, generation: generation);
@@ -296,7 +336,9 @@ class _PDFViewState extends State<PDFView> {
     super.didUpdateWidget(oldWidget);
     // #181: filePath / pdfData changes must load a new document. Settings-only
     // updates go through the method channel; document changes remount the view.
-    if (_documentChanged(oldWidget)) {
+    final bool documentChanged = _documentChanged(oldWidget);
+    _cachePdfData(widget.pdfData);
+    if (documentChanged) {
       _remountPlatformView();
       return;
     }
@@ -316,11 +358,7 @@ class _PDFViewState extends State<PDFView> {
 
 /// The parameters handed to the native view when it is first created.
 class _CreationParams {
-  _CreationParams({
-    this.filePath,
-    this.pdfData,
-    this.settings,
-  });
+  _CreationParams({this.filePath, this.pdfData, this.settings});
 
   static _CreationParams fromWidget(PDFView widget) {
     return _CreationParams(
@@ -336,10 +374,7 @@ class _CreationParams {
   final _PDFViewSettings? settings;
 
   Map<String, dynamic> toMap() {
-    final Map<String, dynamic> params = <String, dynamic>{
-      'filePath': filePath,
-      'pdfData': pdfData,
-    };
+    final Map<String, dynamic> params = <String, dynamic>{'filePath': filePath, 'pdfData': pdfData};
 
     params.addAll(settings!.toMap());
 
