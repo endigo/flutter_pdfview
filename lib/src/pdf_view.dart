@@ -32,7 +32,12 @@ class PDFView extends StatefulWidget {
     this.swipeHorizontal = false,
     this.showScrollIndicators = false,
     this.password,
+    @Deprecated(
+      'Use colorMode instead. nightMode: true maps to PdfColorMode.dark when '
+      'colorMode is left at PdfColorMode.system.',
+    )
     this.nightMode = false,
+    this.colorMode = PdfColorMode.system,
     this.autoSpacing = true,
     this.pageFling = true,
     this.pageSnap = true,
@@ -117,7 +122,22 @@ class PDFView extends StatefulWidget {
 
   /// Indicates whether or not the PDF viewer is in night mode. If set to true, the viewer is in
   /// night mode.
+  ///
+  /// Deprecated: use [colorMode] instead. When [colorMode] is [PdfColorMode.system] (the default)
+  /// and this is `true`, the resolved mode is [PdfColorMode.dark]. An explicit [colorMode] always
+  /// wins.
+  @Deprecated(
+    'Use colorMode instead. nightMode: true maps to PdfColorMode.dark when '
+    'colorMode is left at PdfColorMode.system.',
+  )
   final bool nightMode;
+
+  /// Color theme for page content and the gutter.
+  ///
+  /// Defaults to [PdfColorMode.system], which follows the app [Theme] brightness
+  /// (or [MediaQuery] platform brightness when no [Theme] ancestor exists).
+  /// Resolved in Dart to `light` or `dark` before being sent to the native view.
+  final PdfColorMode colorMode;
 
   /// Whether the viewer adds spacing (page breaks) between pages.
   ///
@@ -169,6 +189,10 @@ class PDFView extends StatefulWidget {
   final bool preventLinkNavigation;
 
   /// The background color drawn behind the document.
+  ///
+  /// When changed at runtime, the new color is pushed to the native view. Setting
+  /// this back to `null` after a non-null value leaves the previous color on
+  /// screen (the key is omitted from the settings diff).
   final Color? backgroundColor;
 
   /// Maximum zoom level. Defaults to 4.0.
@@ -192,6 +216,12 @@ class _PDFViewState extends State<PDFView> {
   /// first hash of each instance.
   Object? _pdfDataIdentity;
   int? _pdfDataDigest;
+
+  /// Whether the first [didChangeDependencies] has already been observed.
+  ///
+  /// The initial dependency pass must not schedule an [updateSettings] (there is
+  /// no controller yet, and creation params already carry the resolved mode).
+  bool _dependenciesReady = false;
 
   @override
   void initState() {
@@ -248,6 +278,49 @@ class _PDFViewState extends State<PDFView> {
     return _digestFor(a) != _digestFor(b);
   }
 
+  /// Resolves [PDFView.colorMode] to [PdfColorMode.light] or [PdfColorMode.dark].
+  ///
+  /// Called from [build] so [Theme]/[MediaQuery] dependencies stick. Also used
+  /// when pushing settings updates after [didUpdateWidget]/[didChangeDependencies].
+  PdfColorMode _resolveColorMode(BuildContext context) {
+    // Explicit colorMode always wins over the deprecated nightMode flag.
+    if (widget.colorMode != PdfColorMode.system) {
+      return widget.colorMode;
+    }
+    // Legacy: nightMode: true with the default colorMode ⇒ dark.
+    // ignore: deprecated_member_use_from_same_package
+    if (widget.nightMode) {
+      return PdfColorMode.dark;
+    }
+    // Prefer Theme when a Theme widget is actually an ancestor. Theme.of alone
+    // returns ThemeData.fallback() (light) when none is present, which would
+    // hide platform dark mode.
+    final Theme? themeWidget = context.findAncestorWidgetOfExactType<Theme>();
+    if (themeWidget != null) {
+      return Theme.of(context).brightness == Brightness.dark
+          ? PdfColorMode.dark
+          : PdfColorMode.light;
+    }
+    return MediaQuery.platformBrightnessOf(context) == Brightness.dark
+        ? PdfColorMode.dark
+        : PdfColorMode.light;
+  }
+
+  /// Coalesces didUpdateWidget + didChangeDependencies in one frame: both schedule
+  /// through the same [_controller] future and re-read [widget]/theme at callback
+  /// time so the first send carries the union and a second sees an empty diff.
+  void _scheduleSettingsUpdate() {
+    _controller.future.then((PDFViewController controller) {
+      if (!mounted) {
+        return;
+      }
+      controller._updateWidget(
+        widget,
+        resolvedColorMode: _resolveColorMode(context),
+      );
+    });
+  }
+
   void _remountPlatformView() {
     if (!mounted) {
       return;
@@ -267,7 +340,29 @@ class _PDFViewState extends State<PDFView> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Theme may change without didUpdateWidget (e.g. a const PDFView under a
+    // new ThemeMode). Skip the first pass — creation params already include the
+    // resolved mode from build().
+    if (_dependenciesReady) {
+      _scheduleSettingsUpdate();
+    } else {
+      _dependenciesReady = true;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Resolve here (not only in didChangeDependencies) so Theme/MediaQuery
+    // dependencies register correctly: StatefulElement.performRebuild clears
+    // _dependencies before build().
+    final PdfColorMode resolvedColorMode = _resolveColorMode(context);
+    final Map<String, dynamic> creationParams = _CreationParams.fromWidget(
+      widget,
+      resolvedColorMode: resolvedColorMode,
+    ).toMap();
+
     // Capture generation at build time so platform-view creation callbacks
     // from a previous mount cannot complete the current Completer.
     final int generation = _viewGeneration;
@@ -294,12 +389,12 @@ class _PDFViewState extends State<PDFView> {
               id: params.id,
               viewType: _viewType,
               layoutDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
-              creationParams: _CreationParams.fromWidget(widget).toMap(),
+              creationParams: creationParams,
               creationParamsCodec: const StandardMessageCodec(),
             )
             ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
             ..addOnPlatformViewCreatedListener((int id) {
-              _onPlatformViewCreated(id, generation: generation);
+              _onPlatformViewCreated(id, generation: generation, resolvedColorMode: resolvedColorMode);
             })
             ..create();
         },
@@ -309,18 +404,26 @@ class _PDFViewState extends State<PDFView> {
         key: viewKey,
         viewType: _viewType,
         onPlatformViewCreated: (int id) {
-          _onPlatformViewCreated(id, generation: generation);
+          _onPlatformViewCreated(id, generation: generation, resolvedColorMode: resolvedColorMode);
         },
         gestureRecognizers: widget.gestureRecognizers,
-        creationParams: _CreationParams.fromWidget(widget).toMap(),
+        creationParams: creationParams,
         creationParamsCodec: const StandardMessageCodec(),
       );
     }
     return Text('$defaultTargetPlatform is not yet supported by the pdfview_flutter plugin');
   }
 
-  void _onPlatformViewCreated(int id, {required int generation}) {
-    final PDFViewController controller = PDFViewController._(id, widget);
+  void _onPlatformViewCreated(
+    int id, {
+    required int generation,
+    required PdfColorMode resolvedColorMode,
+  }) {
+    final PDFViewController controller = PDFViewController._(
+      id,
+      widget,
+      resolvedColorMode: resolvedColorMode,
+    );
     // Ignore late callbacks from a remounted/disposed platform view so they
     // cannot complete the new Completer with a stale controller.
     if (!mounted || generation != _viewGeneration) {
@@ -346,7 +449,7 @@ class _PDFViewState extends State<PDFView> {
       _remountPlatformView();
       return;
     }
-    _controller.future.then((PDFViewController controller) => controller._updateWidget(widget));
+    _scheduleSettingsUpdate();
   }
 
   @override
@@ -364,11 +467,14 @@ class _PDFViewState extends State<PDFView> {
 class _CreationParams {
   _CreationParams({this.filePath, this.pdfData, this.settings});
 
-  static _CreationParams fromWidget(PDFView widget) {
+  static _CreationParams fromWidget(
+    PDFView widget, {
+    required PdfColorMode resolvedColorMode,
+  }) {
     return _CreationParams(
       filePath: widget.filePath,
       pdfData: widget.pdfData,
-      settings: _PDFViewSettings.fromWidget(widget),
+      settings: _PDFViewSettings.fromWidget(widget, resolvedColorMode: resolvedColorMode),
     );
   }
 

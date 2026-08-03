@@ -1,5 +1,17 @@
 ## 1.5.0-beta.1
 
+- **Dart**: add `PdfColorMode` (`light` / `dark` / `system`) and `PDFView.colorMode` (default
+  `system`). `system` resolves from the app `Theme` brightness (or platform brightness when no
+  `Theme` ancestor is present) and is sent to native as `"light"` / `"dark"`. Dark mode uses a
+  luminance-preserving inversion on both platforms so photos keep their hue.
+- **Deprecate** `nightMode` (still honored: `nightMode: true` with default `colorMode` maps to
+  `dark`; an explicit `colorMode` always wins). Annotate the field and constructor formal so
+  callers see the analyzer warning.
+- Runtime updates now include `colorMode` and `backgroundColor` in the settings diff (without
+  remounting the platform view). Setting `backgroundColor` back to `null` after a non-null value
+  leaves the previous color on screen.
+- **Example**: `MaterialApp` `theme` / `darkTheme` / `themeMode` with an AppBar toggle; PDF gutter
+  uses `colorScheme.surface`; removed the hardcoded `nightMode: true` + light gutter pair.
 - **Android**: migrate the plugin implementation from Java to Kotlin (KGP 2.0.0, JVM target 17).
   Behavior verified by the existing 64-test native suite running against the Kotlin sources unchanged
 - **iOS**: migrate the plugin implementation from Objective-C to Swift 5.9. The registered
@@ -8,7 +20,6 @@
   Swift Package Manager and CocoaPods (`pod lib lint`, dynamic + static)
 - Fix a platform-view remount race: late creation callbacks from a disposed or remounted view can no
   longer complete the new controller with a stale instance
-- No public Dart API changes
 
 ## 1.4.5-beta.5
 

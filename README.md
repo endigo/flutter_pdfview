@@ -58,7 +58,8 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | enableSwipe           |   ✅    | ✅  |      `true`       |
 | swipeHorizontal       |   ✅    | ✅  |      `false`      |
 | password              |   ✅    | ✅  |      `null`       |
-| nightMode             |   ✅    | ❌  |      `false`      |
+| colorMode             |   ✅    | ✅  | `PdfColorMode.system` |
+| nightMode*            |   ✅    | ✅  |      `false`      |
 | autoSpacing*          |   ✅    | ✅  |      `true`       |
 | pageFling             |   ✅    | ✅  |      `true`       |
 | pageSnap              |   ✅    | ❌  |      `true`       |
@@ -69,6 +70,9 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | showScrollIndicators* |   ✅    | ✅  |      `false`      |
 
 Notes:
+- `colorMode` themes page content and the gutter on both platforms. Values: `PdfColorMode.light`, `PdfColorMode.dark`, `PdfColorMode.system` (default). `system` follows the app `Theme` brightness (or platform brightness when no `Theme` is present) and is resolved in Dart before being sent to the native view. Dark mode uses a luminance-preserving inversion (hue kept; photos do not become pure negatives). Live updates apply without remounting the platform view.
+- `nightMode` is **deprecated**. Prefer `colorMode`. When `colorMode` is left at `system` and `nightMode: true`, the resolved mode is `dark`. An explicit `colorMode` always wins.
+- `backgroundColor` can be updated at runtime together with `colorMode`. Setting it back to `null` after a non-null value leaves the previous color on screen.
 - `showScrollIndicators` is ignored on iOS while horizontal page-flipping is active (`pageFling: true` together with `swipeHorizontal: true`).
 - `autoSpacing` only adds gaps between pages. It does not change initial zoom or `fitPolicy` (fixed in [#150](https://github.com/endigo/flutter_pdfview/issues/150)).
 
@@ -118,7 +122,8 @@ PDFView(
   autoSpacing: false,
   pageFling: false,
   showScrollIndicators: true,
-  backgroundColor: Colors.grey,
+  colorMode: PdfColorMode.system, // follows Theme brightness
+  backgroundColor: Theme.of(context).colorScheme.surface,
   onRender: (_pages) {
     setState(() {
       pages = _pages;

@@ -31,6 +31,7 @@ class _MyAppState extends State<MyApp> {
   String landscapePathPdf = '';
   String remotePDFpath = '';
   String corruptedPathPDF = '';
+  ThemeMode _themeMode = ThemeMode.system;
 
   @override
   void initState() {
@@ -59,6 +60,30 @@ class _MyAppState extends State<MyApp> {
         remotePDFpath = f.path;
       });
     });
+  }
+
+  void _toggleThemeMode() {
+    setState(() {
+      switch (_themeMode) {
+        case ThemeMode.light:
+          _themeMode = ThemeMode.dark;
+        case ThemeMode.dark:
+          _themeMode = ThemeMode.system;
+        case ThemeMode.system:
+          _themeMode = ThemeMode.light;
+      }
+    });
+  }
+
+  IconData get _themeModeIcon {
+    switch (_themeMode) {
+      case ThemeMode.light:
+        return Icons.light_mode;
+      case ThemeMode.dark:
+        return Icons.dark_mode;
+      case ThemeMode.system:
+        return Icons.brightness_auto;
+    }
   }
 
   Future<File> createFileOfPdfUrl() async {
@@ -109,8 +134,29 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       title: 'Flutter PDF View',
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      themeMode: _themeMode,
       home: Scaffold(
-        appBar: AppBar(title: const Text('Plugin example app')),
+        appBar: AppBar(
+          title: const Text('Plugin example app'),
+          actions: <Widget>[
+            IconButton(
+              tooltip: 'Theme: ${_themeMode.name}',
+              icon: Icon(_themeModeIcon),
+              onPressed: _toggleThemeMode,
+            ),
+          ],
+        ),
         body: Center(
           child: Builder(
             builder: (BuildContext context) {
@@ -203,7 +249,7 @@ class PDFScreen extends StatefulWidget {
   State<PDFScreen> createState() => _PDFScreenState();
 }
 
-class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
+class _PDFScreenState extends State<PDFScreen> {
   final Completer<PDFViewController> _controller = Completer<PDFViewController>();
   int? _pages = 0;
   int? _currentPage = 0;
@@ -216,6 +262,8 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final Color surface = Theme.of(context).colorScheme.surface;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Document'),
@@ -238,8 +286,9 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
             defaultPage: _currentPage!,
             fitPolicy: FitPolicy.BOTH,
             preventLinkNavigation: false, // if set to true the link is handled in flutter
-            backgroundColor: const Color(0xFFFEF7FF),
-            nightMode: true,
+            // Follows app Theme; page content + gutter update live without remount.
+            colorMode: PdfColorMode.system,
+            backgroundColor: surface,
             maxZoom: 4.0,
             minZoom: 1.0,
             onRender: (pages) {
