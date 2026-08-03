@@ -15,8 +15,20 @@ Add this to your package's pubspec.yaml file:
 
 ```
 dependencies:
-  flutter_pdfview: 1.4.5-beta.5
+  flutter_pdfview: ^1.4.5
 ```
+
+#### Trying the 1.5.0 beta
+
+`1.5.0-beta.1` ports the native implementations to Kotlin (Android) and Swift (iOS) with no
+public Dart API changes. Pre-releases are not picked up by a `^` constraint, so pin it explicitly:
+
+```
+dependencies:
+  flutter_pdfview: 1.5.0-beta.1
+```
+
+Feedback is welcome in [#348](https://github.com/endigo/flutter_pdfview/issues/348).
 
 ### 2. Install it
 
@@ -180,7 +192,13 @@ PDFView(
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=endigo/flutter_pdfview&type=Date)](https://star-history.com/#endigo/flutter_pdfview&Date)
+<a href="https://www.star-history.com/?repos=endigo%2Fflutter_pdfview&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=endigo/flutter_pdfview&type=date&theme=dark&legend=top-left&sealed_token=S1XP4ji8L4z53VPV5FGMdzk3yCvYUaH9uBFonXTPmBmtYYHnT56eK11PoHhF4Ddyag11KmOKj1fhkCWcr2mvTkUn8hWeAmfCm2Ecnow8IYstEsirfXUII2Uu2iETsve4HVUUfJMaJli_Vcd4-T8qTUvm_lYlfNkaTLd5GIvMh3As1CBaGN3o-fHAtKof" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=endigo/flutter_pdfview&type=date&legend=top-left&sealed_token=S1XP4ji8L4z53VPV5FGMdzk3yCvYUaH9uBFonXTPmBmtYYHnT56eK11PoHhF4Ddyag11KmOKj1fhkCWcr2mvTkUn8hWeAmfCm2Ecnow8IYstEsirfXUII2Uu2iETsve4HVUUfJMaJli_Vcd4-T8qTUvm_lYlfNkaTLd5GIvMh3As1CBaGN3o-fHAtKof" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=endigo/flutter_pdfview&type=date&legend=top-left&sealed_token=S1XP4ji8L4z53VPV5FGMdzk3yCvYUaH9uBFonXTPmBmtYYHnT56eK11PoHhF4Ddyag11KmOKj1fhkCWcr2mvTkUn8hWeAmfCm2Ecnow8IYstEsirfXUII2Uu2iETsve4HVUUfJMaJli_Vcd4-T8qTUvm_lYlfNkaTLd5GIvMh3As1CBaGN3o-fHAtKof" />
+ </picture>
+</a>
 
 ### Developer
 

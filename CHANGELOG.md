@@ -1,5 +1,7 @@
 ## 1.5.0-beta.1
 
+Native language migration on both platforms. Includes everything in `1.4.5`.
+
 - **Android**: migrate the plugin implementation from Java to Kotlin (KGP 2.0.0, JVM target 17).
   Behavior verified by the existing 64-test native suite running against the Kotlin sources unchanged
 - **iOS**: migrate the plugin implementation from Objective-C to Swift 5.9. The registered
@@ -8,13 +10,34 @@
   Swift Package Manager and CocoaPods (`pod lib lint`, dynamic + static)
 - Fix a platform-view remount race: late creation callbacks from a disposed or remounted view can no
   longer complete the new controller with a stale instance
+- Harden iOS `setZoomLimits` and align the podspec `swift_version`
 - No public Dart API changes
+
+## 1.4.5
+
+Stable release of the `1.4.5-beta.1` → `1.4.5-beta.5` line; no code changes since `1.4.5-beta.5`.
+
+Highlights since `1.4.4` (see the beta sections below for the full list):
+
+- **BREAKING**: minimum Flutter 3.32.0 / Dart 3.8.0
+- **BREAKING**: Android platform views now use true hybrid composition (`initExpensiveAndroidView`) — fixes surface lock [#263](https://github.com/endigo/flutter_pdfview/issues/263), `EGL_NO_DISPLAY` crash [#280](https://github.com/endigo/flutter_pdfview/issues/280), blanking on rotation [#9](https://github.com/endigo/flutter_pdfview/issues/9) / dialogs [#182](https://github.com/endigo/flutter_pdfview/issues/182) / load [#298](https://github.com/endigo/flutter_pdfview/issues/298), and GPU glitches [#306](https://github.com/endigo/flutter_pdfview/issues/306)
+- **BREAKING**: Android external PDF links only auto-launch `http`/`https`; other schemes are reported through `onLinkHandler` instead
+- iOS: `fitPolicy` (WIDTH / HEIGHT / BOTH) implemented for Android parity, page fit decoupled from `autoSpacing` [#150](https://github.com/endigo/flutter_pdfview/issues/150), `onError` on bad passwords/documents [#211](https://github.com/endigo/flutter_pdfview/issues/211), white background and continuous scrolling [#204](https://github.com/endigo/flutter_pdfview/issues/204), Privacy Manifest [#271](https://github.com/endigo/flutter_pdfview/issues/271)
+- Android: Java 17 toolchain [#334](https://github.com/endigo/flutter_pdfview/issues/334), dispose/memory-leak fixes [#261](https://github.com/endigo/flutter_pdfview/issues/261), absolute-path loading [#266](https://github.com/endigo/flutter_pdfview/issues/266), `libc++_shared.so` packaging [#287](https://github.com/endigo/flutter_pdfview/issues/287)
+- New API: `minZoom` / `maxZoom` [#296](https://github.com/endigo/flutter_pdfview/issues/296), `showScrollIndicators` [#337](https://github.com/endigo/flutter_pdfview/issues/337), `onLoadComplete` / `onDraw`, `getCurrentPageSize()`, `getScreenshot()`, `getPosition()` / `setPosition()`, `getScale()` / `setScale()`, `reload()`, `setZoomLimits()` [#333](https://github.com/endigo/flutter_pdfview/pull/333)
+- Document remount when `filePath` / `pdfData` changes [#181](https://github.com/endigo/flutter_pdfview/issues/181)
+
+### Migration from 1.4.4
+
+1. Raise your app to Flutter ≥ 3.32 and Dart ≥ 3.8.
+2. Android PDF views now use expensive hybrid composition (true platform views); re-check layout and gesture behavior if you embed `PDFView` in complex widget trees.
+3. Non-`http(s)` PDF links no longer auto-open — handle them yourself in `onLinkHandler`.
 
 ## 1.4.5-beta.5
 
-- Fix #150: iOS initial page fit no longer depends on `autoSpacing` (spacing vs zoom decoupled); re-fit after placeholder→real bounds and on rotation while preserving user zoom
+- Fix [#150](https://github.com/endigo/flutter_pdfview/issues/150): iOS initial page fit no longer depends on `autoSpacing` (spacing vs zoom decoupled); re-fit after placeholder→real bounds and on rotation while preserving user zoom
 - Implement `fitPolicy` (WIDTH / HEIGHT / BOTH) on iOS for parity with Android (iOS previously ignored the flag and always auto-fit the full page; default `FitPolicy.WIDTH` now matches Android)
-- Add regression tests for #150 creation-param independence (Dart iOS/Android + Android Robolectric) and iOS fit-scale formula oracle
+- Add regression tests for [#150](https://github.com/endigo/flutter_pdfview/issues/150) creation-param independence (Dart iOS/Android + Android Robolectric) and iOS fit-scale formula oracle
 - Make standalone Android unit tests runnable: `compileOnly` Flutter embedding jar, fix `android/settings.gradle`, add `scripts/run_android_unit_tests.sh`
 
 ## 1.4.5-beta.4
