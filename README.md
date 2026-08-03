@@ -28,7 +28,7 @@ dependencies:
   flutter_pdfview: 1.5.0-beta.1
 ```
 
-Feedback is welcome in [#348](https://github.com/endigo/flutter_pdfview/issues/348).
+Feedback is welcome in [#351](https://github.com/endigo/flutter_pdfview/issues/351).
 
 ### 2. Install it
 
