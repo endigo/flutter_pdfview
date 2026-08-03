@@ -391,6 +391,7 @@ void main() {
         onLinkHandler: (String? uri) => events.add('onLinkHandler($uri)'),
         onLoadComplete: (int? pages) => events.add('onLoadComplete($pages)'),
         onDraw: (double x, double y, double scale) => events.add('onDraw($x,$y,$scale)'),
+        onTap: () => events.add('onTap'),
       );
       controller = PDFViewController.test(_viewId, view);
     });
@@ -457,6 +458,16 @@ void main() {
         }),
       );
       expect(events, <String>['onDraw(1.5,2.5,3.5)']);
+    });
+
+    test('onTap is delivered with null arguments', () async {
+      await _emit(const MethodCall('onTap'));
+      expect(events, <String>['onTap']);
+    });
+
+    test('onTap tolerates an empty argument map', () async {
+      await _emit(const MethodCall('onTap', <String, Object?>{}));
+      expect(events, <String>['onTap']);
     });
 
     test('an unknown native method is reported as a missing plugin', () async {

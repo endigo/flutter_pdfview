@@ -286,6 +286,13 @@ class _PDFScreenState extends State<PDFScreen> with WidgetsBindingObserver {
               });
               debugPrint('onDraw - x offset: $pdfXOffset, y offset: $pdfYOffset scale: $pdfScale');
             },
+            // Prefer onTap over gestureRecognizers + TapGestureRecognizer (#133).
+            onTap: () {
+              debugPrint('PDFView onTap');
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('PDF tapped (onTap)')));
+            },
           ),
           _errorMessage.isEmpty
               ? !_isReady

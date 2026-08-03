@@ -61,6 +61,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | onPageChanged         |   ✅    | ✅  |      `null`       |
 | onLoadComplete        |   ✅    | ✅  |      `null`       |
 | onDraw                |   ✅    | ✅  |      `null`       |
+| onTap                 |   ✅    | ✅  |      `null`       |
 | onError               |   ✅    | ✅  |      `null`       |
 | onPageError           |   ✅    | ❌  |      `null`       |
 | onLinkHandle          |   ✅    | ✅  |      `null`       |
@@ -84,6 +85,25 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 Notes:
 - `showScrollIndicators` is ignored on iOS while horizontal page-flipping is active (`pageFling: true` together with `swipeHorizontal: true`).
 - `autoSpacing` only adds gaps between pages. It does not change initial zoom or `fitPolicy` (fixed in [#150](https://github.com/endigo/flutter_pdfview/issues/150)).
+
+### Detecting taps (`onTap`)
+
+For a reliable single-tap callback, use the first-class `onTap` parameter. It
+is delivered from the native PDF control on both platforms:
+
+```dart
+PDFView(
+  filePath: path,
+  onTap: () {
+    // e.g. toggle chrome / app bar
+  },
+)
+```
+
+Do **not** rely on `gestureRecognizers` with a `TapGestureRecognizer` for taps.
+Flutter’s platform-view gesture arena often never delivers `onTap` for embedded
+native views ([#133](https://github.com/endigo/flutter_pdfview/issues/133)).
+Keep `gestureRecognizers` for parent-scroll conflicts (below).
 
 ### Using PDFView inside a scrollable widget
 

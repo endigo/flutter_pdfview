@@ -39,6 +39,15 @@ typedef LoadCompleteCallback = void Function(int? pages);
 /// reporting the current horizontal offset, vertical offset and zoom scale.
 typedef DrawCallback = void Function(double pdfXOffset, double pdfYOffset, double pdfScale);
 
+/// Signature for the callback that is invoked when the user single-taps the
+/// PDF view.
+///
+/// Prefer this over [PDFView.gestureRecognizers] with a [TapGestureRecognizer]
+/// when you only need a reliable tap notification — Flutter platform-view
+/// gesture arenas often fail to deliver `onTap` for embedded native views
+/// ([#133](https://github.com/endigo/flutter_pdfview/issues/133)).
+typedef TapCallback = void Function();
+
 /// Determines how the pages of a document are scaled to fit the viewport.
 enum FitPolicy {
   /// Scales each page so that its width fills the width of the viewport.

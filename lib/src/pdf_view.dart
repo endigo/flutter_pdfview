@@ -27,6 +27,7 @@ class PDFView extends StatefulWidget {
     this.onLinkHandler,
     this.onLoadComplete,
     this.onDraw,
+    this.onTap,
     this.gestureRecognizers,
     this.enableSwipe = true,
     this.swipeHorizontal = false,
@@ -81,6 +82,17 @@ class PDFView extends StatefulWidget {
   /// Invoked while the document is drawn, with the current offsets and scale.
   final DrawCallback? onDraw;
 
+  /// Invoked when the user single-taps the PDF (native-side detection).
+  ///
+  /// This is the recommended way to react to taps. Using a [TapGestureRecognizer]
+  /// in [gestureRecognizers] is unreliable on platform views — the Flutter gesture
+  /// arena often loses the tap to the embedded native PDF control
+  /// ([#133](https://github.com/endigo/flutter_pdfview/issues/133)).
+  ///
+  /// Double-tap zoom and link handling still work; the native side reports the
+  /// single tap without consuming the event for those features.
+  final TapCallback? onTap;
+
   /// Which gestures should be consumed by the pdf view.
   ///
   /// It is possible for other gesture recognizers to be competing with the pdf view on pointer
@@ -90,6 +102,11 @@ class PDFView extends StatefulWidget {
   ///
   /// When this set is empty or null, the pdf view will only handle pointer events for gestures that
   /// were not claimed by any other gesture recognizer.
+  ///
+  /// **Tap detection:** prefer [onTap] instead of adding a [TapGestureRecognizer]
+  /// here. Platform-view gesture arenas frequently drop Flutter-side `onTap`
+  /// callbacks ([#133](https://github.com/endigo/flutter_pdfview/issues/133)). Use
+  /// this set for parent-scroll conflicts (e.g. [EagerGestureRecognizer]).
   final Set<Factory<OneSequenceGestureRecognizer>>? gestureRecognizers;
 
   /// The path of the document to load from disk.

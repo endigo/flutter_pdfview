@@ -158,6 +158,14 @@ class FlutterPDFView(
                 .enableAntialiasing(getBoolean(params, "enableAntialiasing"))
                 .enableDoubletap(true)
                 .defaultPage(getInt(params, "defaultPage"))
+                // First-class tap callback (#133). Return false so links and
+                // double-tap zoom still receive the event.
+                .onTap { _ ->
+                    if (!disposed) {
+                        methodChannel.invokeMethod("onTap", null)
+                    }
+                    false
+                }
                 .onPageChange { page, total ->
                     if (disposed) return@onPageChange
                     val args: MutableMap<String, Any> = HashMap()

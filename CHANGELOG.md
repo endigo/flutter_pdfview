@@ -16,7 +16,9 @@ Native language migration on both platforms. Includes everything in `1.4.5`.
 - Fix a platform-view remount race: late creation callbacks from a disposed or remounted view can no
   longer complete the new controller with a stale instance
 - Harden iOS `setZoomLimits` and align the podspec `swift_version`
-- No public Dart API changes
+- Add first-class `onTap` callback (Dart + Android + iOS) so single taps are reported from the
+  native PDF view; prefer this over `gestureRecognizers` + `TapGestureRecognizer`
+  ([#133](https://github.com/endigo/flutter_pdfview/issues/133))
 
 ## 1.4.5
 
