@@ -1,3 +1,13 @@
+## 1.5.0-beta.8
+
+- Add `PageAlignment` (`center` default, `top`) so short / single-page documents can pin to the top of
+  the viewport instead of being vertically centered ([#250](https://github.com/endigo/flutter_pdfview/issues/250),
+  [#272](https://github.com/endigo/flutter_pdfview/issues/272), [#358](https://github.com/endigo/flutter_pdfview/pull/358));
+  iOS page-break margins put free space below the page when top-aligned
+- Fix Android `setPage` / `jumpTo` leaving pages left-aligned on the secondary axis — re-center
+  horizontally after page changes ([#197](https://github.com/endigo/flutter_pdfview/issues/197))
+- Includes everything in `1.5.0-beta.7`
+
 ## 1.5.0-beta.7
 
 - Improve Android/iOS render quality defaults for [#158](https://github.com/endigo/flutter_pdfview/issues/158)

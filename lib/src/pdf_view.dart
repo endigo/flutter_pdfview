@@ -44,6 +44,7 @@ class PDFView extends StatefulWidget {
     this.fitEachPage = true,
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
+    this.pageAlignment = PageAlignment.center,
     this.preventLinkNavigation = false,
     this.backgroundColor,
     this.maxZoom = 4.0,
@@ -194,6 +195,16 @@ class PDFView extends StatefulWidget {
   ///
   /// Supported on Android and iOS.
   final FitPolicy fitPolicy;
+
+  /// How a document that is shorter than the viewport is placed inside it.
+  ///
+  /// Defaults to [PageAlignment.center] (historical behavior of AndroidPdfViewer
+  /// and PDFKit). Use [PageAlignment.top] so free space sits below the page —
+  /// typical for single-page PDFs ([#250](https://github.com/endigo/flutter_pdfview/issues/250),
+  /// [#272](https://github.com/endigo/flutter_pdfview/issues/272)).
+  ///
+  /// Supported on Android and iOS.
+  final PageAlignment pageAlignment;
 
   /// Whether each page is fitted individually.
   @Deprecated('will be removed next version')

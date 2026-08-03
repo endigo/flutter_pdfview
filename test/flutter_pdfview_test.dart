@@ -120,6 +120,14 @@ void main() {
       expect(bothFit.fitPolicy, FitPolicy.BOTH);
     });
 
+    test('PDFView with pageAlignment options', () {
+      final centered = PDFView(filePath: 'test.pdf');
+      expect(centered.pageAlignment, PageAlignment.center);
+
+      final top = PDFView(filePath: 'test.pdf', pageAlignment: PageAlignment.top);
+      expect(top.pageAlignment, PageAlignment.top);
+    });
+
     test('PDFView with different navigation settings', () {
       final customPdfView = PDFView(
         filePath: 'test.pdf',
