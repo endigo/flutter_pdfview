@@ -260,6 +260,9 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         pdfView.isHidden = true
         isHidden = false
         backgroundColor = .clear
+        // PDFKit is vector, but ensure the host layer is not stuck at 1× when the
+        // Flutter platform view attaches before a window is available (#158).
+        applyDisplayScale()
 
         pendingLoadArguments = args as? [String: Any]
         // If Flutter already handed us a non-zero frame, open immediately;
@@ -643,8 +646,32 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         contentOffsetObservation = nil
     }
 
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        applyDisplayScale()
+    }
+
+    /// Matches the PDFView layer to the screen's native scale (Retina / ProMotion).
+    private func applyDisplayScale() {
+        let scale = window?.screen.scale ?? UIScreen.main.scale
+        guard scale > 0 else { return }
+        if abs(pdfView.contentScaleFactor - scale) > 0.01 {
+            pdfView.contentScaleFactor = scale
+        }
+        if abs(pdfView.layer.contentsScale - scale) > 0.01 {
+            pdfView.layer.contentsScale = scale
+        }
+        if abs(contentScaleFactor - scale) > 0.01 {
+            contentScaleFactor = scale
+        }
+        if abs(layer.contentsScale - scale) > 0.01 {
+            layer.contentsScale = scale
+        }
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
+        applyDisplayScale()
 
         // Skip layout updates during scrolling to prevent conflicts
         if isScrolling {

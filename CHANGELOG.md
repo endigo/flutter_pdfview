@@ -1,3 +1,13 @@
+## 1.5.0-beta.7
+
+- Improve Android/iOS render quality defaults for [#158](https://github.com/endigo/flutter_pdfview/issues/158)
+  ([#357](https://github.com/endigo/flutter_pdfview/pull/357)):
+  density-aware page-part cache, apply Dart’s `thumbnailRatio` 0.8 when the param is omitted
+  (AndroidPdfViewer’s static default is 0.3), keep `useBestQuality` /
+  `enableAntialiasing` / `enableRenderDuringScale` true when params are missing, pin iOS
+  `contentScaleFactor` to the screen scale, and document quality knobs + hard Pdfium limits in the README
+- Includes everything in `1.5.0-beta.6`
+
 ## 1.5.0-beta.6
 
 - Fix [#175](https://github.com/endigo/flutter_pdfview/issues/175): `getScreenshot` no longer returns a

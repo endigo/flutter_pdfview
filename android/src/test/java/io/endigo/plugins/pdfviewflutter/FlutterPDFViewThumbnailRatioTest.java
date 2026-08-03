@@ -77,13 +77,16 @@ public class FlutterPDFViewThumbnailRatioTest {
     }
 
     @Test
-    public void nonNumericValue_isRejected() {
-        assertEquals(SENTINEL, ratioAfterCreating("0.5"), 0f);
+    public void nonNumericValue_fallsBackToPluginDefault() {
+        // Same path as a missing param: only Numbers in (0, 1] write the static.
+        assertEquals(FlutterPDFView.DEFAULT_THUMBNAIL_RATIO, ratioAfterCreating("0.5"), 0f);
     }
 
     @Test
-    public void missingValue_leavesGlobalUntouched() {
-        assertEquals(SENTINEL, ratioAfterCreating(null), 0f);
+    public void missingValue_appliesPluginDefault() {
+        // #158: AndroidPdfViewer defaults to 0.3; the plugin matches Dart's 0.8
+        // when the creation param is omitted so first paint is not soft.
+        assertEquals(FlutterPDFView.DEFAULT_THUMBNAIL_RATIO, ratioAfterCreating(null), 0f);
     }
 
     @Test
