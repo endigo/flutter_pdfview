@@ -11,6 +11,10 @@ Native language migration on both platforms. Includes everything in `1.4.5`.
 - Fix a platform-view remount race: late creation callbacks from a disposed or remounted view can no
   longer complete the new controller with a stale instance
 - Harden iOS `setZoomLimits` and align the podspec `swift_version`
+- Fix [#175](https://github.com/endigo/flutter_pdfview/issues/175): `getScreenshot` no longer returns a
+  white image under hybrid composition. Android captures via `PixelCopy` (with a software-layer
+  `View.draw` fallback); iOS rasterizes the PDFKit layer and falls back to drawing the current
+  `PDFPage` (drawing-cache / hierarchy snapshots are avoided on both platforms)
 - No public Dart API changes
 
 ## 1.4.5
