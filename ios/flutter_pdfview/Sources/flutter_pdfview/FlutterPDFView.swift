@@ -166,13 +166,7 @@ final class PDFViewController: NSObject, FlutterPlatformView, PDFViewDelegate {
         case "reload":
             pdfView.reload(call, result: result)
         case "getScreenshot":
-            result(
-                FlutterError(
-                    code: "UNSUPPORTED",
-                    message: "getScreenshot is not implemented on iOS",
-                    details: nil
-                )
-            )
+            pdfView.getScreenshot(call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -1040,6 +1034,197 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
             pdfView.maxScaleFactor = max(maxScale, minScale)
         }
         result(NSNumber(value: true))
+    }
+
+    /// Captures the currently visible PDF contents and writes a PNG to `fileName`.
+    ///
+    /// Flutter platform views / hybrid composition leave `drawHierarchy` and
+    /// snapshot helpers blank (white). We rasterize the real PDFKit layer, and
+    /// if that is still empty fall back to drawing the current [PDFPage]
+    /// into the viewport (#175).
+    func getScreenshot(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let fileName = (call.arguments as? [String: Any])?["fileName"] as? String,
+              !fileName.isEmpty
+        else {
+            result(
+                FlutterError(code: "FAIL", message: "fileName is required", details: nil)
+            )
+            return
+        }
+
+        let outputURL = URL(fileURLWithPath: fileName)
+        // Require a directory component so we don't silently write next to CWD.
+        guard outputURL.pathComponents.count > 1,
+              !outputURL.deletingLastPathComponent().path.isEmpty
+        else {
+            result(
+                FlutterError(
+                    code: "FAIL",
+                    message: "fileName must include a directory path",
+                    details: nil
+                )
+            )
+            return
+        }
+
+        let size = pdfView.bounds.size
+        guard size.width > 0, size.height > 0 else {
+            result(
+                FlutterError(
+                    code: "FAIL",
+                    message: "PDFView is not laid out yet",
+                    details: nil
+                )
+            )
+            return
+        }
+
+        let image: UIImage
+        var captureError: NSError?
+        var captured: UIImage?
+        catchingNSException {
+            captured = self.capturePDFImage(size: size)
+        } onException: { error in
+            captureError = error
+            NSLog("getScreenshot capture failed: %@", error.pdfExceptionDescription)
+        }
+
+        if let captureError {
+            result(
+                FlutterError(
+                    code: "FAIL",
+                    message: "Failed to generate image",
+                    details: captureError.pdfExceptionReason
+                )
+            )
+            return
+        }
+        guard let captured else {
+            result(
+                FlutterError(
+                    code: "FAIL",
+                    message: "Failed to generate image",
+                    details: nil
+                )
+            )
+            return
+        }
+        image = captured
+
+        guard let data = image.pngData() else {
+            result(
+                FlutterError(
+                    code: "FAIL",
+                    message: "Failed to generate image",
+                    details: "PNG encoding failed"
+                )
+            )
+            return
+        }
+
+        do {
+            try FileManager.default.createDirectory(
+                at: outputURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try data.write(to: outputURL, options: .atomic)
+            result(outputURL.path)
+        } catch {
+            result(
+                FlutterError(
+                    code: "FAIL",
+                    message: "Failed to generate image",
+                    details: error.localizedDescription
+                )
+            )
+        }
+    }
+
+    /// Renders the visible PDF into a bitmap without relying on drawing-cache /
+    /// hierarchy snapshots (blank under Flutter platform views).
+    private func capturePDFImage(size: CGSize) -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = true
+        format.scale = UIScreen.main.scale
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+
+        // 1) Preferred: rasterize the PDFKit layer (includes zoom/scroll).
+        let layerImage = renderer.image { ctx in
+            let cg = ctx.cgContext
+            (pdfView.backgroundColor ?? .white).setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+            pdfView.layer.render(in: cg)
+        }
+        if !isMostlyBlank(layerImage) {
+            return layerImage
+        }
+
+        // 2) Fallback: draw the current page into the viewport via PDFKit.
+        //    This always has real page content even when the platform-view layer
+        //    is not snapshot-friendly.
+        return renderer.image { ctx in
+            let cg = ctx.cgContext
+            (pdfView.backgroundColor ?? .white).setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+
+            guard let page = pdfView.currentPage else { return }
+            let pageRect = page.bounds(for: .mediaBox)
+            guard pageRect.width > 0, pageRect.height > 0 else { return }
+
+            // Fit the page into the viewport the same way PDFView would for a
+            // single-page snapshot (preserve aspect, center).
+            let scale = min(size.width / pageRect.width, size.height / pageRect.height)
+            let drawWidth = pageRect.width * scale
+            let drawHeight = pageRect.height * scale
+            let originX = (size.width - drawWidth) / 2
+            let originY = (size.height - drawHeight) / 2
+
+            cg.saveGState()
+            // PDFKit page coordinates are bottom-up; flip to UIKit space.
+            cg.translateBy(x: originX, y: originY + drawHeight)
+            cg.scaleBy(x: scale, y: -scale)
+            cg.translateBy(x: -pageRect.origin.x, y: -pageRect.origin.y)
+            page.draw(with: .mediaBox, to: cg)
+            cg.restoreGState()
+        }
+    }
+
+    /// True when the image is effectively solid white/empty (failed snapshot).
+    private func isMostlyBlank(_ image: UIImage) -> Bool {
+        guard let cgImage = image.cgImage else { return true }
+        // Downscale into a tiny buffer so we only inspect a handful of pixels.
+        let sampleW = 16
+        let sampleH = 16
+        let bytesPerPixel = 4
+        let bytesPerRow = bytesPerPixel * sampleW
+        var data = [UInt8](repeating: 0, count: bytesPerRow * sampleH)
+        guard let context = CGContext(
+            data: &data,
+            width: sampleW,
+            height: sampleH,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return false
+        }
+        context.interpolationQuality = .low
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: sampleW, height: sampleH))
+
+        var nonWhite = 0
+        let total = sampleW * sampleH
+        for i in 0..<total {
+            let offset = i * bytesPerPixel
+            let r = data[offset]
+            let g = data[offset + 1]
+            let b = data[offset + 2]
+            if r < 250 || g < 250 || b < 250 {
+                nonWhite += 1
+            }
+        }
+        // If fewer than ~2% of samples have ink, treat as a blank capture.
+        return total == 0 || (Double(nonWhite) / Double(total)) < 0.02
     }
 
     // MARK: - Callbacks

@@ -1,13 +1,21 @@
 package io.endigo.plugins.pdfviewflutter
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.PixelCopy
 import android.view.View
+import android.view.Window
 
 import androidx.annotation.VisibleForTesting
 
@@ -466,31 +474,114 @@ class FlutterPDFView(
             result.error("FAIL", "fileName is required", null)
             return
         }
-        try {
-            val outputFile = File(pdfFileName)
-            if (outputFile.parentFile == null) {
-                result.error("FAIL", "fileName must include a directory path", null)
+        val outputFile = File(pdfFileName)
+        if (outputFile.parentFile == null) {
+            result.error("FAIL", "fileName must include a directory path", null)
+            return
+        }
+        val view = pdfView
+        if (disposed || view == null) {
+            result.error("FAIL", "PDFView is not laid out yet", null)
+            return
+        }
+        val width = view.width
+        val height = view.height
+        if (width <= 0 || height <= 0) {
+            result.error("FAIL", "PDFView is not laid out yet", null)
+            return
+        }
+
+        // Prefer PixelCopy of the real window pixels when the hybrid-composition
+        // platform view is attached (#175). Fall back to a software-layer draw.
+        val window = findWindow(context)
+        if (window != null &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            view.isAttachedToWindow
+        ) {
+            val location = IntArray(2)
+            view.getLocationInWindow(location)
+            val srcRect = Rect(
+                location[0],
+                location[1],
+                location[0] + width,
+                location[1] + height
+            )
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            try {
+                PixelCopy.request(
+                    window,
+                    srcRect,
+                    bitmap,
+                    { copyResult ->
+                        if (disposed) {
+                            bitmap.recycle()
+                            result.error("FAIL", "PDFView disposed", null)
+                            return@request
+                        }
+                        if (copyResult == PixelCopy.SUCCESS) {
+                            writeScreenshot(outputFile, bitmap, result)
+                        } else {
+                            bitmap.recycle()
+                            val fallback = loadBitmapFromPDFView()
+                            if (fallback == null) {
+                                result.error(
+                                    "FAIL",
+                                    "Failed to generate image",
+                                    "PixelCopy result=$copyResult"
+                                )
+                            } else {
+                                writeScreenshot(outputFile, fallback, result)
+                            }
+                        }
+                    },
+                    mainHandler
+                )
                 return
+            } catch (e: IllegalArgumentException) {
+                // Window not ready / invalid rect — fall through to software draw.
+                bitmap.recycle()
+                Log.w(TAG, "PixelCopy unavailable, using software capture", e)
             }
-            val imageFileName = outputFile.absolutePath
+        }
+
+        try {
             val bmp = loadBitmapFromPDFView()
             if (bmp == null) {
                 result.error("FAIL", "PDFView is not laid out yet", null)
                 return
             }
-            try {
-                FileOutputStream(outputFile, false).use { fileOut ->
-                    bmp.compress(Bitmap.CompressFormat.PNG, 100, fileOut)
-                }
-            } finally {
-                bmp.recycle()
-            }
-            result.success(imageFileName)
+            writeScreenshot(outputFile, bmp, result)
         } catch (e: Exception) {
             result.error("FAIL", "Failed to generate image", e.message)
         }
     }
 
+    private fun writeScreenshot(outputFile: File, bmp: Bitmap, result: Result) {
+        try {
+            val parent = outputFile.parentFile
+            if (parent != null && !parent.exists()) {
+                parent.mkdirs()
+            }
+            FileOutputStream(outputFile, false).use { fileOut ->
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, fileOut)
+            }
+            result.success(outputFile.absolutePath)
+        } catch (e: Exception) {
+            result.error("FAIL", "Failed to generate image", e.message)
+        } finally {
+            bmp.recycle()
+        }
+    }
+
+    /**
+     * Rasterizes the PDFView into an ARGB bitmap.
+     *
+     * A plain [View.draw] into a software [Canvas] returns a blank white image when
+     * the view (or its children) uses a hardware layer — which is the default under
+     * Flutter hybrid composition (`initExpensiveAndroidView`). Temporarily force a
+     * software layer so Pdfium page bitmaps are actually drawn into the capture (#175).
+     * Drawing-cache APIs are intentionally avoided; they are broken for the same reason.
+     */
     fun loadBitmapFromPDFView(): Bitmap? {
         val view = pdfView
         if (disposed || view == null) {
@@ -503,8 +594,36 @@ class FlutterPDFView(
         }
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        view.draw(canvas)
+        val background = view.background
+        if (background is ColorDrawable) {
+            canvas.drawColor(background.color)
+        } else if (background != null) {
+            background.setBounds(0, 0, width, height)
+            background.draw(canvas)
+        } else {
+            canvas.drawColor(Color.WHITE)
+        }
+        val previousLayerType = view.layerType
+        try {
+            // LAYER_TYPE_SOFTWARE rebuilds the display list into a CPU bitmap so
+            // subsequent draw() copies real page content instead of an empty HW layer.
+            view.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+            view.draw(canvas)
+        } finally {
+            view.setLayerType(previousLayerType, null)
+        }
         return bitmap
+    }
+
+    private fun findWindow(context: Context): Window? {
+        var ctx: Context? = context
+        while (ctx is ContextWrapper) {
+            if (ctx is Activity) {
+                return ctx.window
+            }
+            ctx = ctx.baseContext
+        }
+        return null
     }
 
     fun reload(result: Result) {
