@@ -1,3 +1,10 @@
+## 1.5.0-beta.4
+
+- Document Android AcroForm / fillable form field rendering limits: Pdfium paints `/AP` appearance
+  streams and does not regenerate them like Adobe; producer workarounds for broken appearances
+  ([#303](https://github.com/endigo/flutter_pdfview/issues/303), [#354](https://github.com/endigo/flutter_pdfview/pull/354))
+- Includes everything in `1.5.0-beta.3`
+
 ## 1.5.0-beta.3
 
 - Add first-class `onTap` callback (Dart + Android + iOS) so single taps are reported from the
@@ -23,8 +30,6 @@ Native language migration on both platforms. Includes everything in `1.4.5`.
 - Fix a platform-view remount race: late creation callbacks from a disposed or remounted view can no
   longer complete the new controller with a stale instance
 - Harden iOS `setZoomLimits` and align the podspec `swift_version`
-- Docs: AcroForm / fillable form field rendering limits on Android (Pdfium uses `/AP` appearance
-  streams and does not regenerate them like Adobe) — see [#303](https://github.com/endigo/flutter_pdfview/issues/303)
 - No public Dart API changes
 
 ## 1.4.5
