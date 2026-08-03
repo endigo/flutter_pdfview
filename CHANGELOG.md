@@ -1,4 +1,4 @@
-## Unreleased
+## 1.5.0-beta.10
 
 - Fix [#274](https://github.com/endigo/flutter_pdfview/issues/274): password-protected documents can
   now be unlocked from the app instead of leaving a blank view. New `onPasswordRequired` callback

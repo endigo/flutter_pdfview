@@ -20,14 +20,16 @@ dependencies:
 
 #### Trying the 1.5.0 beta
 
-`1.5.0-beta.9` continues the Kotlin/Swift line with luminance-preserving `PdfColorMode`
-dark theming ([#215](https://github.com/endigo/flutter_pdfview/issues/215),
+`1.5.0-beta.10` continues the Kotlin/Swift line by letting password-protected
+documents be unlocked from the app ([#274](https://github.com/endigo/flutter_pdfview/issues/274)),
+on top of the luminance-preserving `PdfColorMode` dark theming in `beta.9`
+([#215](https://github.com/endigo/flutter_pdfview/issues/215),
 [#138](https://github.com/endigo/flutter_pdfview/issues/138)). Pre-releases are not
 picked up by a `^` constraint, so pin it explicitly:
 
 ```
 dependencies:
-  flutter_pdfview: 1.5.0-beta.9
+  flutter_pdfview: 1.5.0-beta.10
 ```
 
 Feedback is welcome in [#351](https://github.com/endigo/flutter_pdfview/issues/351).
