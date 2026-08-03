@@ -144,6 +144,9 @@ class _PDFViewSettings {
     if (pageAlignment != newSettings.pageAlignment) {
       updates['pageAlignment'] = newSettings.pageAlignment.toString();
     }
+    if (password != newSettings.password) {
+      updates['password'] = newSettings.password;
+    }
     if (maxZoom != newSettings.maxZoom) {
       updates['maxZoom'] = newSettings.maxZoom;
     }

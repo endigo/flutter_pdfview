@@ -65,6 +65,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | onTap                 |   ✅    | ✅  |      `null`       |
 | onError               |   ✅    | ✅  |      `null`       |
 | onPageError           |   ✅    | ❌  |      `null`       |
+| onPasswordRequired    |   ✅    | ✅  |      `null`       |
 | onLinkHandle          |   ✅    | ✅  |      `null`       |
 | gestureRecognizers    |   ✅    | ✅  |      `null`       |
 | filePath              |   ✅    | ✅  |                   |
@@ -93,6 +94,7 @@ Notes:
 - `colorMode` themes page content and the gutter on both platforms. Values: `PdfColorMode.light`, `PdfColorMode.dark`, `PdfColorMode.system` (default). `system` follows the app `Theme` brightness (or platform brightness when no `Theme` is present) and is resolved in Dart before being sent to the native view. Dark mode uses a luminance-preserving inversion (hue kept; photos do not become pure negatives). Live updates apply without remounting the platform view.
 - `nightMode` is **deprecated**. Prefer `colorMode`. When `colorMode` is left at `system` and `nightMode: true`, the resolved mode is `dark`. An explicit `colorMode` always wins.
 - `backgroundColor` can be updated at runtime together with `colorMode`. Setting it back to `null` after a non-null value leaves the previous color on screen.
+- `password` can be changed after the first build: the document is reopened in place, so the platform view is not recreated. See [Password-protected documents](#password-protected-documents).
 - `showScrollIndicators` is ignored on iOS while horizontal page-flipping is active (`pageFling: true` together with `swipeHorizontal: true`).
 - `autoSpacing` only adds gaps between pages. It does not change initial zoom or `fitPolicy` (fixed in [#150](https://github.com/endigo/flutter_pdfview/issues/150)).
 - `thumbnailRatio` must be in `(0, 1]`. Higher values look sharper while tiles load but use more memory.
@@ -187,6 +189,38 @@ This plugin is a **viewer**, not a form editor. Platform behavior:
 
 There is no plugin API that can repair malformed form appearances without embedding a full PDF rewrite stack (out of scope for this viewer).
 
+### Password-protected documents
+
+Pass the password up front with `password` when you already know it. When you do
+not, `onPasswordRequired` tells you that the document is encrypted — either
+because no password was supplied (`PDFPasswordFailure.missing`) or because the
+one you supplied did not open it (`PDFPasswordFailure.incorrect`) — so you can
+prompt the user and try again ([#274](https://github.com/endigo/flutter_pdfview/issues/274)):
+
+```dart
+PDFView(
+  filePath: path,
+  password: _password,
+  onPasswordRequired: (PDFPasswordFailure failure) async {
+    final String? entered = await showPasswordDialog(
+      context,
+      retry: failure == PDFPasswordFailure.incorrect,
+    );
+    if (entered != null) {
+      // Either rebuild with the new password ...
+      setState(() => _password = entered);
+      // ... or hand it straight to the controller:
+      // await controller.unlock(entered);
+    }
+  },
+)
+```
+
+Both routes reopen the document inside the existing platform view, so a wrong
+password can be retried as often as needed without rebuilding the viewer.
+`onError` still fires alongside `onPasswordRequired`, so viewers written before
+this callback existed keep working.
+
 ### Using PDFView inside a scrollable widget
 
 When a `PDFView` is embedded in a scrollable parent (`SingleChildScrollView`,
@@ -269,6 +303,7 @@ Wrapping `PDFView` itself in `ColorFiltered` will keep painting a solid tint
 | setPosition        | Set the position of the top left of the PDF with respect to the origin (top left of PDFView) |                `Offset position`                 |  `Future<bool>`  |
 | setScale           |                             Set the PDF zoom value, for zooming                              |                  `double scale`                  |  `Future<bool>`  |
 | setZoomLimits      |                  Set the minimum, maximum and mid bounds of the zoom limits                  | `double minZoom, double midZoom, double maxZoom` |        -         |
+| unlock             |            Reopen the document with a password, for encrypted PDFs ([#274](https://github.com/endigo/flutter_pdfview/issues/274))            |                `String password`                 |  `Future<bool>`  |
 | reload             |                            Reload the PDF document in the PDFView                            |                        -                         |  `Future<bool>`  |
 
 ## Example

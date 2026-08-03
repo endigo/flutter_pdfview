@@ -31,6 +31,7 @@ class _MyAppState extends State<MyApp> {
   String landscapePathPdf = '';
   String remotePDFpath = '';
   String corruptedPathPDF = '';
+  String protectedPathPDF = '';
   ThemeMode _themeMode = ThemeMode.system;
 
   @override
@@ -52,6 +53,11 @@ class _MyAppState extends State<MyApp> {
     fromAsset('assets/demo-landscape.pdf', 'landscape.pdf').then((f) {
       setState(() {
         landscapePathPdf = f.path;
+      });
+    });
+    fromAsset('assets/demo-protected.pdf', 'protected.pdf').then((f) {
+      setState(() {
+        protectedPathPDF = f.path;
       });
     });
 
@@ -211,6 +217,19 @@ class _MyAppState extends State<MyApp> {
                     },
                   ),
                   TextButton(
+                    child: const Text('Open Password Protected PDF'),
+                    onPressed: () {
+                      if (protectedPathPDF.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PDFScreen(path: protectedPathPDF),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  TextButton(
                     child: const Text('Open Corrupted PDF'),
                     onPressed: () {
                       if (pathPDF.isNotEmpty) {
@@ -259,6 +278,64 @@ class _PDFScreenState extends State<PDFScreen> {
   double _xOffset = 0.0;
   double _yOffset = 0.0;
   double _scale = 1.0;
+
+  /// Guards against stacking dialogs: a rejected password reports again.
+  bool _isPrompting = false;
+
+  /// Asks for a password and hands it to the controller, which reopens the
+  /// document in place.
+  Future<void> _promptForPassword(PDFPasswordFailure failure) async {
+    if (_isPrompting) {
+      return;
+    }
+    _isPrompting = true;
+    // The prompt replaces the error banner for this failure.
+    setState(() {
+      _errorMessage = '';
+    });
+    try {
+      final PDFViewController controller = await _controller.future;
+      if (!mounted) {
+        return;
+      }
+      final String? password = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          final TextEditingController field = TextEditingController();
+          return AlertDialog(
+            title: const Text('Password required'),
+            content: TextField(
+              controller: field,
+              autofocus: true,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                errorText: failure == PDFPasswordFailure.incorrect
+                    ? 'That password did not open the document'
+                    : null,
+              ),
+              onSubmitted: (String value) => Navigator.pop(context, value),
+            ),
+            actions: <Widget>[
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () => Navigator.pop(context, field.text),
+                child: const Text('Open'),
+              ),
+            ],
+          );
+        },
+      );
+      if (password == null || !mounted) {
+        return;
+      }
+      final bool unlocked = await controller.unlock(password);
+      debugPrint(unlocked ? 'document unlocked' : 'wrong password');
+    } finally {
+      _isPrompting = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -309,6 +386,7 @@ class _PDFScreenState extends State<PDFScreen> {
               });
               debugPrint('$page: ${error.toString()}');
             },
+            onPasswordRequired: _promptForPassword,
             onViewCreated: (PDFViewController pdfViewController) {
               _controller.complete(pdfViewController);
             },

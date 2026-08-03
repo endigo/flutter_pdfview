@@ -63,6 +63,13 @@ class PDFViewController {
       case 'onPageError':
         widget.onPageError?.call(call.arguments['page'], call.arguments['error']);
         return null;
+      case 'onPasswordRequired':
+        widget.onPasswordRequired?.call(
+          call.arguments['incorrect'] == true
+              ? PDFPasswordFailure.incorrect
+              : PDFPasswordFailure.missing,
+        );
+        return null;
       case 'onLinkHandler':
         widget.onLinkHandler?.call(call.arguments);
         return null;
@@ -187,6 +194,19 @@ class PDFViewController {
         }) ??
         '';
     return imageFileName;
+  }
+
+  /// Reopens the current document with [password] and returns whether it is now
+  /// unlocked.
+  ///
+  /// The document is reloaded in place, so a wrong password can be retried
+  /// without recreating the platform view; each failure reports
+  /// [PDFPasswordFailure.incorrect] through [PDFView.onPasswordRequired].
+  /// Resolves once the native viewer has finished reloading. An unencrypted
+  /// document simply reloads and returns `true`.
+  Future<bool> unlock(String password) async {
+    return await _channel.invokeMethod<bool>('unlock', <String, dynamic>{'password': password}) ??
+        false;
   }
 
   /// Reloads the current document and returns whether the reload succeeded.

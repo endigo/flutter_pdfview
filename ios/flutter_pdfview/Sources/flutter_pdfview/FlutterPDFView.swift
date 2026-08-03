@@ -168,6 +168,8 @@ final class PDFViewController: NSObject, FlutterPlatformView, PDFViewDelegate {
             pdfView.setZoomLimits(call, result: result)
         case "reload":
             pdfView.reload(call, result: result)
+        case "unlock":
+            pdfView.unlock(call, result: result)
         case "getScreenshot":
             pdfView.getScreenshot(call, result: result)
         default:
@@ -238,6 +240,12 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
     private var lastFitScale: CGFloat = 0
     /// Whether we have successfully applied an initial fit at a real size.
     private var hasAppliedInitialFit = false
+    /// Whether `finishDocumentSetup()` has already run for this document.
+    private var hasFinishedSetup = false
+    /// Creation arguments the deferred setup needs once the document unlocks.
+    private var defaultPageIndex = 0
+    private var showScrollIndicators = false
+    private var useHorizontalPaging = false
     /// Creation args held until the view has a non-zero size (#190 / #127).
     private var pendingLoadArguments: [String: Any]?
     /// Ensures the document is opened at most once from creation args.
@@ -376,7 +384,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         preventLinkNavigation = args?.bool("preventLinkNavigation") ?? false
         setColorMode(Self.colorMode(fromSettings: args) ?? .light)
 
-        var defaultPageIndex = args?.integer("defaultPage") ?? 0
+        defaultPageIndex = args?.integer("defaultPage") ?? 0
 
         if let filePath = args?["filePath"] as? String {
             // Support plain paths and file:// URIs (#266 parity with Android).
@@ -446,7 +454,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         let swipeHorizontal = args?.bool("swipeHorizontal") ?? false
         pdfView.displayDirection = swipeHorizontal ? .horizontal : .vertical
 
-        let showScrollIndicators = args?.bool("showScrollIndicators") ?? false
+        showScrollIndicators = args?.bool("showScrollIndicators") ?? false
 
         // Manage scale ourselves so fitPolicy and autoSpacing stay independent
         // (#150). PDFKit's autoScales always does "fit both" and used to be
@@ -456,7 +464,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         // UIPageViewController flips one page at a time — only match the API
         // for horizontal book-style paging. Vertical layouts scroll
         // continuously so iOS behaves like Android (#204).
-        let useHorizontalPaging = pageFling && swipeHorizontal && enableSwipe
+        useHorizontalPaging = pageFling && swipeHorizontal && enableSwipe
         pdfView.usePageViewController(useHorizontalPaging, withViewOptions: nil)
         pdfView.displayMode = (enableSwipe && !useHorizontalPaging)
             ? .singlePageContinuous
@@ -487,15 +495,11 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         maxScaleFactor = maxZoomArg
         minScaleFactor = minZoomArg
 
-        if let loadedDocument = pdfView.document, loadedDocument.isEncrypted {
-            if let password = args?["password"] as? String {
-                loadedDocument.unlock(withPassword: password)
-            }
-            if loadedDocument.isLocked {
-                // Android reports a PdfPasswordException through onError;
-                // without this the iOS view just stays blank.
-                reportError("Password required or incorrect password.")
-            }
+        // An encrypted document loads, but its pages stay unreadable until the
+        // right password arrives, so the setup below waits for one.
+        let suppliedPassword = args?["password"] as? String ?? ""
+        if document.isEncrypted, !suppliedPassword.isEmpty {
+            document.unlock(withPassword: suppliedPassword)
         }
 
         let doubleTapGestureRecognizer = UITapGestureRecognizer(
@@ -524,14 +528,33 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         singleTapGestureRecognizer.delaysTouchesEnded = false
         singleTapGestureRecognizer.cancelsTouchesInView = false
         pdfView.addGestureRecognizer(singleTapGestureRecognizer)
+        addSubview(pdfView)
 
-        let pageCount = document.pageCount
-        if pageCount == 0 {
+        if document.isLocked {
+            reportPasswordRequired(passwordSupplied: !suppliedPassword.isEmpty)
+            // Android reports a PdfPasswordException through onError; without
+            // this the iOS view just stays blank.
+            reportError("Password required or incorrect password.")
+            return
+        }
+
+        if document.pageCount == 0 {
             // Defer like the nil-document path: the Dart handler is only
             // attached after the platform view is created.
             reportError("PDF has no pages.")
             return
         }
+
+        finishDocumentSetup()
+    }
+
+    /// The part of the setup that needs a readable document: runs from
+    /// `loadDocument`, or from `applyPassword` once an unlock succeeds.
+    private func finishDocumentSetup() {
+        guard !hasFinishedSetup, let document else { return }
+        hasFinishedSetup = true
+
+        let pageCount = document.pageCount
         // Objective-C compared an NSUInteger page count against an NSInteger
         // index, so a negative index wrapped around and also clamped to the
         // last page.
@@ -579,7 +602,8 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
                     scrollView.canCancelContentTouches = true
                     // Indicators cannot be shown while the page-view
                     // controller manages paging (swaps scroll views).
-                    let shouldShow = showScrollIndicators && !useHorizontalPaging
+                    let shouldShow = strongSelf.showScrollIndicators
+                        && !strongSelf.useHorizontalPaging
                     scrollView.showsHorizontalScrollIndicator = shouldShow
                     scrollView.showsVerticalScrollIndicator = shouldShow
                     strongSelf.scrollView = scrollView
@@ -616,7 +640,6 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
             name: .PDFViewPageChanged,
             object: pdfView
         )
-        addSubview(pdfView)
 
         // Force a layout pass now that the document is attached so PDFKit
         // installs its scroll hierarchy before we report onRender. Opening
@@ -626,6 +649,50 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         layoutIfNeeded()
         if hasUsableSize(bounds.size) {
             _ = applyLayoutUpdates()
+        }
+    }
+
+    /// Reopens the document with `password`; returns whether it can now be read.
+    /// An unencrypted one simply reloads, matching Android.
+    @discardableResult
+    private func applyPassword(_ password: String) -> Bool {
+        guard let document else { return false }
+        if document.isLocked {
+            document.unlock(withPassword: password)
+        }
+        if document.isLocked {
+            reportPasswordRequired(passwordSupplied: !password.isEmpty)
+            reportError("Password required or incorrect password.")
+            return false
+        }
+
+        // PDFKit does not re-render a document that was locked when it was
+        // handed over, so assign it again.
+        pdfView.document = document
+        hasAppliedInitialFit = false
+        lastFitScale = 0
+        lastLayoutSize = .zero
+        defaultPageSet = false
+        if hasFinishedSetup {
+            // Already open, so this was a plain reload — report it like Android,
+            // which re-runs the configurator and fires the render callbacks.
+            handleRenderCompleted(NSNumber(value: document.pageCount))
+        } else {
+            finishDocumentSetup()
+        }
+        setNeedsLayout()
+        return true
+    }
+
+    private func reportPasswordRequired(passwordSupplied: Bool) {
+        // Deferred like the other load-time callbacks: Dart attaches its handler
+        // only after the platform view has been created.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            controller?.invokeChannelMethod(
+                "onPasswordRequired",
+                arguments: ["incorrect": NSNumber(value: passwordSupplied)]
+            )
         }
     }
 
@@ -961,7 +1028,18 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
     // MARK: - Method channel handlers
 
     func getPageCount(_: FlutterMethodCall, result: FlutterResult) {
-        result(pageCount)
+        if let pageCount {
+            result(pageCount)
+            return
+        }
+        // `pageCount` is only cached once a layout pass has run, which can land
+        // after the render callback — most visibly right after an unlock. A
+        // still-locked document has no readable pages, so it reports nothing.
+        guard let document = pdfView.document, !document.isLocked else {
+            result(nil)
+            return
+        }
+        result(NSNumber(value: document.pageCount))
     }
 
     func getCurrentPageSize(_: FlutterMethodCall, result: FlutterResult) {
@@ -1058,6 +1136,21 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         result(currentPageIndex)
     }
 
+    func unlock(_ call: FlutterMethodCall, result: FlutterResult) {
+        guard let password = (call.arguments as? [String: Any])?["password"] as? String else {
+            result(
+                FlutterError(code: "INVALID_ARGS", message: "password is required", details: nil)
+            )
+            return
+        }
+        // The initial open is deferred until the view has a usable size (#190),
+        // so an unlock that lands first has to trigger it.
+        if document == nil {
+            beginDocumentLoadIfNeeded()
+        }
+        result(NSNumber(value: applyPassword(password)))
+    }
+
     func reload(_: FlutterMethodCall, result: FlutterResult) {
         // If the initial open was deferred and never completed (still no size),
         // try again now rather than reassigning a nil document.
@@ -1133,6 +1226,12 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         guard let settings = call.arguments as? [String: Any] else {
             result(nil)
             return
+        }
+
+        // A rebuild with a new password reopens the document; a null one
+        // arrives as NSNull and is ignored here.
+        if let password = settings["password"] as? String {
+            applyPassword(password)
         }
 
         // `colorMode` and `backgroundColor` arrive in the same map and both want
