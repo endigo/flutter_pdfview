@@ -23,6 +23,8 @@ Native language migration on both platforms. Includes everything in `1.4.5`.
 - Fix a platform-view remount race: late creation callbacks from a disposed or remounted view can no
   longer complete the new controller with a stale instance
 - Harden iOS `setZoomLimits` and align the podspec `swift_version`
+- Docs: AcroForm / fillable form field rendering limits on Android (Pdfium uses `/AP` appearance
+  streams and does not regenerate them like Adobe) — see [#303](https://github.com/endigo/flutter_pdfview/issues/303)
 - No public Dart API changes
 
 ## 1.4.5

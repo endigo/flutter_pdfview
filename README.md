@@ -20,13 +20,14 @@ dependencies:
 
 #### Trying the 1.5.0 beta
 
-`1.5.0-beta.3` continues the Kotlin/Swift line and adds a first-class `onTap` callback
+`1.5.0-beta.4` continues the Kotlin/Swift line with AcroForm form-field docs
+([#303](https://github.com/endigo/flutter_pdfview/issues/303)) and `onTap`
 ([#133](https://github.com/endigo/flutter_pdfview/issues/133)). Pre-releases are not picked up
 by a `^` constraint, so pin it explicitly:
 
 ```
 dependencies:
-  flutter_pdfview: 1.5.0-beta.3
+  flutter_pdfview: 1.5.0-beta.4
 ```
 
 Feedback is welcome in [#351](https://github.com/endigo/flutter_pdfview/issues/351).
@@ -104,6 +105,26 @@ Do **not** rely on `gestureRecognizers` with a `TapGestureRecognizer` for taps.
 Flutter’s platform-view gesture arena often never delivers `onTap` for embedded
 native views ([#133](https://github.com/endigo/flutter_pdfview/issues/133)).
 Keep `gestureRecognizers` for parent-scroll conflicts (below).
+
+### AcroForm / fillable form fields
+
+This plugin is a **viewer**, not a form editor. Platform behavior:
+
+| Platform | Engine | Annotation / form field painting |
+|:---------|:-------|:---------------------------------|
+| Android  | Pdfium (via [AndroidPdfViewer](https://github.com/barteksc/AndroidPdfViewer)) | Widget appearance streams (`/AP`) are painted when `enableAnnotationRendering` is on (always enabled by this plugin). Pdfium does **not** regenerate appearances from `/V` + `/DA` the way Adobe Reader does. |
+| iOS      | PDFKit | Uses the system renderer; typically more tolerant of incomplete appearances. |
+
+**Implication:** if a PDF’s form field has a missing, empty, or **broken** `/AP` entry, Android can omit that field even when Adobe shows it. A common producer-side failure mode (seen with PDFBox + incremental saves / digital signing) is an object-number collision where the field’s `/AP` indirect reference is later reused for an XRef stream — the field value is still in the file, but the appearance object is no longer valid. See [#303](https://github.com/endigo/flutter_pdfview/issues/303).
+
+**Producer workarounds** (fix generators such as Apache PDFBox):
+
+1. After setting values, generate valid appearance streams (PDFBox: `setValue` / appearance generation; avoid leaving fields without a usable `/AP`).
+2. Prefer a full rewrite save when possible; after incremental updates (especially signing), re-check that each field’s `/AP` still resolves to a Form XObject, not an XRef or other object.
+3. Flatten fields when interactivity is not required (`PDAcroForm.flatten()`), so values become normal page content.
+4. Optionally set `/NeedAppearances true` on the AcroForm dictionary — some viewers honor it; **Pdfium generally still requires a real appearance stream** for reliable display.
+
+There is no plugin API that can repair malformed form appearances without embedding a full PDF rewrite stack (out of scope for this viewer).
 
 ### Using PDFView inside a scrollable widget
 
