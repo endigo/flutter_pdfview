@@ -20,15 +20,13 @@ dependencies:
 
 #### Trying the 1.5.0 beta
 
-`1.5.0-beta.5` continues the Kotlin/Swift line with load-flash / first-layout fixes
-([#40](https://github.com/endigo/flutter_pdfview/issues/40),
-[#127](https://github.com/endigo/flutter_pdfview/issues/127),
-[#190](https://github.com/endigo/flutter_pdfview/issues/190)). Pre-releases are not picked up
-by a `^` constraint, so pin it explicitly:
+`1.5.0-beta.6` continues the Kotlin/Swift line and fixes `getScreenshot` under hybrid
+composition ([#175](https://github.com/endigo/flutter_pdfview/issues/175)). Pre-releases are not
+picked up by a `^` constraint, so pin it explicitly:
 
 ```
 dependencies:
-  flutter_pdfview: 1.5.0-beta.5
+  flutter_pdfview: 1.5.0-beta.6
 ```
 
 Feedback is welcome in [#351](https://github.com/endigo/flutter_pdfview/issues/351).
