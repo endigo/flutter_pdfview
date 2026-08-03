@@ -20,14 +20,15 @@ dependencies:
 
 #### Trying the 1.5.0 beta
 
-`1.5.0-beta.4` continues the Kotlin/Swift line with AcroForm form-field docs
-([#303](https://github.com/endigo/flutter_pdfview/issues/303)) and `onTap`
-([#133](https://github.com/endigo/flutter_pdfview/issues/133)). Pre-releases are not picked up
+`1.5.0-beta.5` continues the Kotlin/Swift line with load-flash / first-layout fixes
+([#40](https://github.com/endigo/flutter_pdfview/issues/40),
+[#127](https://github.com/endigo/flutter_pdfview/issues/127),
+[#190](https://github.com/endigo/flutter_pdfview/issues/190)). Pre-releases are not picked up
 by a `^` constraint, so pin it explicitly:
 
 ```
 dependencies:
-  flutter_pdfview: 1.5.0-beta.4
+  flutter_pdfview: 1.5.0-beta.5
 ```
 
 Feedback is welcome in [#351](https://github.com/endigo/flutter_pdfview/issues/351).
