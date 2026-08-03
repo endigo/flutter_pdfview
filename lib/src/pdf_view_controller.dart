@@ -72,6 +72,9 @@ class PDFViewController {
           call.arguments['pdfScale'],
         );
         return null;
+      case 'onTap':
+        widget.onTap?.call();
+        return null;
     }
     throw MissingPluginException('${call.method} was invoked but has no handler');
   }

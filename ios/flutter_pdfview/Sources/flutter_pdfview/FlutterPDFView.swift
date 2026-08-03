@@ -395,16 +395,32 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
             }
         }
 
-        let tapGestureRecognizer = UITapGestureRecognizer(
+        let doubleTapGestureRecognizer = UITapGestureRecognizer(
             target: self,
             action: #selector(onDoubleTap(_:))
         )
-        tapGestureRecognizer.numberOfTapsRequired = 2
-        tapGestureRecognizer.numberOfTouchesRequired = 1
-        tapGestureRecognizer.delegate = self
-        tapGestureRecognizer.delaysTouchesBegan = false
-        tapGestureRecognizer.delaysTouchesEnded = false
-        pdfView.addGestureRecognizer(tapGestureRecognizer)
+        doubleTapGestureRecognizer.numberOfTapsRequired = 2
+        doubleTapGestureRecognizer.numberOfTouchesRequired = 1
+        doubleTapGestureRecognizer.delegate = self
+        doubleTapGestureRecognizer.delaysTouchesBegan = false
+        doubleTapGestureRecognizer.delaysTouchesEnded = false
+        pdfView.addGestureRecognizer(doubleTapGestureRecognizer)
+
+        // First-class single-tap callback for Dart onTap (#133). Platform-view
+        // gestureRecognizers are unreliable for TapGestureRecognizer; report
+        // taps from the native PDF view instead. Do not require the double-tap
+        // to fail so the callback stays responsive (double-tap zoom still works).
+        let singleTapGestureRecognizer = UITapGestureRecognizer(
+            target: self,
+            action: #selector(onSingleTap(_:))
+        )
+        singleTapGestureRecognizer.numberOfTapsRequired = 1
+        singleTapGestureRecognizer.numberOfTouchesRequired = 1
+        singleTapGestureRecognizer.delegate = self
+        singleTapGestureRecognizer.delaysTouchesBegan = false
+        singleTapGestureRecognizer.delaysTouchesEnded = false
+        singleTapGestureRecognizer.cancelsTouchesInView = false
+        pdfView.addGestureRecognizer(singleTapGestureRecognizer)
 
         let pageCount = document.pageCount
         if pageCount == 0 {
@@ -985,6 +1001,15 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
     }
 
     // MARK: - Gestures
+
+    @objc private func onSingleTap(_ recognizer: UITapGestureRecognizer) {
+        guard recognizer.state == .ended else { return }
+        // Skip while scrolling so page-fling / drag does not look like a tap.
+        if isScrolling {
+            return
+        }
+        controller?.invokeChannelMethod("onTap", arguments: nil)
+    }
 
     @objc private func onDoubleTap(_ recognizer: UITapGestureRecognizer) {
         guard recognizer.state == .ended else { return }
