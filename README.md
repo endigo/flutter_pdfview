@@ -80,10 +80,57 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | minZoom               |   ✅    | ✅  |        1.0        |
 | maxZoom               |   ✅    | ✅  |        4.0        |
 | showScrollIndicators* |   ✅    | ✅  |      `false`      |
+| enableAntialiasing   |   ✅    | ❌  |      `true`       |
+| useBestQuality        |   ✅    | ❌  |      `true`       |
+| enableRenderDuringScale | ✅    | ❌  |      `true`       |
+| thumbnailRatio*       |   ✅    | ❌  |        0.8        |
 
 Notes:
 - `showScrollIndicators` is ignored on iOS while horizontal page-flipping is active (`pageFling: true` together with `swipeHorizontal: true`).
 - `autoSpacing` only adds gaps between pages. It does not change initial zoom or `fitPolicy` (fixed in [#150](https://github.com/endigo/flutter_pdfview/issues/150)).
+- `thumbnailRatio` must be in `(0, 1]`. Higher values look sharper while tiles load but use more memory.
+
+### Render quality ([#158](https://github.com/endigo/flutter_pdfview/issues/158))
+
+**iOS (PDFKit)** draws PDF content as vectors at the screen scale. Text and line art
+should stay sharp when zooming. This plugin sets the platform view’s
+`contentScaleFactor` / layer `contentsScale` to the native display scale so
+Flutter embedding never leaves the layer at 1×.
+
+**Android (AndroidPdfViewer + Pdfium)** rasterizes each page into bitmap tiles:
+
+| Knob | What it does | Cost |
+|:-----|:-------------|:-----|
+| `useBestQuality: true` (default) | ARGB_8888 tiles instead of RGB_565 | ~2× bitmap memory vs 565 |
+| `enableAntialiasing: true` (default) | `FILTER_BITMAP` / AA when drawing tiles | Negligible |
+| `enableRenderDuringScale: true` (default) | Re-render tiles during pinch zoom | More CPU while pinching |
+| `thumbnailRatio` (default `0.8`) | Resolution of the full-page preview shown before high-res tiles arrive | Memory ∝ ratio² |
+
+On high-DPI devices the plugin also raises AndroidPdfViewer’s page-part cache
+slightly (still capped) so fewer tiles fall out of cache after zoom — the common
+“only part of the page is clear” report.
+
+**Hard limits (not a bug in this plugin):**
+
+- Tile spatial resolution matches the **view size in pixels**, not print DPI.
+  Small text on a phone-sized view will never look like a desktop PDF reader
+  without a different engine (supersampling / MuPDF / Android `PdfRenderer` at
+  higher scale). That would multiply memory and is intentionally not enabled by
+  default.
+- AndroidPdfViewer’s tile size / cache are process-wide statics; `thumbnailRatio`
+  from the first (or latest) view construction wins for the process.
+
+For the sharpest Android preview without a huge memory hit:
+
+```dart
+PDFView(
+  filePath: path,
+  useBestQuality: true,          // default
+  enableAntialiasing: true,    // default
+  enableRenderDuringScale: true, // default
+  thumbnailRatio: 1.0,           // full-page preview at 1:1 (more RAM)
+)
+```
 
 ### Using PDFView inside a scrollable widget
 

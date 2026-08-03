@@ -134,18 +134,36 @@ class PDFView extends StatefulWidget {
   /// If set to true, snapping is enabled. No effect on iOS.
   final bool pageSnap;
 
-  /// Controls whether the PDF renderer uses anti-aliasing (Android only).
+  /// Controls whether the PDF renderer uses anti-aliasing when compositing
+  /// page bitmaps (Android only; default `true`).
+  ///
+  /// No effect on iOS (PDFKit is vector). See the README "Render quality"
+  /// section and [#158](https://github.com/endigo/flutter_pdfview/issues/158).
   final bool enableAntialiasing;
 
-  /// Improves render quality at the cost of performance (Android only).
+  /// Uses full-color ARGB_8888 page bitmaps instead of RGB_565 (Android only;
+  /// default `true`).
+  ///
+  /// This improves color fidelity and text edges slightly. It does **not**
+  /// increase spatial resolution — AndroidPdfViewer still rasterizes at view
+  /// pixel size. Prefer raising [thumbnailRatio] for sharper low-res previews.
+  /// No effect on iOS.
   final bool useBestQuality;
 
-  /// Renders during scale gestures for smoother zooming (Android only).
+  /// Re-rasterizes page tiles while the user pinches to zoom (Android only;
+  /// default `true`).
+  ///
+  /// Without this, zoomed regions stay blurry until the gesture ends. Costs
+  /// more CPU/GPU during the pinch. No effect on iOS.
   final bool enableRenderDuringScale;
 
-  /// Thumbnail ratio used by AndroidPdfViewer (Android only).
+  /// Full-page preview scale used by AndroidPdfViewer while high-res tiles
+  /// load (Android only).
   ///
-  /// Must be within `(0, 1]` when it is not null.
+  /// Library default inside AndroidPdfViewer is `0.3`; this plugin defaults to
+  /// `0.8` for a sharper first paint. Must be within `(0, 1]` when non-null.
+  /// `1.0` is sharpest but uses more memory (one full-page bitmap per cached
+  /// page). No effect on iOS.
   final double? thumbnailRatio;
 
   /// The page to display when the PDF document is loaded.

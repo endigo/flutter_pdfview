@@ -64,17 +64,15 @@ class FlutterPDFView(
 
         linkHandler = PDFLinkHandler(context, view, methodChannel, preventLinkNavigation)
 
-        view.useBestQuality(getBoolean(params, "useBestQuality"))
-        view.enableRenderDuringScale(getBoolean(params, "enableRenderDuringScale"))
-        val thumbnailRatioObj = params["thumbnailRatio"]
-        if (thumbnailRatioObj is Number) {
-            val thumbnailRatio = thumbnailRatioObj.toFloat()
-            // A ratio outside (0, 1] makes AndroidPdfViewer create zero-sized or
-            // oversized thumbnail bitmaps, which throws at render time.
-            if (thumbnailRatio > 0f && thumbnailRatio <= 1f) {
-                Constants.THUMBNAIL_RATIO = thumbnailRatio
-            }
-        }
+        // Quality defaults match Dart PDFView so incomplete param maps still render
+        // with ARGB_8888, antialiasing, and live re-render while pinching (#158).
+        view.useBestQuality(
+            getBoolean(params, "useBestQuality", DEFAULT_USE_BEST_QUALITY)
+        )
+        view.enableRenderDuringScale(
+            getBoolean(params, "enableRenderDuringScale", DEFAULT_ENABLE_RENDER_DURING_SCALE)
+        )
+        applyDisplayQualityDefaults(displayDensity, params)
 
         val backgroundColor = params["backgroundColor"]
         if (backgroundColor != null) {
@@ -155,7 +153,9 @@ class FlutterPDFView(
                     if (getBoolean(params, "showScrollIndicators")) DefaultScrollHandle(context) else null
                 )
                 .linkHandler(linkHandler)
-                .enableAntialiasing(getBoolean(params, "enableAntialiasing"))
+                .enableAntialiasing(
+                    getBoolean(params, "enableAntialiasing", DEFAULT_ENABLE_ANTIALIASING)
+                )
                 .enableDoubletap(true)
                 .defaultPage(getInt(params, "defaultPage"))
                 .onPageChange { page, total ->
@@ -535,12 +535,102 @@ class FlutterPDFView(
         private const val DEFAULT_MIN_ZOOM = 1.0f
         private const val DRAW_THROTTLE_MS = 16L // ~1 frame at 60fps
 
+        /** Matches Dart [PDFView.useBestQuality] default (ARGB_8888 vs RGB_565). */
+        const val DEFAULT_USE_BEST_QUALITY = true
+
+        /** Matches Dart [PDFView.enableAntialiasing] default. */
+        const val DEFAULT_ENABLE_ANTIALIASING = true
+
+        /** Matches Dart [PDFView.enableRenderDuringScale] default. */
+        const val DEFAULT_ENABLE_RENDER_DURING_SCALE = true
+
+        /**
+         * Matches Dart [PDFView.thumbnailRatio] default. AndroidPdfViewer's own
+         * static default is 0.3, which looks soft while high-res tiles load (#158).
+         */
+        const val DEFAULT_THUMBNAIL_RATIO = 0.8f
+
+        /** AndroidPdfViewer library baseline for [Constants.Cache.CACHE_SIZE]. */
+        const val BASE_PAGE_PART_CACHE_SIZE = 120
+
+        /** AndroidPdfViewer library baseline for [Constants.Cache.THUMBNAILS_CACHE_SIZE]. */
+        const val BASE_THUMBNAIL_CACHE_SIZE = 8
+
+        /**
+         * Applies process-wide AndroidPdfViewer [Constants] for render quality.
+         *
+         * - [Constants.THUMBNAIL_RATIO]: from params when in (0, 1], else Dart's 0.8
+         *   default (library default 0.3 is notably soft on modern phones).
+         * - Cache sizes: raised modestly on high-DPI displays. A dense viewport
+         *   covers more 256px page tiles; keeping more of them reduces the common
+         *   "only some of the page is sharp after zoom" effect without supersampling
+         *   (which would 2–4× bitmap memory). Growth is capped (~+80 tiles ≈ +20MB
+         *   worst case for ARGB_8888 256² tiles).
+         *
+         * These statics are process-wide (AndroidPdfViewer design). We only ever
+         * raise cache sizes so concurrent views do not shrink a larger setting.
+         */
+        @JvmStatic
+        @VisibleForTesting
+        fun applyDisplayQualityDefaults(density: Float, params: Map<String, Any?>) {
+            val thumbnailRatioObj = params["thumbnailRatio"]
+            if (thumbnailRatioObj is Number) {
+                val thumbnailRatio = thumbnailRatioObj.toFloat()
+                // A ratio outside (0, 1] makes AndroidPdfViewer create zero-sized or
+                // oversized thumbnail bitmaps, which throws at render time.
+                if (thumbnailRatio > 0f && thumbnailRatio <= 1f) {
+                    Constants.THUMBNAIL_RATIO = thumbnailRatio
+                }
+            } else {
+                Constants.THUMBNAIL_RATIO = DEFAULT_THUMBNAIL_RATIO
+            }
+
+            val sizes = cacheSizesForDensity(density)
+            val cacheSize = sizes[0]
+            val thumbnailCacheSize = sizes[1]
+            if (Constants.Cache.CACHE_SIZE < cacheSize) {
+                Constants.Cache.CACHE_SIZE = cacheSize
+            }
+            if (Constants.Cache.THUMBNAILS_CACHE_SIZE < thumbnailCacheSize) {
+                Constants.Cache.THUMBNAILS_CACHE_SIZE = thumbnailCacheSize
+            }
+        }
+
+        /**
+         * Page-part and thumbnail cache sizes for a display density.
+         *
+         * Returns `{pagePartCache, thumbnailCache}` — library baselines at 1× density;
+         * steps up at 2× / 2.5× / 3.5× (roughly xhdpi / xxhdpi / high-end xxxhdpi+).
+         */
+        @JvmStatic
+        @VisibleForTesting
+        fun cacheSizesForDensity(density: Float): IntArray {
+            return when {
+                density >= 3.5f -> intArrayOf(200, 16)
+                density >= 2.5f -> intArrayOf(180, 12)
+                density >= 2.0f -> intArrayOf(150, 10)
+                else -> intArrayOf(BASE_PAGE_PART_CACHE_SIZE, BASE_THUMBNAIL_CACHE_SIZE)
+            }
+        }
+
         @JvmStatic
         @VisibleForTesting
         fun getBoolean(params: Map<String, Any?>, key: String): Boolean {
+            return getBoolean(params, key, false)
+        }
+
+        /**
+         * Reads a boolean creation param, returning [defaultValue] when the key is
+         * missing or the value is null.
+         */
+        @JvmStatic
+        @VisibleForTesting
+        fun getBoolean(params: Map<String, Any?>, key: String, defaultValue: Boolean): Boolean {
+            if (!params.containsKey(key)) {
+                return defaultValue
+            }
             val keyObj = params[key] as Boolean?
-            val bKey: Boolean = keyObj ?: false
-            return params.containsKey(key) && bKey
+            return keyObj ?: defaultValue
         }
 
         @JvmStatic

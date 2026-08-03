@@ -1,3 +1,11 @@
+## Unreleased
+
+- Improve Android/iOS render quality defaults for [#158](https://github.com/endigo/flutter_pdfview/issues/158):
+  density-aware page-part cache, apply Dart’s `thumbnailRatio` 0.8 when the param is omitted
+  (AndroidPdfViewer’s static default is 0.3), keep `useBestQuality` /
+  `enableAntialiasing` / `enableRenderDuringScale` true when params are missing, pin iOS
+  `contentScaleFactor` to the screen scale, and document quality knobs + hard Pdfium limits in the README
+
 ## 1.5.0-beta.2
 
 - Document iOS platform-view composition limits for `ColorFiltered` / `ShaderMask` / `BackdropFilter` over `PDFView`, with official Flutter evidence and workarounds ([#213](https://github.com/endigo/flutter_pdfview/issues/213), [#352](https://github.com/endigo/flutter_pdfview/pull/352))
