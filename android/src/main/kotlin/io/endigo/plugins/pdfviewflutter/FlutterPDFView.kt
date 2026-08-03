@@ -50,11 +50,23 @@ class FlutterPDFView(
     @Volatile
     private var documentLoadStarted = false
 
+    /** Width/height at the moment load started — used to detect a first-layout resize. */
+    private var loadWidth = 0
+    private var loadHeight = 0
+
+    /** True once onRender has revealed the view (or load failed and we un-hide). */
+    @Volatile
+    private var contentRevealed = false
+
+    /** Remains attached after load so a late size settle can re-fit (#127). */
+    private var sizeSettleListener: View.OnLayoutChangeListener? = null
+
     init {
         val view = PDFView(context, null)
         pdfView = view
-        // Prevent premature draw while the Hybrid Composition surface is still
-        // being attached (#263 Surface already locked, #280 EGL_NO_DISPLAY).
+        // Stay invisible until first successful render so transitions / first
+        // layout do not flash an empty or wrongly-fitted surface (#40, #127).
+        // Also avoids premature Hybrid Composition draws (#263, #280).
         view.visibility = View.INVISIBLE
         displayDensity = context.resources.displayMetrics.density
         val preventLinkNavigation = getBoolean(params, "preventLinkNavigation")
@@ -84,7 +96,7 @@ class FlutterPDFView(
 
         // Defer load until the view has a non-zero size so Pdfium does not render
         // into a zero-sized / unattached surface (#298 blank, #280 quick-open crash).
-        view.addOnLayoutChangeListener(object : View.OnLayoutChangeListener {
+        val initialLayoutListener = object : View.OnLayoutChangeListener {
             override fun onLayoutChange(
                 v: View, left: Int, top: Int, right: Int, bottom: Int,
                 oldLeft: Int, oldTop: Int, oldRight: Int, oldBottom: Int
@@ -98,9 +110,10 @@ class FlutterPDFView(
                 }
                 currentView.removeOnLayoutChangeListener(this)
                 loadDocument(params)
-                currentView.visibility = View.VISIBLE
+                // Keep INVISIBLE until onRender — do not flash mid-load (#40).
             }
-        })
+        }
+        view.addOnLayoutChangeListener(initialLayoutListener)
         // Fallback if layout already has size (e.g. recycled view / tests).
         view.post {
             val currentView = pdfView
@@ -108,10 +121,86 @@ class FlutterPDFView(
                 return@post
             }
             if (currentView.width > 0 && currentView.height > 0) {
+                currentView.removeOnLayoutChangeListener(initialLayoutListener)
                 loadDocument(params)
-                currentView.visibility = View.VISIBLE
             }
         }
+    }
+
+    private fun revealContent() {
+        if (contentRevealed || disposed) {
+            return
+        }
+        contentRevealed = true
+        pdfView?.visibility = View.VISIBLE
+    }
+
+    /**
+     * When the first non-zero layout is not the final size (common with hybrid
+     * composition and nested containers), re-apply default fit so the first
+     * painted frame matches the settled bounds (#127).
+     */
+    private fun attachSizeSettleListener(view: PDFView) {
+        sizeSettleListener?.let { view.removeOnLayoutChangeListener(it) }
+        val listener = View.OnLayoutChangeListener { v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            if (disposed || pdfView == null) {
+                return@OnLayoutChangeListener
+            }
+            val newW = right - left
+            val newH = bottom - top
+            val oldW = oldRight - oldLeft
+            val oldH = oldBottom - oldTop
+            if (newW <= 0 || newH <= 0) {
+                return@OnLayoutChangeListener
+            }
+            // Only care about meaningful size changes after load.
+            if (loadWidth <= 0 || loadHeight <= 0) {
+                return@OnLayoutChangeListener
+            }
+            val sizeChanged =
+                kotlin.math.abs(newW - loadWidth) > 1 || kotlin.math.abs(newH - loadHeight) > 1
+            val grewFromPrevious =
+                kotlin.math.abs(newW - oldW) > 1 || kotlin.math.abs(newH - oldH) > 1
+            if (!sizeChanged || !grewFromPrevious) {
+                return@OnLayoutChangeListener
+            }
+            // User still at default fit zoom (1f) — re-fit to new size.
+            val current = pdfView ?: return@OnLayoutChangeListener
+            if (current.pageCount <= 0) {
+                return@OnLayoutChangeListener
+            }
+            val atDefaultZoom = kotlin.math.abs(current.zoom - 1f) < 0.02f
+            if (!atDefaultZoom) {
+                // User has zoomed; stop watching for settle re-fit.
+                sizeSettleListener?.let { current.removeOnLayoutChangeListener(it) }
+                sizeSettleListener = null
+                return@OnLayoutChangeListener
+            }
+            loadWidth = newW
+            loadHeight = newH
+            try {
+                // jumpTo + zoomTo(1) forces AndroidPdfViewer to recompute fit
+                // against the new viewport after the late size settle.
+                current.zoomTo(1f)
+                current.loadPages()
+                current.invalidate()
+            } catch (e: Exception) {
+                Log.w(TAG, "size-settle re-fit", e)
+            }
+        }
+        sizeSettleListener = listener
+        view.addOnLayoutChangeListener(listener)
+        // Drop the settle listener after a short window — only first-load
+        // wrong size is in scope (#127), not every later resize/rotation
+        // (library onSizeChanged already handles those).
+        mainHandler.postDelayed({
+            val current = pdfView
+            val settle = sizeSettleListener
+            if (current != null && settle != null) {
+                current.removeOnLayoutChangeListener(settle)
+            }
+            sizeSettleListener = null
+        }, SIZE_SETTLE_WINDOW_MS)
     }
 
     private fun loadDocument(params: Map<String, Any?>) {
@@ -120,6 +209,8 @@ class FlutterPDFView(
             return
         }
         documentLoadStarted = true
+        loadWidth = view.width
+        loadHeight = view.height
         var config: Configurator? = null
         if (params["filePath"] != null) {
             val filePath = params["filePath"] as String
@@ -167,6 +258,9 @@ class FlutterPDFView(
                 }
                 .onError { t ->
                     if (disposed) return@onError
+                    // Un-hide so the host is not stuck with an invisible view
+                    // after a failed open.
+                    revealContent()
                     val args: MutableMap<String, Any> = HashMap()
                     args["error"] = t.toString()
                     methodChannel.invokeMethod("onError", args)
@@ -178,6 +272,29 @@ class FlutterPDFView(
                     methodChannel.invokeMethod("onPageError", args)
                 }.onRender { pages ->
                     if (disposed) return@onRender
+                    // First painted frame — safe to show (#40). Then watch for a
+                    // late size settle that needs a re-fit (#127).
+                    revealContent()
+                    attachSizeSettleListener(view)
+                    // One more pass on the next frame in case the surface size
+                    // changed between load and first draw.
+                    view.post {
+                        if (disposed || pdfView == null) return@post
+                        try {
+                            if (kotlin.math.abs(view.zoom - 1f) < 0.02f &&
+                                (view.width != loadWidth || view.height != loadHeight) &&
+                                view.width > 0 && view.height > 0
+                            ) {
+                                loadWidth = view.width
+                                loadHeight = view.height
+                                view.zoomTo(1f)
+                                view.loadPages()
+                            }
+                            view.invalidate()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "post-render re-fit", e)
+                        }
+                    }
                     val args: MutableMap<String, Any> = HashMap()
                     args["pages"] = pages
                     methodChannel.invokeMethod("onRender", args)
@@ -205,6 +322,9 @@ class FlutterPDFView(
             }
             view.maxZoom = effectiveMax
             view.minZoom = effectiveMin
+        } else {
+            // No filePath / pdfData — reveal so the host is not stuck hidden.
+            revealContent()
         }
         configurator = config
     }
@@ -490,9 +610,17 @@ class FlutterPDFView(
         methodChannel.setMethodCallHandler(null)
         mainHandler.removeCallbacksAndMessages(null)
         val view = pdfView
+        val settle = sizeSettleListener
+        sizeSettleListener = null
         pdfView = null
         configurator = null
         if (view != null) {
+            if (settle != null) {
+                try {
+                    view.removeOnLayoutChangeListener(settle)
+                } catch (ignored: Exception) {
+                }
+            }
             try {
                 view.visibility = View.GONE
             } catch (ignored: Exception) {
@@ -534,6 +662,8 @@ class FlutterPDFView(
         private const val DEFAULT_MAX_ZOOM = 4.0f
         private const val DEFAULT_MIN_ZOOM = 1.0f
         private const val DRAW_THROTTLE_MS = 16L // ~1 frame at 60fps
+        /** How long to watch for a late first-layout size settle after onRender. */
+        private const val SIZE_SETTLE_WINDOW_MS = 750L
 
         @JvmStatic
         @VisibleForTesting

@@ -228,12 +228,19 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
     private var hasSentInitialPage = false
     private var fitPolicy: FitPolicy = .width
     /// Last view size we laid out against — used to re-fit after the temporary
-    /// non-zero frame (#268) expands to the real Flutter bounds (#150).
+    /// non-zero frame (#268) expands to the real Flutter bounds (#150 / #127).
     private var lastLayoutSize: CGSize = .zero
     /// Fit scale applied for `lastLayoutSize` (before user zoom multiplier).
     private var lastFitScale: CGFloat = 0
     /// Whether we have successfully applied an initial fit at a real size.
     private var hasAppliedInitialFit = false
+    /// Creation args held until the view has a non-zero size (#190 / #127).
+    private var pendingLoadArguments: [String: Any]?
+    /// Ensures the document is opened at most once from creation args.
+    private var documentLoadStarted = false
+    /// Hide until first successful fit so callers do not see a flash of wrong
+    /// scale or an empty surface during transitions (#40).
+    private var isContentRevealed = false
 
     init(frame: CGRect, arguments args: Any?, controller: PDFViewController) {
         self.controller = controller
@@ -254,8 +261,49 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         isScrolling = false
 
         pdfView.delegate = self
+        // Keep blank until first real-size fit to avoid flash / wrong initial
+        // scale when the platform view is still 0×0 or a placeholder (#40, #127).
+        pdfView.isHidden = true
+        isHidden = false
+        backgroundColor = .clear
 
-        loadDocument(arguments: args as? [String: Any])
+        pendingLoadArguments = args as? [String: Any]
+        // If Flutter already handed us a non-zero frame, open immediately;
+        // otherwise wait for layoutSubviews (#190 blank until foreground).
+        if hasUsableSize(bounds.size) {
+            beginDocumentLoadIfNeeded()
+        }
+    }
+
+    /// True when both dimensions are finite and large enough for PDFKit layout.
+    private func hasUsableSize(_ size: CGSize) -> Bool {
+        size.width.isFinite && size.height.isFinite && size.width > 1 && size.height > 1
+    }
+
+    private func beginDocumentLoadIfNeeded() {
+        guard !documentLoadStarted else { return }
+        documentLoadStarted = true
+        let args = pendingLoadArguments
+        pendingLoadArguments = nil
+        loadDocument(arguments: args)
+    }
+
+    private func reportError(_ message: String) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            // Reveal so a parent overlay / empty state is not stuck forever.
+            self.revealContentIfNeeded()
+            self.controller?.invokeChannelMethod(
+                "onError",
+                arguments: ["error": message]
+            )
+        }
+    }
+
+    private func revealContentIfNeeded() {
+        guard !isContentRevealed else { return }
+        isContentRevealed = true
+        pdfView.isHidden = false
     }
 
     @available(*, unavailable)
@@ -314,21 +362,51 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
             // Support plain paths and file:// URIs (#266 parity with Android).
             // URL(string:) returns nil for unescaped characters (spaces, etc.);
             // never fall back to fileURLWithPath on a full "file://..." string.
-            document = PDFDocument(url: Self.pdfURL(fromFilePath: filePath))
+            let url = Self.pdfURL(fromFilePath: filePath)
+            // Harden open path (#190): missing / unreadable files used to leave a
+            // blank PDFView with no onError until the app was backgrounded.
+            var isDirectory: ObjCBool = false
+            let exists = FileManager.default.fileExists(
+                atPath: url.path,
+                isDirectory: &isDirectory
+            )
+            if !exists || isDirectory.boolValue {
+                reportError(
+                    "cannot create document: File not found at \(url.path)."
+                )
+                return
+            }
+            if !FileManager.default.isReadableFile(atPath: url.path) {
+                reportError(
+                    "cannot create document: File is not readable at \(url.path)."
+                )
+                return
+            }
+            document = PDFDocument(url: url)
+            if document == nil {
+                reportError(
+                    "cannot create document: File not in PDF format or corrupted."
+                )
+                return
+            }
         } else if let pdfData = args?["pdfData"] as? FlutterStandardTypedData {
+            if pdfData.data.isEmpty {
+                reportError("cannot create document: pdfData is empty.")
+                return
+            }
             document = PDFDocument(data: pdfData.data)
+            if document == nil {
+                reportError(
+                    "cannot create document: File not in PDF format or corrupted."
+                )
+                return
+            }
         }
 
         guard let document else {
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                controller?.invokeChannelMethod(
-                    "onError",
-                    arguments: [
-                        "error": "cannot create document: File not in PDF format or corrupted.",
-                    ]
-                )
-            }
+            reportError(
+                "cannot create document: No filePath or pdfData provided."
+            )
             return
         }
 
@@ -385,13 +463,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
             if loadedDocument.isLocked {
                 // Android reports a PdfPasswordException through onError;
                 // without this the iOS view just stays blank.
-                DispatchQueue.main.async { [weak self] in
-                    guard let self else { return }
-                    controller?.invokeChannelMethod(
-                        "onError",
-                        arguments: ["error": "Password required or incorrect password."]
-                    )
-                }
+                reportError("Password required or incorrect password.")
             }
         }
 
@@ -410,13 +482,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         if pageCount == 0 {
             // Defer like the nil-document path: the Dart handler is only
             // attached after the platform view is created.
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                controller?.invokeChannelMethod(
-                    "onError",
-                    arguments: ["error": "PDF has no pages."]
-                )
-            }
+            reportError("PDF has no pages.")
             return
         }
         // Objective-C compared an NSUInteger page count against an NSInteger
@@ -504,6 +570,16 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
             object: pdfView
         )
         addSubview(pdfView)
+
+        // Force a layout pass now that the document is attached so PDFKit
+        // installs its scroll hierarchy before we report onRender. Opening
+        // against a deferred non-zero size (#190) still needs an immediate
+        // fit so the first paint is correct (#127).
+        setNeedsLayout()
+        layoutIfNeeded()
+        if hasUsableSize(bounds.size) {
+            _ = applyLayoutUpdates()
+        }
     }
 
     deinit {
@@ -566,9 +642,14 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         }
 
         // Guard against zero bounds — PDFKit NaN paths (#268).
-        if bounds.size.width <= 0 || bounds.size.height <= 0 {
+        if !hasUsableSize(bounds.size) {
             return
         }
+
+        // #190 / #127: open only once we have a real size so PDFKit does not
+        // lock to a 0×0 / placeholder layout that stays blank until the next
+        // app lifecycle event.
+        beginDocumentLoadIfNeeded()
 
         // Wrap layout updates in try-catch for safety
         var shouldUpdateCachedState = true
@@ -709,10 +790,18 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
             lastFitScale = fitScale
             lastLayoutSize = boundsSize
             hasAppliedInitialFit = true
+            // First correct fit at a real size — safe to show content (#40).
+            if hasUsableSize(boundsSize) {
+                revealContentIfNeeded()
+            }
         } else {
             // Still track size so a later change is detected; keep fit baseline.
             lastLayoutSize = boundsSize
             lastFitScale = fitScale
+            // If we already fit earlier, keep content visible after resizes.
+            if hasAppliedInitialFit {
+                revealContentIfNeeded()
+            }
         }
 
         if !hasSentInitialPage, defaultPageSet,
@@ -837,10 +926,20 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
     }
 
     func reload(_: FlutterMethodCall, result: FlutterResult) {
+        // If the initial open was deferred and never completed (still no size),
+        // try again now rather than reassigning a nil document.
+        if document == nil {
+            beginDocumentLoadIfNeeded()
+            result(NSNumber(value: document != nil))
+            return
+        }
+
         pdfView.document = document
         hasAppliedInitialFit = false
         lastFitScale = 0
         lastLayoutSize = .zero
+        isContentRevealed = false
+        pdfView.isHidden = true
         if let document, document.pageCount > 0, let firstPage = document.page(at: 0) {
             pdfView.go(to: firstPage)
 
@@ -856,6 +955,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
                 lastFitScale = fitScale
                 lastLayoutSize = bounds.size
                 hasAppliedInitialFit = true
+                revealContentIfNeeded()
             }
         }
 
@@ -949,12 +1049,25 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
     }
 
     private func handleRenderCompleted(_ pages: NSNumber) {
+        // If fit applied earlier we already revealed; if not (edge case where
+        // scale was not yet computable), still show so #190 does not leave a
+        // permanently hidden view after onRender.
+        if hasAppliedInitialFit || hasUsableSize(bounds.size) {
+            revealContentIfNeeded()
+        }
         controller?.invokeChannelMethod("onRender", arguments: ["pages": pages])
         if !didLoadComplete {
             didLoadComplete = true
             controller?.invokeChannelMethod("onLoadComplete", arguments: ["pages": pages])
         }
         startObserving()
+        // Post one more layout pass after PDFKit finishes installing pages so
+        // the first visible frame uses the real bounds (#127).
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.hasUsableSize(self.bounds.size) else { return }
+            self.setNeedsLayout()
+            self.layoutIfNeeded()
+        }
     }
 
     private func handleOnDraw() {
