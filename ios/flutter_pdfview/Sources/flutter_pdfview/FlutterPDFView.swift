@@ -17,7 +17,10 @@ import flutter_pdfview_objc
 ///
 /// Swift has no `@try`/`@catch`; every call site below mirrors one that the
 /// Objective-C implementation guarded the same way.
-private func catchingNSException(_ body: () -> Void, onException: (NSError) -> Void) {
+///
+/// Internal rather than file-private so `FPVThemedPage` can guard its own PDFKit
+/// calls the same way.
+func catchingNSException(_ body: () -> Void, onException: (NSError) -> Void) {
     do {
         try FPVExceptionCatcher.catchException(body)
     } catch {
@@ -25,7 +28,7 @@ private func catchingNSException(_ body: () -> Void, onException: (NSError) -> V
     }
 }
 
-private extension NSError {
+extension NSError {
     /// Equivalent of `exception.reason`, including the `"(null)"` that
     /// `NSLog(@"%@", exception.reason)` printed when there was none.
     var pdfExceptionReason: String {
@@ -190,7 +193,7 @@ final class PDFViewController: NSObject, FlutterPlatformView, PDFViewDelegate {
 // MARK: - The view itself
 
 @objc(FLTPDFView)
-final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
+final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDocumentDelegate,
     UIGestureRecognizerDelegate, UIScrollViewDelegate
 {
     /// How pages are scaled to the viewport (mirrors Dart [FitPolicy]).
@@ -242,6 +245,17 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
     /// Hide until first successful fit so callers do not see a flash of wrong
     /// scale or an empty surface during transitions (#40).
     private var isContentRevealed = false
+    /// Resolved color mode, read by `FPVThemedPage` on every page draw.
+    ///
+    /// Stored rather than derived on demand so the page never has to touch
+    /// `traitCollection` — PDFKit renders pages off the main thread.
+    private(set) var isDarkMode = false
+    /// Set while `rerenderPreservingPosition()` swaps the document out and back,
+    /// so the page churn that causes is not reported to Dart as a page change.
+    private var isRerendering = false
+    /// Last `enableSwipe` pushed through `updateSettings`, re-applied after a
+    /// re-render. `nil` until Dart updates it.
+    private var swipeEnabledOverride: Bool?
 
     init(frame: CGRect, arguments args: Any?, controller: PDFViewController) {
         self.controller = controller
@@ -360,6 +374,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         let pageFling = args?.bool("pageFling") ?? false
         let enableSwipe = args?.bool("enableSwipe") ?? false
         preventLinkNavigation = args?.bool("preventLinkNavigation") ?? false
+        setColorMode(Self.colorMode(fromSettings: args) ?? .light)
 
         var defaultPageIndex = args?.integer("defaultPage") ?? 0
 
@@ -414,6 +429,11 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
             )
             return
         }
+
+        // Pages are instantiated lazily on first access, so the delegate that
+        // supplies `FPVThemedPage` has to be in place before anything — including
+        // `pdfView.document` below — touches a page.
+        document.delegate = self
 
         pdfView.autoresizesSubviews = true
         pdfView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -1101,9 +1121,67 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         result(NSNumber(value: true))
     }
 
+    /// Applies the settings Dart pushes when a `PDFView` is rebuilt with
+    /// different values.
+    ///
+    /// Until 1.5.0 this was a no-op stub and every key was silently dropped, so
+    /// apps that relied on updates not taking effect will now see them applied.
+    /// Keys iOS cannot honour (`pageFling`, `pageSnap`) and keys it does not know
+    /// are accepted and ignored — never rejected — because a `FlutterError` here
+    /// surfaces as an unhandled exception in the app's build phase.
     func onUpdateSettings(_ call: FlutterMethodCall, result: FlutterResult) {
-        let settings = call.arguments as? [String: Any]
-        if settings?["pageAlignment"] != nil {
+        guard let settings = call.arguments as? [String: Any] else {
+            result(nil)
+            return
+        }
+
+        // `colorMode` and `backgroundColor` arrive in the same map and both want
+        // the view repainted, so state is recorded first and the (expensive)
+        // re-render runs once at the end.
+        var needsRerender = false
+
+        if settings.keys.contains("colorMode") || settings.keys.contains("nightMode"),
+           let mode = Self.colorMode(fromSettings: settings)
+        {
+            needsRerender = setColorMode(mode)
+        }
+
+        if settings.keys.contains("backgroundColor"), let color = settings.color("backgroundColor") {
+            // Only pages go through the color matrix on iOS, so the gutter is set
+            // to exactly what Dart asked for. A present-but-null value keeps the
+            // current color (documented: clearing back to null is not supported).
+            pdfView.backgroundColor = color
+            backgroundColor = color
+        }
+
+        if settings.keys.contains("preventLinkNavigation") {
+            preventLinkNavigation = settings.bool("preventLinkNavigation")
+        }
+
+        if settings.keys.contains("enableSwipe") {
+            swipeEnabledOverride = settings.bool("enableSwipe")
+            applySwipeEnabled()
+        }
+
+        if settings.keys.contains("minZoom") || settings.keys.contains("maxZoom") {
+            // Either key can arrive on its own; keep the other multiplier.
+            var minZoom = minScaleFactor
+            var maxZoom = maxScaleFactor
+            if let requested = settings.number("minZoom")?.doubleValue, requested > 0 {
+                minZoom = CGFloat(requested)
+            }
+            if let requested = settings.number("maxZoom")?.doubleValue, requested > 0 {
+                maxZoom = CGFloat(requested)
+            }
+            // Unlike setZoomLimits this cannot report INVALID_ARGS, so an
+            // inverted pair is dropped rather than applied.
+            if minZoom > 0, maxZoom >= minZoom {
+                applyZoomLimits(minZoom: minZoom, maxZoom: maxZoom)
+            }
+        }
+
+
+        if settings.keys.contains("pageAlignment") {
             pageAlignment = Self.pageAlignment(fromArguments: settings)
             // Update page-break margins to match top vs center (#272 gaps).
             if autoSpacing {
@@ -1116,12 +1194,15 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
             if pageAlignment == .top {
                 pinContentToTop(animated: false)
             } else if let scrollView {
-                // Restore default centering: clear the bottom pad we may have added.
                 var inset = scrollView.contentInset
                 inset.bottom = 0
                 scrollView.contentInset = inset
             }
             setNeedsLayout()
+        }
+
+        if needsRerender {
+            rerenderPreservingPosition()
         }
         result(nil)
     }
@@ -1142,6 +1223,13 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
             )
             return
         }
+        applyZoomLimits(minZoom: minZoom, maxZoom: maxZoom)
+        result(NSNumber(value: true))
+    }
+
+    /// Stores the zoom multipliers and derives PDFKit's absolute limits from the
+    /// current fit scale. Callers are responsible for validating the pair.
+    private func applyZoomLimits(minZoom: CGFloat, maxZoom: CGFloat) {
         // Persist the multipliers — applyLayoutUpdates re-derives PDFKit's
         // min/max from these on every layout pass, so writing only the PDFKit
         // values would be reverted by the next rotation/resize.
@@ -1160,7 +1248,107 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
             pdfView.minScaleFactor = minScale
             pdfView.maxScaleFactor = max(maxScale, minScale)
         }
-        result(NSNumber(value: true))
+    }
+
+    private func applySwipeEnabled() {
+        guard let enabled = swipeEnabledOverride else { return }
+        // The scroll view is discovered asynchronously after load, so fall back to
+        // a fresh lookup if the update lands first.
+        let target = scrollView ?? findScrollView(pdfView)
+        target?.isScrollEnabled = enabled
+    }
+
+    // MARK: - Color mode
+
+    /// Parses `colorMode` (`"PdfColorMode.dark"`, `"dark"`, …), falling back to
+    /// the deprecated `nightMode` boolean. `nil` when neither key is usable.
+    private static func colorMode(fromSettings settings: [String: Any]?) -> FPVColorMode? {
+        if let raw = settings?["colorMode"] as? String {
+            // Accepts both `enum.toString()` and `enum.name` spellings.
+            let token = (raw.split(separator: ".").last.map(String.init) ?? raw).lowercased()
+            switch token {
+            case "light":
+                return .light
+            case "dark":
+                return .dark
+            case "system":
+                return .system
+            default:
+                break
+            }
+        }
+        if let nightMode = settings?.number("nightMode")?.boolValue {
+            return nightMode ? .dark : .light
+        }
+        return nil
+    }
+
+    /// - Returns: `true` when the resolved mode actually changed, i.e. when the
+    ///   caller has to force a re-render.
+    @discardableResult
+    private func setColorMode(_ mode: FPVColorMode) -> Bool {
+        let resolved: Bool
+        switch mode {
+        case .light:
+            resolved = false
+        case .dark:
+            resolved = true
+        case .system:
+            // Dart normally resolves `system` from the app's Theme; this is only
+            // the fallback for a caller that passes it through verbatim.
+            resolved = traitCollection.userInterfaceStyle == .dark
+        }
+        guard resolved != isDarkMode else { return false }
+        isDarkMode = resolved
+        return true
+    }
+
+    /// Forces every visible page through `FPVThemedPage.draw` again without
+    /// losing the reader's place.
+    ///
+    /// PDFKit caches rendered pages and exposes no cache-flush API, so the
+    /// document has to be handed back to the view — the same primitive `reload`
+    /// uses. Unlike `reload` this restores the page, scale and scroll offset, and
+    /// leaves the #150 fit state (`hasAppliedInitialFit` / `lastFitScale` /
+    /// `lastLayoutSize`) untouched so the next layout pass does not re-fit.
+    private func rerenderPreservingPosition() {
+        guard let document = pdfView.document else { return }
+
+        let savedScale = pdfView.scaleFactor
+        let savedDestination = pdfView.currentDestination
+        let savedOffset = scrollView?.contentOffset
+        let savedPage = pdfView.currentPage
+
+        isRerendering = true
+        catchingNSException {
+            pdfView.document = nil
+            pdfView.document = document
+
+            // Reassigning the document resets PDFKit's own min/max scale factors,
+            // so re-derive them before restoring the scale — otherwise the restore
+            // is clamped to PDFKit's defaults.
+            applyZoomLimits(minZoom: minScaleFactor, maxZoom: maxScaleFactor)
+
+            if savedScale.isFinite, savedScale > 0 {
+                pdfView.scaleFactor = savedScale
+            }
+            if let savedDestination {
+                pdfView.go(to: savedDestination)
+            } else if let savedPage {
+                pdfView.go(to: savedPage)
+            }
+            // The destination restores the page and the point within it; the raw
+            // offset pins the remaining sub-page scroll. PDFKit keeps the same
+            // scroll view across a document swap, so the cached reference (and the
+            // contentOffset observation on it) stays valid.
+            if let savedOffset, let scrollView {
+                scrollView.setContentOffset(savedOffset, animated: false)
+            }
+            applySwipeEnabled()
+        } onException: { error in
+            NSLog("Warning: Failed to re-render after settings update: %@", error.pdfExceptionReason)
+        }
+        isRerendering = false
     }
 
     /// Captures the currently visible PDF contents and writes a PNG to `fileName`.
@@ -1357,6 +1545,11 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
     // MARK: - Callbacks
 
     @objc private func handlePageChanged(_: Notification) {
+        // Swapping the document out and back fires this for the intermediate
+        // state; the page the user is on has not actually changed.
+        if isRerendering {
+            return
+        }
         guard let document = pdfView.document, let currentPage = pdfView.currentPage else {
             return
         }
@@ -1408,6 +1601,14 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
                 "pdfScale": NSNumber(value: Float(pdfView.scaleFactor)),
             ]
         )
+    }
+
+    // MARK: - PDFDocumentDelegate
+
+    /// Installed unconditionally, in every color mode: `FPVThemedPage` reads the
+    /// mode at draw time, so a theme change never has to re-instantiate pages.
+    @objc func classForPage() -> AnyClass {
+        FPVThemedPage.self
     }
 
     // MARK: - PDFViewDelegate

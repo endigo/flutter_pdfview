@@ -73,3 +73,21 @@ enum PageAlignment {
   /// Pin the document to the top of the viewport; free space is below.
   top,
 }
+
+/// Color theme for PDF page content and the gutter behind it.
+///
+/// - [light]: normal rendering (no inversion).
+/// - [dark]: luminance-preserving inversion (white↔black, hue kept).
+/// - [system]: follows the app [Theme] brightness (or platform brightness when
+///   no [Theme] ancestor is present). Resolved in Dart before the value is
+///   sent to the native view.
+enum PdfColorMode {
+  /// Normal light rendering.
+  light,
+
+  /// Dark theme via luminance-preserving color inversion.
+  dark,
+
+  /// Follow the ambient app theme / platform brightness.
+  system,
+}

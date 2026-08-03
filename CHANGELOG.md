@@ -1,3 +1,18 @@
+## 1.5.0-beta.9
+
+- Fix [#215](https://github.com/endigo/flutter_pdfview/issues/215): night mode used a naive
+  channel invert that turned photos into negatives. Dark mode now uses a luminance-preserving
+  inversion on both platforms so white↔black while hue is kept
+  ([#348](https://github.com/endigo/flutter_pdfview/pull/348), [#349](https://github.com/endigo/flutter_pdfview/pull/349), [#350](https://github.com/endigo/flutter_pdfview/pull/350))
+- Fix [#138](https://github.com/endigo/flutter_pdfview/issues/138): iOS dark mode via `FPVThemedPage`
+- **Android**: `colorMode` via hardware-layer `ColorMatrixColorFilter` (replacing `setNightMode`);
+  gutters use matrix-compensated background; screenshots use `saveLayer` for theme-correct captures
+- **Dart**: add `PdfColorMode` (`light` / `dark` / `system`) and `PDFView.colorMode` (default
+  `system`); deprecate `nightMode` (still honored when `colorMode` is left at `system`)
+- Runtime updates include `colorMode` and `backgroundColor` without remounting; iOS `onUpdateSettings`
+  is now live for color, background, swipe, zoom limits, and link navigation
+- Includes everything in `1.5.0-beta.8`
+
 ## 1.5.0-beta.8
 
 - Add `PageAlignment` (`center` default, `top`) so short / single-page documents can pin to the top of
@@ -61,7 +76,6 @@
 ## 1.5.0-beta.1
 
 Native language migration on both platforms. Includes everything in `1.4.5`.
-
 - **Android**: migrate the plugin implementation from Java to Kotlin (KGP 2.0.0, JVM target 17).
   Behavior verified by the existing 64-test native suite running against the Kotlin sources unchanged
 - **iOS**: migrate the plugin implementation from Objective-C to Swift 5.9. The registered

@@ -13,6 +13,7 @@ const Set<String> _expectedKeys = <String>{
   'showScrollIndicators',
   'password',
   'nightMode',
+  'colorMode',
   'autoSpacing',
   'pageFling',
   'pageSnap',
@@ -129,6 +130,8 @@ void main() {
       expect(params['swipeHorizontal'], isFalse);
       expect(params['showScrollIndicators'], isFalse);
       expect(params['nightMode'], isFalse);
+      // Default colorMode is system; MaterialApp Theme is light → light.
+      expect(params['colorMode'], 'light');
       expect(params['autoSpacing'], isTrue);
       expect(params['pageFling'], isTrue);
       expect(params['pageSnap'], isTrue);
@@ -153,7 +156,7 @@ void main() {
           swipeHorizontal: true,
           showScrollIndicators: true,
           password: 's3cret',
-          nightMode: true,
+          colorMode: PdfColorMode.dark,
           autoSpacing: false,
           pageFling: false,
           pageSnap: false,
@@ -176,7 +179,7 @@ void main() {
       expect(params['enableSwipe'], isFalse);
       expect(params['swipeHorizontal'], isTrue);
       expect(params['showScrollIndicators'], isTrue);
-      expect(params['nightMode'], isTrue);
+      expect(params['colorMode'], 'dark');
       expect(params['autoSpacing'], isFalse);
       expect(params['pageFling'], isFalse);
       expect(params['pageSnap'], isFalse);
@@ -238,14 +241,71 @@ void main() {
       (WidgetTester tester) async {
         final Map<Object?, Object?> params = await pumpAndCapture(
           tester,
-          const PDFView(filePath: 'android.pdf', nightMode: true),
+          const PDFView(filePath: 'android.pdf', colorMode: PdfColorMode.dark),
         );
         expect(params.keys.cast<String>().toSet(), _expectedKeys);
         expect(params['filePath'], 'android.pdf');
-        expect(params['nightMode'], isTrue);
+        expect(params['colorMode'], 'dark');
       },
       variant: TargetPlatformVariant.only(TargetPlatform.android),
     );
+
+    testWidgets('serializes colorMode light and dark by name', (WidgetTester tester) async {
+      final Map<Object?, Object?> lightParams = await pumpAndCapture(
+        tester,
+        const PDFView(filePath: 'a.pdf', colorMode: PdfColorMode.light),
+      );
+      expect(lightParams['colorMode'], 'light');
+
+      // Remount with a new document so create fires again with dark params.
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: PDFView(filePath: 'b.pdf', colorMode: PdfColorMode.dark),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(created, hasLength(2));
+      expect(created.last['colorMode'], 'dark');
+    }, variant: _iOS);
+
+    testWidgets('deprecated nightMode: true resolves to dark when colorMode is system', (
+      WidgetTester tester,
+    ) async {
+      final Map<Object?, Object?> params = await pumpAndCapture(
+        tester,
+        // ignore: deprecated_member_use_from_same_package
+        const PDFView(filePath: 'a.pdf', nightMode: true),
+      );
+      expect(params['colorMode'], 'dark');
+      expect(params['nightMode'], isTrue);
+    }, variant: _iOS);
+
+    testWidgets('explicit colorMode beats deprecated nightMode', (WidgetTester tester) async {
+      final Map<Object?, Object?> params = await pumpAndCapture(
+        tester,
+        // ignore: deprecated_member_use_from_same_package
+        const PDFView(filePath: 'a.pdf', colorMode: PdfColorMode.light, nightMode: true),
+      );
+      expect(params['colorMode'], 'light');
+    }, variant: _iOS);
+
+    testWidgets('system colorMode resolves from ambient Theme brightness', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.light(),
+          darkTheme: ThemeData.dark(),
+          themeMode: ThemeMode.dark,
+          home: const Scaffold(body: PDFView(filePath: 'a.pdf')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(created, hasLength(1));
+      expect(created.single['colorMode'], 'dark');
+    }, variant: _iOS);
   });
 
   group('Settings updates over the method channel', () {
@@ -264,8 +324,9 @@ void main() {
           home: Scaffold(
             body: PDFView(
               filePath: 'a.pdf',
-              nightMode: true,
+              colorMode: PdfColorMode.dark,
               maxZoom: 6.0,
+              backgroundColor: Color(0xFF112233),
               // Not part of the updatable diff.
               swipeHorizontal: true,
             ),
@@ -276,7 +337,45 @@ void main() {
 
       expect(created, hasLength(1), reason: 'settings-only change must not remount the view');
       expect(viewCalls.map((MethodCall c) => c.method), <String>['updateSettings']);
-      expect(viewCalls.single.arguments, <String, Object?>{'nightMode': true, 'maxZoom': 6.0});
+      expect(viewCalls.single.arguments, <String, Object?>{
+        'colorMode': 'dark',
+        'maxZoom': 6.0,
+        'backgroundColor': 0xFF112233,
+      });
+    }, variant: _iOS);
+
+    testWidgets('theme brightness change updates colorMode without remounting', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.light(),
+          darkTheme: ThemeData.dark(),
+          themeMode: ThemeMode.light,
+          home: const Scaffold(body: PDFView(filePath: 'a.pdf')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(created, hasLength(1));
+      expect(created.single['colorMode'], 'light');
+      viewCalls.clear();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.light(),
+          darkTheme: ThemeData.dark(),
+          themeMode: ThemeMode.dark,
+          home: const Scaffold(body: PDFView(filePath: 'a.pdf')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(created, hasLength(1), reason: 'theme toggle must not remount the platform view');
+      final List<MethodCall> updates = viewCalls
+          .where((MethodCall c) => c.method == 'updateSettings')
+          .toList();
+      expect(updates, hasLength(1));
+      expect(updates.single.arguments, <String, Object?>{'colorMode': 'dark'});
     }, variant: _iOS);
 
     testWidgets('sends nothing when no updatable setting changed', (WidgetTester tester) async {

@@ -32,7 +32,7 @@ void main() {
       filePath: 'test.pdf',
       enableSwipe: true,
       swipeHorizontal: false,
-      nightMode: false,
+      colorMode: PdfColorMode.light,
       autoSpacing: true,
       pageFling: true,
       pageSnap: true,
@@ -214,7 +214,7 @@ void main() {
         swipeHorizontal: true,
         showScrollIndicators: true,
         password: 's3cret',
-        nightMode: true,
+        colorMode: PdfColorMode.dark,
         autoSpacing: false,
         pageFling: false,
         pageSnap: false,
@@ -234,10 +234,10 @@ void main() {
       await tester.pump();
 
       // Smoke: widget still builds with the full settings surface used by the
-      // example app (nightMode, backgroundColor, zoom bounds, fit policy).
+      // example app (colorMode, backgroundColor, zoom bounds, fit policy).
       expect(find.byType(PDFView), findsOneWidget);
       expect(view.filePath, '/docs/demo.pdf');
-      expect(view.nightMode, isTrue);
+      expect(view.colorMode, PdfColorMode.dark);
       expect(view.backgroundColor, const Color(0xFF112233));
       expect(view.fitPolicy, FitPolicy.HEIGHT);
       expect(view.defaultPage, 3);
@@ -245,6 +245,15 @@ void main() {
       expect(view.minZoom, 0.5);
       expect(view.preventLinkNavigation, isTrue);
       expect(view.showScrollIndicators, isTrue);
+    });
+
+    test('PdfColorMode values are light, dark, system', () {
+      expect(PdfColorMode.values, <PdfColorMode>[
+        PdfColorMode.light,
+        PdfColorMode.dark,
+        PdfColorMode.system,
+      ]);
+      expect(PdfColorMode.dark.name, 'dark');
     });
 
     test('pdfData source is accepted without filePath', () {

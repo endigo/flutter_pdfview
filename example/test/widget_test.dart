@@ -20,6 +20,25 @@ void main() {
       expect(find.text('Remote PDF'), findsOneWidget);
       expect(find.text('Open PDF (iPad Safe Mode)'), findsOneWidget);
       expect(find.text('Open Corrupted PDF'), findsOneWidget);
+      // Theme toggle lives in the home AppBar.
+      expect(find.byTooltip('Theme: system'), findsOneWidget);
+    });
+
+    testWidgets('theme toggle cycles light → dark → system', (tester) async {
+      await tester.pumpWidget(const MyApp(loadDocuments: false));
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Theme: system'));
+      await tester.pump();
+      expect(find.byTooltip('Theme: light'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Theme: light'));
+      await tester.pump();
+      expect(find.byTooltip('Theme: dark'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Theme: dark'));
+      await tester.pump();
+      expect(find.byTooltip('Theme: system'), findsOneWidget);
     });
 
     testWidgets('Open PDF is a tappable TextButton', (tester) async {

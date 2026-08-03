@@ -7,17 +7,21 @@ part of '../flutter_pdfview.dart';
 /// happens automatically when the owning [PDFView] leaves the tree or loads a
 /// different document.
 class PDFViewController {
-  PDFViewController._(int id, PDFView widget)
+  PDFViewController._(int id, PDFView widget, {PdfColorMode resolvedColorMode = PdfColorMode.light})
     : _channel = MethodChannel('plugins.endigo.io/pdfview_$id'),
       _widget = widget {
-    _settings = _PDFViewSettings.fromWidget(widget);
+    _settings = _PDFViewSettings.fromWidget(widget, resolvedColorMode: resolvedColorMode);
     _channel.setMethodCallHandler(_onMethodCall);
   }
 
   /// Test-only constructor so unit tests can exercise the method channel
   /// without a real platform view.
   @visibleForTesting
-  factory PDFViewController.test(int id, PDFView widget) => PDFViewController._(id, widget);
+  factory PDFViewController.test(
+    int id,
+    PDFView widget, {
+    PdfColorMode resolvedColorMode = PdfColorMode.light,
+  }) => PDFViewController._(id, widget, resolvedColorMode: resolvedColorMode);
 
   final MethodChannel _channel;
 
@@ -203,9 +207,11 @@ class PDFViewController {
     return isSet;
   }
 
-  Future<void> _updateWidget(PDFView widget) async {
+  Future<void> _updateWidget(PDFView widget, {required PdfColorMode resolvedColorMode}) async {
     _widget = widget;
-    await _updateSettings(_PDFViewSettings.fromWidget(widget));
+    await _updateSettings(
+      _PDFViewSettings.fromWidget(widget, resolvedColorMode: resolvedColorMode),
+    );
   }
 
   Future<void> _updateSettings(_PDFViewSettings setting) async {

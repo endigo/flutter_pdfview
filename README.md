@@ -20,15 +20,14 @@ dependencies:
 
 #### Trying the 1.5.0 beta
 
-`1.5.0-beta.8` continues the Kotlin/Swift line with `PageAlignment.top` and Android
-`setPage` horizontal centering ([#250](https://github.com/endigo/flutter_pdfview/issues/250),
-[#272](https://github.com/endigo/flutter_pdfview/issues/272),
-[#197](https://github.com/endigo/flutter_pdfview/issues/197)). Pre-releases are not
+`1.5.0-beta.9` continues the Kotlin/Swift line with luminance-preserving `PdfColorMode`
+dark theming ([#215](https://github.com/endigo/flutter_pdfview/issues/215),
+[#138](https://github.com/endigo/flutter_pdfview/issues/138)). Pre-releases are not
 picked up by a `^` constraint, so pin it explicitly:
 
 ```
 dependencies:
-  flutter_pdfview: 1.5.0-beta.8
+  flutter_pdfview: 1.5.0-beta.9
 ```
 
 Feedback is welcome in [#351](https://github.com/endigo/flutter_pdfview/issues/351).
@@ -75,7 +74,8 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | enableSwipe           |   ✅    | ✅  |      `true`       |
 | swipeHorizontal       |   ✅    | ✅  |      `false`      |
 | password              |   ✅    | ✅  |      `null`       |
-| nightMode             |   ✅    | ❌  |      `false`      |
+| colorMode             |   ✅    | ✅  | `PdfColorMode.system` |
+| nightMode*            |   ✅    | ✅  |      `false`      |
 | autoSpacing*          |   ✅    | ✅  |      `true`       |
 | pageFling             |   ✅    | ✅  |      `true`       |
 | pageSnap              |   ✅    | ❌  |      `true`       |
@@ -90,6 +90,9 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | thumbnailRatio*       |   ✅    | ❌  |        0.8        |
 
 Notes:
+- `colorMode` themes page content and the gutter on both platforms. Values: `PdfColorMode.light`, `PdfColorMode.dark`, `PdfColorMode.system` (default). `system` follows the app `Theme` brightness (or platform brightness when no `Theme` is present) and is resolved in Dart before being sent to the native view. Dark mode uses a luminance-preserving inversion (hue kept; photos do not become pure negatives). Live updates apply without remounting the platform view.
+- `nightMode` is **deprecated**. Prefer `colorMode`. When `colorMode` is left at `system` and `nightMode: true`, the resolved mode is `dark`. An explicit `colorMode` always wins.
+- `backgroundColor` can be updated at runtime together with `colorMode`. Setting it back to `null` after a non-null value leaves the previous color on screen.
 - `showScrollIndicators` is ignored on iOS while horizontal page-flipping is active (`pageFling: true` together with `swipeHorizontal: true`).
 - `autoSpacing` only adds gaps between pages. It does not change initial zoom or `fitPolicy` (fixed in [#150](https://github.com/endigo/flutter_pdfview/issues/150)).
 - `thumbnailRatio` must be in `(0, 1]`. Higher values look sharper while tiles load but use more memory.
@@ -226,10 +229,10 @@ within the constraints of the
 
 1. **Color inversion / dark pages** — Prefer the plugin API instead of wrapping
    the view in `ColorFiltered`:
-   - Android: `nightMode: true` (native invert).
-   - iOS: `nightMode` is not available today; use a theme-appropriate
-     `backgroundColor`, or invert offline content before load if you control the
-     PDF bytes.
+   - Both platforms: `colorMode: PdfColorMode.dark` (or `PdfColorMode.system` to
+     follow the app `Theme`). Luminance-preserving invert keeps photos recognizable.
+   - Legacy: `nightMode: true` still maps to dark when `colorMode` is left at
+     `system` (deprecated).
 
 2. **Blur / glass under a sheet** — Place the `BackdropFilter` so it samples
    Flutter-drawn content (not only the hole where the native PDF sits), use a
@@ -278,7 +281,8 @@ PDFView(
   autoSpacing: false,
   pageFling: false,
   showScrollIndicators: true,
-  backgroundColor: Colors.grey,
+  colorMode: PdfColorMode.system, // follows Theme brightness
+  backgroundColor: Theme.of(context).colorScheme.surface,
   onRender: (_pages) {
     setState(() {
       pages = _pages;

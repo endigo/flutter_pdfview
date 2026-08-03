@@ -8,6 +8,9 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -55,6 +58,15 @@ class FlutterPDFView(
     /** Creation / runtime page alignment (#250, #272). Default centers short docs. */
     private var pageAlignment: PageAlignment = getPageAlignment(params)
 
+    /**
+     * Active color transform, or null for light mode. Stored as the matrix
+     * (not a boolean) so sepia/soft-dark is a one-constant addition later.
+     */
+    private var colorMatrix: FloatArray? = null
+
+    /** Last background requested by Dart (pre-compensation), or null. */
+    private var requestedBackgroundColor: Int? = null
+
     @Volatile
     private var disposed = false
 
@@ -97,11 +109,10 @@ class FlutterPDFView(
         )
         applyDisplayQualityDefaults(displayDensity, params)
 
-        val backgroundColor = params["backgroundColor"]
-        if (backgroundColor != null) {
-            val color = (backgroundColor as Number).toInt()
-            view.setBackgroundColor(color)
-        }
+        // Record creation-time theme; single applyColorTheme (no loadPages yet).
+        requestedBackgroundColor = (params["backgroundColor"] as? Number)?.toInt()
+        colorMatrix = resolveColorMatrix(params)
+        applyColorTheme(reloadPages = false)
 
         // Defer load until the view has a non-zero size so Pdfium does not render
         // into a zero-sized / unattached surface (#298 blank, #280 quick-open crash).
@@ -248,11 +259,12 @@ class FlutterPDFView(
             val topAlign = pageAlignment == PageAlignment.TOP
             val effectiveAutoSpacing = userAutoSpacing && !topAlign
             val interPageSpacingDp = if (topAlign && userAutoSpacing) TOP_ALIGN_SPACING_DP else 0
+            // Do not call nightMode() — hardware-layer colorMode is applied via
+            // applyColorTheme(); composing both would double-invert.
             config
                 .enableSwipe(getBoolean(params, "enableSwipe"))
                 .swipeHorizontal(getBoolean(params, "swipeHorizontal"))
                 .password(getString(params, "password"))
-                .nightMode(getBoolean(params, "nightMode"))
                 .autoSpacing(effectiveAutoSpacing)
                 .spacing(interPageSpacingDp)
                 .pageFling(getBoolean(params, "pageFling"))
@@ -621,7 +633,19 @@ class FlutterPDFView(
             // LAYER_TYPE_SOFTWARE rebuilds the display list into a CPU bitmap so
             // subsequent draw() copies real page content instead of an empty HW layer.
             view.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-            view.draw(canvas)
+            // View.draw bypasses the hardware layer paint, so without saveLayer
+            // screenshots would silently stay light-mode while dark is on screen.
+            val matrix = colorMatrix
+            if (matrix != null) {
+                val paint = Paint().apply {
+                    colorFilter = ColorMatrixColorFilter(ColorMatrix(matrix.copyOf()))
+                }
+                canvas.saveLayer(null, paint)
+                view.draw(canvas)
+                canvas.restore()
+            } else {
+                view.draw(canvas)
+            }
         } finally {
             view.setLayerType(previousLayerType, null)
         }
@@ -826,15 +850,31 @@ class FlutterPDFView(
         if (disposed || view == null) {
             return
         }
+        // colorMode + backgroundColor arrive together; only record during the
+        // loop, then a single applyColorTheme() so gutter compensation sees the
+        // final mode and loadPages runs once.
+        var colorThemeDirty = false
         for (key in settings.keys) {
             when (key) {
                 "enableSwipe" -> view.setSwipeEnabled(getBoolean(settings, key))
+                "colorMode" -> {
+                    colorMatrix = matrixForColorMode(settings[key] as? String)
+                    colorThemeDirty = true
+                }
+                "backgroundColor" -> {
+                    val bg = settings[key]
+                    requestedBackgroundColor = if (bg is Number) bg.toInt() else null
+                    colorThemeDirty = true
+                }
+                // Legacy: map nightMode through the color-matrix path; never
+                // call setNightMode (would compose with the layer and double-invert).
                 "nightMode" -> {
-                    view.setNightMode(getBoolean(settings, key))
-                    // Night mode is applied when pages are (re)rendered; AndroidPdfViewer
-                    // caches page bitmaps so invalidate() alone is not enough.
-                    view.loadPages()
-                    view.invalidate()
+                    colorMatrix = if (getBoolean(settings, key)) {
+                        PdfColorMatrix.LUMINANCE_INVERT
+                    } else {
+                        null
+                    }
+                    colorThemeDirty = true
                 }
                 "pageFling" -> view.setPageFling(getBoolean(settings, key))
                 "pageSnap" -> view.setPageSnap(getBoolean(settings, key))
@@ -855,6 +895,67 @@ class FlutterPDFView(
                 "minZoom" -> view.minZoom = getFloat(settings, key, DEFAULT_MIN_ZOOM)
                 else -> throw IllegalArgumentException("Unknown PDFView setting: $key")
             }
+        }
+        if (colorThemeDirty) {
+            applyColorTheme(reloadPages = true)
+        }
+    }
+
+    /**
+     * Apply [colorMatrix] as a hardware-layer [ColorMatrixColorFilter] and set
+     * the gutter background.
+     *
+     * Because M is an involution, dark mode sets the view background to
+     * `M(requestedBackgroundColor)` so the layer renders the color Dart asked
+     * for. Background is always `null` (never TRANSPARENT): AndroidPdfViewer
+     * self-fills only when `getBackground() == null`; with a dark layer that
+     * fill becomes black.
+     */
+    private fun applyColorTheme(reloadPages: Boolean) {
+        val view = pdfView
+        if (disposed || view == null) {
+            return
+        }
+        val matrix = colorMatrix
+        if (matrix != null) {
+            val paint = Paint().apply {
+                colorFilter = ColorMatrixColorFilter(ColorMatrix(matrix.copyOf()))
+            }
+            view.setLayerType(View.LAYER_TYPE_HARDWARE, paint)
+            val bg = requestedBackgroundColor
+            if (bg != null) {
+                view.setBackgroundColor(PdfColorMatrix.transformColor(bg, matrix))
+            } else {
+                view.background = null
+            }
+        } else {
+            view.setLayerType(View.LAYER_TYPE_NONE, null)
+            val bg = requestedBackgroundColor
+            if (bg != null) {
+                view.setBackgroundColor(bg)
+            } else {
+                view.background = null
+            }
+        }
+        if (reloadPages && view.pageCount > 0) {
+            // Cached page bitmaps must be flushed; invalidate alone is not enough.
+            view.loadPages()
+            view.invalidate()
+        }
+    }
+
+    private fun resolveColorMatrix(params: Map<String, Any?>): FloatArray? {
+        if (params.containsKey("colorMode")) {
+            return matrixForColorMode(params["colorMode"] as? String)
+        }
+        // Creation-time fallback while Dart still sends nightMode.
+        return if (getBoolean(params, "nightMode")) PdfColorMatrix.LUMINANCE_INVERT else null
+    }
+
+    private fun matrixForColorMode(mode: String?): FloatArray? {
+        return when (mode) {
+            "dark" -> PdfColorMatrix.LUMINANCE_INVERT
+            else -> null // "light", null, or unknown → light
         }
     }
 
