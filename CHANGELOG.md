@@ -1,3 +1,8 @@
+## 1.5.0-beta.2
+
+- Document iOS platform-view composition limits for `ColorFiltered` / `ShaderMask` / `BackdropFilter` over `PDFView`, with official Flutter evidence and workarounds ([#213](https://github.com/endigo/flutter_pdfview/issues/213), [#352](https://github.com/endigo/flutter_pdfview/pull/352))
+- Includes everything in `1.5.0-beta.1`
+
 ## 1.5.0-beta.1
 
 Native language migration on both platforms. Includes everything in `1.4.5`.
