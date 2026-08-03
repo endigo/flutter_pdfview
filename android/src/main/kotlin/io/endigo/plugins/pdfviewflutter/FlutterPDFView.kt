@@ -28,6 +28,7 @@ import com.github.barteksc.pdfviewer.link.LinkHandler
 import com.github.barteksc.pdfviewer.scroll.DefaultScrollHandle
 import com.github.barteksc.pdfviewer.util.Constants
 import com.github.barteksc.pdfviewer.util.FitPolicy
+import com.shockwave.pdfium.PdfPasswordException
 
 import java.io.File
 import java.io.FileOutputStream
@@ -43,7 +44,7 @@ class FlutterPDFView(
     private val context: Context,
     messenger: BinaryMessenger,
     id: Int,
-    params: Map<String, Any?>
+    creationParams: Map<String, Any?>
 ) : PlatformView, MethodCallHandler {
 
     private var pdfView: PDFView?
@@ -54,6 +55,12 @@ class FlutterPDFView(
     private var lastDrawTime: Long = 0
     private val displayDensity: Float
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** Mutable so a password set later still reaches the deferred first load. */
+    private val params: MutableMap<String, Any?> = HashMap(creationParams)
+
+    /** Pending `unlock`, settled from onLoad / onError once the reload lands. */
+    private var pendingUnlockResult: Result? = null
 
     /** Creation / runtime page alignment (#250, #272). Default centers short docs. */
     private var pageAlignment: PageAlignment = getPageAlignment(params)
@@ -129,7 +136,7 @@ class FlutterPDFView(
                     return
                 }
                 currentView.removeOnLayoutChangeListener(this)
-                loadDocument(params)
+                loadDocument()
                 // Keep INVISIBLE until onRender — do not flash mid-load (#40).
             }
         }
@@ -142,7 +149,7 @@ class FlutterPDFView(
             }
             if (currentView.width > 0 && currentView.height > 0) {
                 currentView.removeOnLayoutChangeListener(initialLayoutListener)
-                loadDocument(params)
+                loadDocument()
             }
         }
     }
@@ -223,7 +230,7 @@ class FlutterPDFView(
         }, SIZE_SETTLE_WINDOW_MS)
     }
 
-    private fun loadDocument(params: Map<String, Any?>) {
+    private fun loadDocument() {
         val view = pdfView
         if (disposed || view == null || documentLoadStarted) {
             return
@@ -296,10 +303,16 @@ class FlutterPDFView(
                     methodChannel.invokeMethod("onPageChanged", args)
                 }
                 .onError { t ->
+                    // Always settle a pending unlock, even after dispose, so an
+                    // awaiting Dart caller is never left hanging.
+                    completeUnlock(false)
                     if (disposed) return@onError
                     // Un-hide so the host is not stuck with an invisible view
                     // after a failed open.
                     revealContent()
+                    if (isPasswordError(t)) {
+                        notifyPasswordRequired()
+                    }
                     val args: MutableMap<String, Any> = HashMap()
                     args["error"] = t.toString()
                     methodChannel.invokeMethod("onError", args)
@@ -350,6 +363,8 @@ class FlutterPDFView(
                     onDrawArgs["pdfScale"] = view.zoom
                     methodChannel.invokeMethod("onDraw", onDrawArgs)
                 }.onLoad { nbPages ->
+                    // The document opened, so a pending unlock succeeded.
+                    completeUnlock(true)
                     if (disposed) return@onLoad
                     val args: MutableMap<String, Any> = HashMap()
                     args["pages"] = nbPages
@@ -366,6 +381,8 @@ class FlutterPDFView(
         } else {
             // No filePath / pdfData — reveal so the host is not stuck hidden.
             revealContent()
+            // No load callback will ever settle an unlock queued before this.
+            completeUnlock(false)
         }
         configurator = config
     }
@@ -384,6 +401,7 @@ class FlutterPDFView(
             "setScale" -> setScale(methodCall, result)
             "getScreenshot" -> getScreenshot(methodCall, result)
             "reload" -> reload(result)
+            "unlock" -> unlock(methodCall, result)
             "currentPage" -> getCurrentPage(result)
             "setPage" -> setPage(methodCall, result)
             "updateSettings" -> updateSettings(methodCall, result)
@@ -684,6 +702,69 @@ class FlutterPDFView(
         }
     }
 
+    fun unlock(call: MethodCall, result: Result) {
+        val password = call.argument<String>("password")
+        if (password == null) {
+            result.error("INVALID_ARGS", "password is required", null)
+            return
+        }
+        applyPassword(password, result)
+    }
+
+    /**
+     * Reloads the document with [password], settling [result] from onLoad /
+     * onError. The `updateSettings` path passes null and relies on callbacks.
+     */
+    private fun applyPassword(password: String?, result: Result?) {
+        if (disposed) {
+            result?.success(false)
+            return
+        }
+        // A still-pending unlock loses its reload to this one.
+        completeUnlock(false)
+        params["password"] = password
+
+        val view = pdfView
+        val config = configurator
+        if (config == null) {
+            if (documentLoadStarted) {
+                // No usable document source, so there is nothing to reopen.
+                result?.success(false)
+                return
+            }
+            // The deferred first load picks the password up from params.
+            pendingUnlockResult = result
+            return
+        }
+        if (view == null) {
+            result?.success(false)
+            return
+        }
+
+        pendingUnlockResult = result
+        config.password(password)
+        // Recycle first so Pdfium releases the previous (locked) document (#261).
+        try {
+            view.recycle()
+        } catch (e: Exception) {
+            Log.w(TAG, "recycle before password reload", e)
+        }
+        config.load()
+    }
+
+    private fun completeUnlock(success: Boolean) {
+        val pending = pendingUnlockResult ?: return
+        pendingUnlockResult = null
+        pending.success(success)
+    }
+
+    private fun notifyPasswordRequired() {
+        val password = params["password"] as? String
+        val args: MutableMap<String, Any> = HashMap()
+        args["incorrect"] = !password.isNullOrEmpty()
+        methodChannel.invokeMethod("onPasswordRequired", args)
+    }
+
     fun getCurrentPage(result: Result) {
         val view = pdfView
         if (disposed || view == null) {
@@ -893,6 +974,7 @@ class FlutterPDFView(
                 }
                 "maxZoom" -> view.maxZoom = getFloat(settings, key, DEFAULT_MAX_ZOOM)
                 "minZoom" -> view.minZoom = getFloat(settings, key, DEFAULT_MIN_ZOOM)
+                "password" -> applyPassword(settings[key] as? String, null)
                 else -> throw IllegalArgumentException("Unknown PDFView setting: $key")
             }
         }
@@ -964,6 +1046,8 @@ class FlutterPDFView(
         // Hide first so Flutter stops drawing into the platform surface, then
         // recycle Pdfium resources on the main thread and drop channel handlers.
         disposed = true
+        // Settle an unlock that will never load now, so its caller stops waiting.
+        completeUnlock(false)
         methodChannel.setMethodCallHandler(null)
         mainHandler.removeCallbacksAndMessages(null)
         val view = pdfView
@@ -1025,6 +1109,8 @@ class FlutterPDFView(
         private const val DEFAULT_MAX_ZOOM = 4.0f
         private const val DEFAULT_MIN_ZOOM = 1.0f
         private const val DRAW_THROTTLE_MS = 16L // ~1 frame at 60fps
+        /** How deep to look for a wrapped Pdfium password failure. */
+        private const val MAX_CAUSE_DEPTH = 8
         /** How long to watch for a late first-layout size settle after onRender. */
         private const val SIZE_SETTLE_WINDOW_MS = 750L
         /** Fixed inter-page gap (dp) when top-align disables autoSpacing but user wants gaps. */
@@ -1106,6 +1192,31 @@ class FlutterPDFView(
                 density >= 2.0f -> intArrayOf(150, 10)
                 else -> intArrayOf(BASE_PAGE_PART_CACHE_SIZE, BASE_THUMBNAIL_CACHE_SIZE)
             }
+        }
+
+        /** Whether [t] (or anything it wraps) is Pdfium's password failure. */
+        @JvmStatic
+        @VisibleForTesting
+        fun isPasswordError(t: Throwable?): Boolean {
+            var cause = t
+            var depth = 0
+            // Bounded so a cyclic cause chain cannot spin.
+            while (cause != null && depth < MAX_CAUSE_DEPTH) {
+                if (cause is PdfPasswordException) {
+                    return true
+                }
+                // Forks of PdfiumAndroid repackage it under their own name.
+                if (cause.javaClass.simpleName == "PdfPasswordException") {
+                    return true
+                }
+                val next = cause.cause
+                if (next === cause) {
+                    return false
+                }
+                cause = next
+                depth++
+            }
+            return false
         }
 
         @JvmStatic

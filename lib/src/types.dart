@@ -25,6 +25,19 @@ typedef ErrorCallback = void Function(dynamic error);
 /// rendered, reporting the zero-based [page] index and the platform [error].
 typedef PageErrorCallback = void Function(int? page, dynamic error);
 
+/// Why an encrypted document could not be opened.
+enum PDFPasswordFailure {
+  /// The document is encrypted and no password was supplied.
+  missing,
+
+  /// A password was supplied but it did not open the document.
+  incorrect,
+}
+
+/// Signature for the callback that is invoked when an encrypted document could
+/// not be opened, reporting why in [failure].
+typedef PasswordRequiredCallback = void Function(PDFPasswordFailure failure);
+
 /// Signature for the callback that is invoked when a link inside the document is
 /// tapped, reporting the target [uri].
 ///

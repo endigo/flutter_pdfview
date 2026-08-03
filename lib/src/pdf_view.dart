@@ -24,6 +24,7 @@ class PDFView extends StatefulWidget {
     this.onPageChanged,
     this.onError,
     this.onPageError,
+    this.onPasswordRequired,
     this.onLinkHandler,
     this.onLoadComplete,
     this.onDraw,
@@ -77,6 +78,12 @@ class PDFView extends StatefulWidget {
 
   /// Invoked when a page cannot be rendered or something else goes wrong.
   final PageErrorCallback? onPageError;
+
+  /// Invoked when the document is encrypted and [password] did not open it.
+  ///
+  /// Prompt the user and pass what they type to [PDFViewController.unlock], or
+  /// rebuild with the new [password]. [onError] also fires.
+  final PasswordRequiredCallback? onPasswordRequired;
 
   /// Used with `preventLinkNavigation: true`. Helpful to customize link
   /// navigation.
@@ -136,6 +143,9 @@ class PDFView extends StatefulWidget {
   final bool showScrollIndicators;
 
   /// The password for a password-protected PDF document. It can be nullable.
+  ///
+  /// Changing it reopens the document without recreating the platform view.
+  /// [onPasswordRequired] reports when it did not open the document.
   final String? password;
 
   /// Indicates whether or not the PDF viewer is in night mode. If set to true, the viewer is in

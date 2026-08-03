@@ -1,3 +1,17 @@
+## Unreleased
+
+- Fix [#274](https://github.com/endigo/flutter_pdfview/issues/274): password-protected documents can
+  now be unlocked from the app instead of leaving a blank view. New `onPasswordRequired` callback
+  reports whether the document needs a password or was given the wrong one, and the new
+  `PDFViewController.unlock(password)` — or simply rebuilding `PDFView` with a new `password` —
+  reopens the document in place, so a wrong password can be retried without recreating the view
+- iOS: an encrypted document no longer skips the scroll-view/page setup it needs, so a document
+  unlocked after the prompt renders and navigates like any other; `getPageCount()` no longer returns
+  null between the render callback and the first layout pass
+- Add end-to-end tests (`example/integration_test/`) that drive the real native viewers against an
+  encrypted document, plus Dart and Android unit coverage for the new API
+- Includes everything in `1.5.0-beta.9`
+
 ## 1.5.0-beta.9
 
 - Fix [#215](https://github.com/endigo/flutter_pdfview/issues/215): night mode used a naive
