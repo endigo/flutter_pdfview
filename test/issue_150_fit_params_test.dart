@@ -66,85 +66,97 @@ void main() {
   );
 
   group('Issue #150 creation params (iOS)', () {
-    testWidgets('reporter config keeps autoSpacing false and FitPolicy.BOTH', (WidgetTester tester) async {
-      final Map<Object?, Object?> params = await pumpAndCapture(tester, issue150Config);
+    testWidgets(
+      'reporter config keeps autoSpacing false and FitPolicy.BOTH',
+      (WidgetTester tester) async {
+        final Map<Object?, Object?> params = await pumpAndCapture(tester, issue150Config);
 
-      expect(params['autoSpacing'], isFalse, reason: 'spacing must not be forced true for fit');
-      expect(params['fitPolicy'], 'FitPolicy.BOTH');
-      expect(params['swipeHorizontal'], isFalse);
-      expect(params['enableSwipe'], isTrue);
-      expect(params['pageFling'], isTrue);
-      expect(params['pageSnap'], isTrue);
-      expect(params['defaultPage'], 0);
-      expect(params['preventLinkNavigation'], isFalse);
-    }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+        expect(params['autoSpacing'], isFalse, reason: 'spacing must not be forced true for fit');
+        expect(params['fitPolicy'], 'FitPolicy.BOTH');
+        expect(params['swipeHorizontal'], isFalse);
+        expect(params['enableSwipe'], isTrue);
+        expect(params['pageFling'], isTrue);
+        expect(params['pageSnap'], isTrue);
+        expect(params['defaultPage'], 0);
+        expect(params['preventLinkNavigation'], isFalse);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+    );
 
-    testWidgets('autoSpacing and fitPolicy serialize independently', (WidgetTester tester) async {
-      for (final bool autoSpacing in <bool>[true, false]) {
-        for (final FitPolicy policy in FitPolicy.values) {
-          // Tear down the previous platform view so the next create is recorded
-          // (settings-only rebuilds would not remount).
-          await tester.pumpWidget(const SizedBox.shrink());
-          await tester.pumpAndSettle();
-          created.clear();
+    testWidgets(
+      'autoSpacing and fitPolicy serialize independently',
+      (WidgetTester tester) async {
+        for (final bool autoSpacing in <bool>[true, false]) {
+          for (final FitPolicy policy in FitPolicy.values) {
+            // Tear down the previous platform view so the next create is recorded
+            // (settings-only rebuilds would not remount).
+            await tester.pumpWidget(const SizedBox.shrink());
+            await tester.pumpAndSettle();
+            created.clear();
 
-          final Map<Object?, Object?> params = await pumpAndCapture(
-            tester,
-            PDFView(
-              filePath: 'a.pdf',
-              autoSpacing: autoSpacing,
-              fitPolicy: policy,
-            ),
-          );
-          expect(
-            params['autoSpacing'],
-            autoSpacing,
-            reason: 'autoSpacing=$autoSpacing with $policy must pass through',
-          );
-          expect(
-            params['fitPolicy'],
-            policy.toString(),
-            reason: 'fitPolicy=$policy with autoSpacing=$autoSpacing must pass through',
-          );
+            final Map<Object?, Object?> params = await pumpAndCapture(
+              tester,
+              PDFView(filePath: 'a.pdf', autoSpacing: autoSpacing, fitPolicy: policy),
+            );
+            expect(
+              params['autoSpacing'],
+              autoSpacing,
+              reason: 'autoSpacing=$autoSpacing with $policy must pass through',
+            );
+            expect(
+              params['fitPolicy'],
+              policy.toString(),
+              reason: 'fitPolicy=$policy with autoSpacing=$autoSpacing must pass through',
+            );
+          }
         }
-      }
-    }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+    );
 
-    testWidgets('default still ships FitPolicy.WIDTH with autoSpacing true', (WidgetTester tester) async {
-      final Map<Object?, Object?> params = await pumpAndCapture(
-        tester,
-        const PDFView(filePath: 'a.pdf'),
-      );
-      // Defaults match Android so iOS no longer silently "fits both".
-      expect(params['fitPolicy'], 'FitPolicy.WIDTH');
-      expect(params['autoSpacing'], isTrue);
-    }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+    testWidgets(
+      'default still ships FitPolicy.WIDTH with autoSpacing true',
+      (WidgetTester tester) async {
+        final Map<Object?, Object?> params = await pumpAndCapture(
+          tester,
+          const PDFView(filePath: 'a.pdf'),
+        );
+        // Defaults match Android so iOS no longer silently "fits both".
+        expect(params['fitPolicy'], 'FitPolicy.WIDTH');
+        expect(params['autoSpacing'], isTrue);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+    );
   });
 
   group('Issue #150 creation params (Android)', () {
-    testWidgets('reporter config matches iOS serialization', (WidgetTester tester) async {
-      final Map<Object?, Object?> params = await pumpAndCapture(tester, issue150Config);
+    testWidgets(
+      'reporter config matches iOS serialization',
+      (WidgetTester tester) async {
+        final Map<Object?, Object?> params = await pumpAndCapture(tester, issue150Config);
 
-      expect(params['autoSpacing'], isFalse);
-      expect(params['fitPolicy'], 'FitPolicy.BOTH');
-      expect(params['enableSwipe'], isTrue);
-      expect(params['swipeHorizontal'], isFalse);
-    }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+        expect(params['autoSpacing'], isFalse);
+        expect(params['fitPolicy'], 'FitPolicy.BOTH');
+        expect(params['enableSwipe'], isTrue);
+        expect(params['swipeHorizontal'], isFalse);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+    );
 
-    testWidgets('autoSpacing false does not drop fitPolicy', (WidgetTester tester) async {
-      final Map<Object?, Object?> params = await pumpAndCapture(
-        tester,
-        const PDFView(
-          filePath: 'a.pdf',
-          autoSpacing: false,
-          fitPolicy: FitPolicy.WIDTH,
-        ),
-      );
-      expect(params.containsKey('autoSpacing'), isTrue);
-      expect(params.containsKey('fitPolicy'), isTrue);
-      expect(params['autoSpacing'], isFalse);
-      expect(params['fitPolicy'], 'FitPolicy.WIDTH');
-    }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+    testWidgets(
+      'autoSpacing false does not drop fitPolicy',
+      (WidgetTester tester) async {
+        final Map<Object?, Object?> params = await pumpAndCapture(
+          tester,
+          const PDFView(filePath: 'a.pdf', autoSpacing: false, fitPolicy: FitPolicy.WIDTH),
+        );
+        expect(params.containsKey('autoSpacing'), isTrue);
+        expect(params.containsKey('fitPolicy'), isTrue);
+        expect(params['autoSpacing'], isFalse);
+        expect(params['fitPolicy'], 'FitPolicy.WIDTH');
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+    );
   });
 
   group('Issue #150 FitPolicy enum contract', () {
@@ -158,10 +170,11 @@ void main() {
 
     test('all policies are covered', () {
       expect(FitPolicy.values, hasLength(3));
-      expect(
-        FitPolicy.values.map((FitPolicy p) => p.name).toSet(),
-        <String>{'WIDTH', 'HEIGHT', 'BOTH'},
-      );
+      expect(FitPolicy.values.map((FitPolicy p) => p.name).toSet(), <String>{
+        'WIDTH',
+        'HEIGHT',
+        'BOTH',
+      });
     });
   });
 }

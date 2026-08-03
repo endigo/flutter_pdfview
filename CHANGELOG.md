@@ -1,9 +1,16 @@
 ## 1.5.0-beta.1
 
+- Fix [#215](https://github.com/endigo/flutter_pdfview/issues/215): night mode used a naive
+  channel invert that turned photos into negatives. Dark mode now uses a luminance-preserving
+  inversion on both platforms so white↔black while hue is kept.
+- Fix [#138](https://github.com/endigo/flutter_pdfview/issues/138): iOS had no night mode. Dark
+  mode is implemented via `FPVThemedPage` (PDFKit page draw through the same matrix).
+- **Android**: apply `colorMode` via a hardware-layer `ColorMatrixColorFilter` (replacing
+  AndroidPdfViewer `setNightMode`); gutters use `M(backgroundColor)` so the layer shows the
+  color Dart requested; screenshots use `saveLayer` so captures match the on-screen theme.
 - **Dart**: add `PdfColorMode` (`light` / `dark` / `system`) and `PDFView.colorMode` (default
   `system`). `system` resolves from the app `Theme` brightness (or platform brightness when no
-  `Theme` ancestor is present) and is sent to native as `"light"` / `"dark"`. Dark mode uses a
-  luminance-preserving inversion on both platforms so photos keep their hue.
+  `Theme` ancestor is present) and is sent to native as `"light"` / `"dark"`.
 - **Deprecate** `nightMode` (still honored: `nightMode: true` with default `colorMode` maps to
   `dark`; an explicit `colorMode` always wins). Annotate the field and constructor formal so
   callers see the analyzer warning.

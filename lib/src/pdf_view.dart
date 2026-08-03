@@ -314,10 +314,7 @@ class _PDFViewState extends State<PDFView> {
       if (!mounted) {
         return;
       }
-      controller._updateWidget(
-        widget,
-        resolvedColorMode: _resolveColorMode(context),
-      );
+      controller._updateWidget(widget, resolvedColorMode: _resolveColorMode(context));
     });
   }
 
@@ -394,7 +391,11 @@ class _PDFViewState extends State<PDFView> {
             )
             ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
             ..addOnPlatformViewCreatedListener((int id) {
-              _onPlatformViewCreated(id, generation: generation, resolvedColorMode: resolvedColorMode);
+              _onPlatformViewCreated(
+                id,
+                generation: generation,
+                resolvedColorMode: resolvedColorMode,
+              );
             })
             ..create();
         },
@@ -467,10 +468,7 @@ class _PDFViewState extends State<PDFView> {
 class _CreationParams {
   _CreationParams({this.filePath, this.pdfData, this.settings});
 
-  static _CreationParams fromWidget(
-    PDFView widget, {
-    required PdfColorMode resolvedColorMode,
-  }) {
+  static _CreationParams fromWidget(PDFView widget, {required PdfColorMode resolvedColorMode}) {
     return _CreationParams(
       filePath: widget.filePath,
       pdfData: widget.pdfData,

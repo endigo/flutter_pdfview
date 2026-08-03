@@ -240,7 +240,9 @@ void main() {
       // Remount with a new document so create fires again with dark params.
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(body: PDFView(filePath: 'b.pdf', colorMode: PdfColorMode.dark)),
+          home: Scaffold(
+            body: PDFView(filePath: 'b.pdf', colorMode: PdfColorMode.dark),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -264,11 +266,7 @@ void main() {
       final Map<Object?, Object?> params = await pumpAndCapture(
         tester,
         // ignore: deprecated_member_use_from_same_package
-        const PDFView(
-          filePath: 'a.pdf',
-          colorMode: PdfColorMode.light,
-          nightMode: true,
-        ),
+        const PDFView(filePath: 'a.pdf', colorMode: PdfColorMode.light, nightMode: true),
       );
       expect(params['colorMode'], 'light');
     }, variant: _iOS);

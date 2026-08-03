@@ -35,10 +35,7 @@ class _PDFViewSettings {
   ///
   /// [resolvedColorMode] must already be [PdfColorMode.light] or
   /// [PdfColorMode.dark] (never [PdfColorMode.system]).
-  static _PDFViewSettings fromWidget(
-    PDFView widget, {
-    required PdfColorMode resolvedColorMode,
-  }) {
+  static _PDFViewSettings fromWidget(PDFView widget, {required PdfColorMode resolvedColorMode}) {
     assert(
       resolvedColorMode != PdfColorMode.system,
       'system must be resolved before building settings',
