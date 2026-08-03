@@ -104,6 +104,54 @@ PDFView(
 )
 ```
 
+### BackdropFilter / ColorFiltered over PDFView (iOS)
+
+`PDFView` is a **platform view** (`UiKitView` on iOS, hybrid composition on
+Android). Flutter composites native views outside the normal Flutter layer
+tree, so some widgets that sample or recolor the scene **do not apply to the
+PDF pixels** — especially on iOS.
+
+| Widget | iOS platform view | Notes |
+|:-------|:-----------------:|:------|
+| `ColorFiltered` / `ShaderMask` | ❌ not supported | Official Flutter limitation |
+| `BackdropFilter` | ⚠️ partial | Supported with restrictions; needs a recent Flutter |
+
+This is **not a bug in flutter_pdfview**. Flutter documents it under
+[iOS platform view composition limitations](https://docs.flutter.dev/platform-integration/ios/platform-views#composition-limitations):
+`ShaderMask` and `ColorFiltered` are unsupported; `BackdropFilter` works only
+within the constraints of the
+[iOS Platform View Backdrop Filter design](https://flutter.dev/go/ios-platformview-backdrop-filter-blur).
+
+**Workarounds**
+
+1. **Color inversion / dark pages** — Prefer the plugin API instead of wrapping
+   the view in `ColorFiltered`:
+   - Android: `nightMode: true` (native invert).
+   - iOS: `nightMode` is not available today; use a theme-appropriate
+     `backgroundColor`, or invert offline content before load if you control the
+     PDF bytes.
+
+2. **Blur / glass under a sheet** — Place the `BackdropFilter` so it samples
+   Flutter-drawn content (not only the hole where the native PDF sits), use a
+   semi-transparent `barrierColor` / scrim, or capture a static preview with
+   `PDFViewController.getScreenshot` and blur that `Image` with Flutter widgets.
+
+3. **Static filtered preview** — For a one-shot recolor (e.g. thumbnail), take a
+   screenshot and wrap the resulting image:
+
+```dart
+final path = await controller.getScreenshot('preview.png');
+// Then:
+ColorFiltered(
+  colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.saturation),
+  child: Image.file(File(path)),
+);
+```
+
+Wrapping `PDFView` itself in `ColorFiltered` will keep painting a solid tint
+*under* the native view on iOS while leaving the PDF contents unchanged
+([#213](https://github.com/endigo/flutter_pdfview/issues/213)).
+
 ## Controller Options
 
 | Name               |                                         Description                                          |                    Parameters                    |      Return      |
