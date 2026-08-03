@@ -44,6 +44,9 @@ class FlutterPDFView(
     private val displayDensity: Float
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    /** Creation / runtime page alignment (#250, #272). Default centers short docs. */
+    private var pageAlignment: PageAlignment = getPageAlignment(params)
+
     @Volatile
     private var disposed = false
 
@@ -141,12 +144,20 @@ class FlutterPDFView(
         }
 
         if (config != null) {
+            // PageAlignment.top disables AndroidPdfViewer's autoSpacing "center each
+            // page in the viewport" pads (#250). Keep a small fixed gap when the user
+            // still asked for spacing between multi-page documents.
+            val userAutoSpacing = getBoolean(params, "autoSpacing")
+            val topAlign = pageAlignment == PageAlignment.TOP
+            val effectiveAutoSpacing = userAutoSpacing && !topAlign
+            val interPageSpacingDp = if (topAlign && userAutoSpacing) TOP_ALIGN_SPACING_DP else 0
             config
                 .enableSwipe(getBoolean(params, "enableSwipe"))
                 .swipeHorizontal(getBoolean(params, "swipeHorizontal"))
                 .password(getString(params, "password"))
                 .nightMode(getBoolean(params, "nightMode"))
-                .autoSpacing(getBoolean(params, "autoSpacing"))
+                .autoSpacing(effectiveAutoSpacing)
+                .spacing(interPageSpacingDp)
                 .pageFling(getBoolean(params, "pageFling"))
                 .pageSnap(getBoolean(params, "pageSnap"))
                 .pageFitPolicy(getFitPolicy(params))
@@ -178,6 +189,13 @@ class FlutterPDFView(
                     methodChannel.invokeMethod("onPageError", args)
                 }.onRender { pages ->
                     if (disposed) return@onRender
+                    // After first layout, pin short docs to top and re-center
+                    // the secondary axis for defaultPage / setPage parity (#197, #250).
+                    view.post {
+                        if (!disposed && pdfView != null) {
+                            applyPagePlacement(view)
+                        }
+                    }
                     val args: MutableMap<String, Any> = HashMap()
                     args["pages"] = pages
                     methodChannel.invokeMethod("onRender", args)
@@ -433,6 +451,10 @@ class FlutterPDFView(
             }
             try {
                 current.jumpTo(page)
+                // #197: jumpTo keeps the previous secondary-axis offset, so after
+                // a pan/zoom the new page can sit left-aligned. Re-center X (or Y
+                // in horizontal mode) and re-apply PageAlignment.top when needed.
+                applyPagePlacement(current)
                 current.loadPages()
                 current.invalidate()
                 result.success(true)
@@ -446,6 +468,109 @@ class FlutterPDFView(
         } else {
             mainHandler.post(jump)
         }
+    }
+
+    /**
+     * Re-centers the secondary axis (#197) and optionally pins the primary axis
+     * to the start for [PageAlignment.TOP] when the document is shorter than the
+     * viewport (#250, #272).
+     *
+     * AndroidPdfViewer's [PDFView.moveTo] always vertical-centers short
+     * documents and [PDFView.jumpTo] preserves the previous X offset, so we
+     * recompute offsets here after load / setPage.
+     */
+    private fun applyPagePlacement(view: PDFView) {
+        if (disposed || view.pageCount <= 0 || view.width <= 0 || view.height <= 0) {
+            return
+        }
+        try {
+            // Preserve the primary-axis offset from jumpTo / current scroll; only
+            // recompute the secondary axis (#197). For short docs + TOP, force
+            // primary to 0 after moveTo undoes library vertical-centering (#250).
+            val secondary = centeredSecondaryOffset(view)
+            if (view.isSwipeVertical) {
+                view.moveTo(secondary, view.currentYOffset)
+                if (pageAlignment == PageAlignment.TOP) {
+                    forcePrimaryOffsetIfShort(view, isVertical = true)
+                }
+            } else {
+                view.moveTo(view.currentXOffset, secondary)
+                if (pageAlignment == PageAlignment.TOP) {
+                    forcePrimaryOffsetIfShort(view, isVertical = false)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "applyPagePlacement", e)
+        }
+    }
+
+    /**
+     * Offset that centers the max-page strip on the secondary axis (X when
+     * swiping vertically, Y when swiping horizontally).
+     */
+    private fun centeredSecondaryOffset(view: PDFView): Float {
+        val pageCount = view.pageCount
+        if (pageCount <= 0) {
+            return 0f
+        }
+        var maxSecondary = 0f
+        for (i in 0 until pageCount) {
+            val size = view.getPageSize(i) ?: continue
+            val dim = if (view.isSwipeVertical) size.width else size.height
+            if (dim > maxSecondary) {
+                maxSecondary = dim
+            }
+        }
+        val scaled = view.toCurrentScale(maxSecondary)
+        return if (view.isSwipeVertical) {
+            centerSecondaryOffset(view.width.toFloat(), scaled)
+        } else {
+            centerSecondaryOffset(view.height.toFloat(), scaled)
+        }
+    }
+
+    /**
+     * [PDFView.moveTo] overwrites the primary offset when content fits the
+     * viewport (centers it). For [PageAlignment.TOP] we write 0 after moveTo so
+     * free space sits below / after the content.
+     */
+    private fun forcePrimaryOffsetIfShort(view: PDFView, isVertical: Boolean) {
+        if (!documentFitsAlongPrimary(view, isVertical)) {
+            return
+        }
+        try {
+            val fieldName = if (isVertical) "currentYOffset" else "currentXOffset"
+            val field = PDFView::class.java.getDeclaredField(fieldName)
+            field.isAccessible = true
+            field.setFloat(view, 0f)
+            view.loadPages()
+            view.invalidate()
+        } catch (e: Exception) {
+            Log.w(TAG, "forcePrimaryOffsetIfShort", e)
+        }
+    }
+
+    /** True when the tight document length is smaller than the viewport. */
+    private fun documentFitsAlongPrimary(view: PDFView, isVertical: Boolean): Boolean {
+        val pageCount = view.pageCount
+        if (pageCount <= 0) {
+            return true
+        }
+        var length = 0f
+        val spacingPx = view.spacingPx.toFloat() * view.zoom
+        for (i in 0 until pageCount) {
+            val size = view.getPageSize(i) ?: continue
+            length += if (isVertical) {
+                view.toCurrentScale(size.height)
+            } else {
+                view.toCurrentScale(size.width)
+            }
+            if (i < pageCount - 1) {
+                length += spacingPx
+            }
+        }
+        val viewport = if (isVertical) view.height.toFloat() else view.width.toFloat()
+        return length < viewport - 1f
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -474,6 +599,15 @@ class FlutterPDFView(
                 "preventLinkNavigation" -> {
                     val plh = this.linkHandler as PDFLinkHandler
                     plh.setPreventLinkNavigation(getBoolean(settings, key))
+                }
+                "pageAlignment" -> {
+                    pageAlignment = getPageAlignment(settings)
+                    // Re-apply offsets; full autoSpacing flip needs a remount.
+                    view.post {
+                        if (!disposed && pdfView != null) {
+                            applyPagePlacement(view)
+                        }
+                    }
                 }
                 "maxZoom" -> view.maxZoom = getFloat(settings, key, DEFAULT_MAX_ZOOM)
                 "minZoom" -> view.minZoom = getFloat(settings, key, DEFAULT_MIN_ZOOM)
@@ -528,12 +662,20 @@ class FlutterPDFView(
         }
     }
 
+    /** Dart [PageAlignment] mirrored for creation-param parsing. */
+    enum class PageAlignment {
+        CENTER,
+        TOP,
+    }
+
     companion object {
         const val TAG = "FlutterPDFView"
 
         private const val DEFAULT_MAX_ZOOM = 4.0f
         private const val DEFAULT_MIN_ZOOM = 1.0f
         private const val DRAW_THROTTLE_MS = 16L // ~1 frame at 60fps
+        /** Fixed inter-page gap (dp) when top-align disables autoSpacing but user wants gaps. */
+        private const val TOP_ALIGN_SPACING_DP = 8
 
         @JvmStatic
         @VisibleForTesting
@@ -541,6 +683,25 @@ class FlutterPDFView(
             val keyObj = params[key] as Boolean?
             val bKey: Boolean = keyObj ?: false
             return params.containsKey(key) && bKey
+        }
+
+        @JvmStatic
+        @VisibleForTesting
+        fun getPageAlignment(params: Map<String, Any?>): PageAlignment {
+            return when (getString(params, "pageAlignment")) {
+                "PageAlignment.top" -> PageAlignment.TOP
+                else -> PageAlignment.CENTER
+            }
+        }
+
+        /**
+         * Secondary-axis offset that centers a [scaledMax] strip in [viewport].
+         * Exposed for unit tests of the #197 centering math.
+         */
+        @JvmStatic
+        @VisibleForTesting
+        fun centerSecondaryOffset(viewport: Float, scaledMax: Float): Float {
+            return (viewport - scaledMax) / 2f
         }
 
         @JvmStatic

@@ -11,7 +11,12 @@ Native language migration on both platforms. Includes everything in `1.4.5`.
 - Fix a platform-view remount race: late creation callbacks from a disposed or remounted view can no
   longer complete the new controller with a stale instance
 - Harden iOS `setZoomLimits` and align the podspec `swift_version`
-- No public Dart API changes
+- Add `PageAlignment` (`center` default, `top`) so short / single-page documents can pin to the top of
+  the viewport instead of being vertically centered ([#250](https://github.com/endigo/flutter_pdfview/issues/250),
+  [#272](https://github.com/endigo/flutter_pdfview/issues/272)); iOS page-break margins put free space
+  below the page when top-aligned
+- Fix Android `setPage` / `jumpTo` leaving pages left-aligned on the secondary axis — re-center
+  horizontally after page changes ([#197](https://github.com/endigo/flutter_pdfview/issues/197))
 
 ## 1.4.5
 

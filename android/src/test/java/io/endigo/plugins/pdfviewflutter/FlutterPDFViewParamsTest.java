@@ -186,6 +186,56 @@ public class FlutterPDFViewParamsTest {
         assertEquals(FitPolicy.BOTH, FlutterPDFView.getFitPolicy(empty()));
     }
 
+    // --------------------------------------------------------- getPageAlignment
+
+    @Test
+    public void getPageAlignment_top() {
+        assertEquals(
+                FlutterPDFView.PageAlignment.TOP,
+                FlutterPDFView.getPageAlignment(params("pageAlignment", "PageAlignment.top")));
+    }
+
+    @Test
+    public void getPageAlignment_center() {
+        assertEquals(
+                FlutterPDFView.PageAlignment.CENTER,
+                FlutterPDFView.getPageAlignment(params("pageAlignment", "PageAlignment.center")));
+    }
+
+    @Test
+    public void getPageAlignment_missingKey_defaultsToCenter() {
+        assertEquals(
+                FlutterPDFView.PageAlignment.CENTER,
+                FlutterPDFView.getPageAlignment(empty()));
+    }
+
+    @Test
+    public void getPageAlignment_unknownValue_defaultsToCenter() {
+        assertEquals(
+                FlutterPDFView.PageAlignment.CENTER,
+                FlutterPDFView.getPageAlignment(params("pageAlignment", "PageAlignment.bottom")));
+    }
+
+    /**
+     * #197: secondary-axis centering math used after setPage / jumpTo.
+     * When the page strip is narrower than the viewport the offset is positive
+     * (centered); when wider it is negative (moveTo clamps).
+     */
+    @Test
+    public void centerSecondaryOffset_pageNarrowerThanViewport_isPositive() {
+        assertEquals(50f, FlutterPDFView.centerSecondaryOffset(200f, 100f), 0.001f);
+    }
+
+    @Test
+    public void centerSecondaryOffset_pageEqualsViewport_isZero() {
+        assertEquals(0f, FlutterPDFView.centerSecondaryOffset(200f, 200f), 0.001f);
+    }
+
+    @Test
+    public void centerSecondaryOffset_pageWiderThanViewport_isNegative() {
+        assertEquals(-50f, FlutterPDFView.centerSecondaryOffset(200f, 300f), 0.001f);
+    }
+
     // ---------------------------------------------------- issue #150 independence
 
     /**

@@ -22,6 +22,7 @@ const Set<String> _expectedKeys = <String>{
   'thumbnailRatio',
   'defaultPage',
   'fitPolicy',
+  'pageAlignment',
   'preventLinkNavigation',
   'backgroundColor',
   'maxZoom',
@@ -137,6 +138,7 @@ void main() {
       expect(params['thumbnailRatio'], 0.8);
       expect(params['defaultPage'], 0);
       expect(params['fitPolicy'], 'FitPolicy.WIDTH');
+      expect(params['pageAlignment'], 'PageAlignment.center');
       expect(params['preventLinkNavigation'], isFalse);
       expect(params['maxZoom'], 4.0);
       expect(params['minZoom'], 1.0);
@@ -161,6 +163,7 @@ void main() {
           thumbnailRatio: 0.5,
           defaultPage: 3,
           fitPolicy: FitPolicy.HEIGHT,
+          pageAlignment: PageAlignment.top,
           preventLinkNavigation: true,
           backgroundColor: Color(0xFF112233),
           maxZoom: 8.0,
@@ -183,10 +186,27 @@ void main() {
       expect(params['thumbnailRatio'], 0.5);
       expect(params['defaultPage'], 3);
       expect(params['fitPolicy'], 'FitPolicy.HEIGHT');
+      expect(params['pageAlignment'], 'PageAlignment.top');
       expect(params['preventLinkNavigation'], isTrue);
       expect(params['backgroundColor'], 0xFF112233);
       expect(params['maxZoom'], 8.0);
       expect(params['minZoom'], 0.5);
+    }, variant: _iOS);
+
+    testWidgets('serializes PageAlignment.center', (WidgetTester tester) async {
+      final Map<Object?, Object?> params = await pumpAndCapture(
+        tester,
+        const PDFView(filePath: 'a.pdf', pageAlignment: PageAlignment.center),
+      );
+      expect(params['pageAlignment'], 'PageAlignment.center');
+    }, variant: _iOS);
+
+    testWidgets('serializes PageAlignment.top', (WidgetTester tester) async {
+      final Map<Object?, Object?> params = await pumpAndCapture(
+        tester,
+        const PDFView(filePath: 'a.pdf', pageAlignment: PageAlignment.top),
+      );
+      expect(params['pageAlignment'], 'PageAlignment.top');
     }, variant: _iOS);
 
     testWidgets('serializes FitPolicy.BOTH', (WidgetTester tester) async {

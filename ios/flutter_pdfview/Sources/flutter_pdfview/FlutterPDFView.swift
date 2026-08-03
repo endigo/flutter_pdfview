@@ -206,6 +206,12 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         case both
     }
 
+    /// How short documents sit in free space (mirrors Dart [PageAlignment]).
+    private enum PageAlignment {
+        case center
+        case top
+    }
+
     private weak var controller: PDFViewController?
 
     private let pdfView: PDFView
@@ -227,6 +233,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
     private var minScaleFactor: CGFloat = 0
     private var hasSentInitialPage = false
     private var fitPolicy: FitPolicy = .width
+    private var pageAlignment: PageAlignment = .center
     /// Last view size we laid out against — used to re-fit after the temporary
     /// non-zero frame (#268) expands to the real Flutter bounds (#150).
     private var lastLayoutSize: CGSize = .zero
@@ -304,6 +311,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
     private func loadDocument(arguments args: [String: Any]?) {
         autoSpacing = args?.bool("autoSpacing") ?? false
         fitPolicy = Self.fitPolicy(fromArguments: args)
+        pageAlignment = Self.pageAlignment(fromArguments: args)
         let pageFling = args?.bool("pageFling") ?? false
         let enableSwipe = args?.bool("enableSwipe") ?? false
         preventLinkNavigation = args?.bool("preventLinkNavigation") ?? false
@@ -359,9 +367,15 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
             ? .singlePageContinuous
             : .singlePage
         // autoSpacing only controls gaps between pages — never zoom/fit (#150).
+        // With PageAlignment.top, put the break margin only after each page so
+        // free space (and gaps) sit below rather than sandwiching the page (#272).
         pdfView.displaysPageBreaks = autoSpacing
         if autoSpacing {
-            pdfView.pageBreakMargins = UIEdgeInsets(top: 4, left: 0, bottom: 4, right: 0)
+            if pageAlignment == .top {
+                pdfView.pageBreakMargins = UIEdgeInsets(top: 0, left: 0, bottom: 8, right: 0)
+            } else {
+                pdfView.pageBreakMargins = UIEdgeInsets(top: 4, left: 0, bottom: 4, right: 0)
+            }
         } else {
             pdfView.pageBreakMargins = .zero
         }
@@ -729,7 +743,69 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
                 ]
             )
         }
+
+        // After scale/layout, pin short documents to the top when requested
+        // (#250, #272). PDFKit centers by default.
+        if pageAlignment == .top {
+            pinContentToTop(animated: false)
+        }
         return true
+    }
+
+    /// Parses Dart's `PageAlignment.center|top` creation argument.
+    private static func pageAlignment(fromArguments args: [String: Any]?) -> PageAlignment {
+        guard let raw = args?["pageAlignment"] as? String else { return .center }
+        switch raw {
+        case "PageAlignment.top":
+            return .top
+        default:
+            return .center
+        }
+    }
+
+    /// Pins the visible page to the top of the viewport and removes the
+    /// vertical centering inset PDFKit applies when content is shorter than
+    /// the view (#250, #272).
+    private func pinContentToTop(animated: Bool) {
+        guard let page = pdfView.currentPage ?? defaultPage else { return }
+
+        // Navigate to the top edge of the page (PDF coords: origin bottom-left).
+        let pageBounds = page.bounds(for: pdfView.displayBox)
+        let topRect = CGRect(
+            x: 0,
+            y: max(pageBounds.maxY - 1, pageBounds.minY),
+            width: max(1, min(1, pageBounds.width)),
+            height: max(1, min(1, pageBounds.height))
+        )
+        pdfView.go(to: topRect, on: page)
+
+        guard let scrollView else { return }
+
+        // If the document is shorter than the viewport, PDFKit centers it via
+        // content offset / insets. Force free space below the page.
+        let contentHeight = scrollView.contentSize.height
+        let viewHeight = scrollView.bounds.height
+        if contentHeight > 0, contentHeight < viewHeight - 0.5 {
+            let extra = viewHeight - contentHeight
+            var inset = scrollView.contentInset
+            // Keep horizontal insets untouched; put leftover height at the bottom.
+            inset.top = 0
+            inset.bottom = max(inset.bottom, extra)
+            scrollView.contentInset = inset
+            let topY = -scrollView.adjustedContentInset.top
+            let offset = CGPoint(x: scrollView.contentOffset.x, y: topY)
+            scrollView.setContentOffset(offset, animated: animated)
+        } else {
+            // Tall document: still ensure we are at the top of the current page
+            // destination (go(to:) above), without rewriting insets.
+            let topY = -scrollView.adjustedContentInset.top
+            if scrollView.contentOffset.y < topY - 0.5 {
+                scrollView.setContentOffset(
+                    CGPoint(x: scrollView.contentOffset.x, y: topY),
+                    animated: animated
+                )
+            }
+        }
     }
 
     func view() -> UIView {
@@ -882,10 +958,34 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate,
         }
 
         pdfView.go(to: page)
+        if pageAlignment == .top {
+            pinContentToTop(animated: false)
+        }
         result(NSNumber(value: true))
     }
 
-    func onUpdateSettings(_: FlutterMethodCall, result: FlutterResult) {
+    func onUpdateSettings(_ call: FlutterMethodCall, result: FlutterResult) {
+        let settings = call.arguments as? [String: Any]
+        if settings?["pageAlignment"] != nil {
+            pageAlignment = Self.pageAlignment(fromArguments: settings)
+            // Update page-break margins to match top vs center (#272 gaps).
+            if autoSpacing {
+                if pageAlignment == .top {
+                    pdfView.pageBreakMargins = UIEdgeInsets(top: 0, left: 0, bottom: 8, right: 0)
+                } else {
+                    pdfView.pageBreakMargins = UIEdgeInsets(top: 4, left: 0, bottom: 4, right: 0)
+                }
+            }
+            if pageAlignment == .top {
+                pinContentToTop(animated: false)
+            } else if let scrollView {
+                // Restore default centering: clear the bottom pad we may have added.
+                var inset = scrollView.contentInset
+                inset.bottom = 0
+                scrollView.contentInset = inset
+            }
+            setNeedsLayout()
+        }
         result(nil)
     }
 

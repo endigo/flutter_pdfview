@@ -10,6 +10,7 @@
 /// PDFView(
 ///   filePath: path,
 ///   fitPolicy: FitPolicy.BOTH,
+///   pageAlignment: PageAlignment.top, // optional; default centers short docs
 ///   onViewCreated: (PDFViewController controller) async {
 ///     final int? pages = await controller.getPageCount();
 ///     await controller.setPage(0);

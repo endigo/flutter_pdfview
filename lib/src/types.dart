@@ -50,3 +50,17 @@ enum FitPolicy {
   /// Scales each page so that it fits entirely inside the viewport.
   BOTH,
 }
+
+/// How a document that is shorter than the viewport is placed inside it.
+///
+/// AndroidPdfViewer and PDFKit both center short documents by default. Use
+/// [top] when free space should sit below the page (single-page PDFs, forms).
+/// See [#250](https://github.com/endigo/flutter_pdfview/issues/250) and
+/// [#272](https://github.com/endigo/flutter_pdfview/issues/272).
+enum PageAlignment {
+  /// Center the document in free space (historical default).
+  center,
+
+  /// Pin the document to the top of the viewport; free space is below.
+  top,
+}

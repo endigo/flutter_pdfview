@@ -21,6 +21,7 @@ class _PDFViewSettings {
     this.thumbnailRatio,
     this.defaultPage,
     this.fitPolicy,
+    this.pageAlignment,
     this.preventLinkNavigation,
     this.backgroundColor,
     this.maxZoom,
@@ -43,6 +44,7 @@ class _PDFViewSettings {
       thumbnailRatio: widget.thumbnailRatio,
       defaultPage: widget.defaultPage,
       fitPolicy: widget.fitPolicy,
+      pageAlignment: widget.pageAlignment,
       preventLinkNavigation: widget.preventLinkNavigation,
       backgroundColor: widget.backgroundColor,
       maxZoom: widget.maxZoom,
@@ -64,6 +66,7 @@ class _PDFViewSettings {
   final double? thumbnailRatio;
   final int? defaultPage;
   final FitPolicy? fitPolicy;
+  final PageAlignment? pageAlignment;
   final bool? preventLinkNavigation;
 
   final Color? backgroundColor;
@@ -87,6 +90,7 @@ class _PDFViewSettings {
       'thumbnailRatio': thumbnailRatio,
       'defaultPage': defaultPage,
       'fitPolicy': fitPolicy.toString(),
+      'pageAlignment': pageAlignment.toString(),
       'preventLinkNavigation': preventLinkNavigation,
       'backgroundColor': backgroundColor?.toARGB32(),
       'maxZoom': maxZoom,
@@ -114,6 +118,9 @@ class _PDFViewSettings {
     }
     if (preventLinkNavigation != newSettings.preventLinkNavigation) {
       updates['preventLinkNavigation'] = newSettings.preventLinkNavigation;
+    }
+    if (pageAlignment != newSettings.pageAlignment) {
+      updates['pageAlignment'] = newSettings.pageAlignment.toString();
     }
     if (maxZoom != newSettings.maxZoom) {
       updates['maxZoom'] = newSettings.maxZoom;

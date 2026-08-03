@@ -67,6 +67,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | filePath              |   ✅    | ✅  |                   |
 | pdfData               |   ✅    | ✅  |                   |
 | fitPolicy             |   ✅    | ✅  | `FitPolicy.WIDTH` |
+| pageAlignment*        |   ✅    | ✅  | `PageAlignment.center` |
 | enableSwipe           |   ✅    | ✅  |      `true`       |
 | swipeHorizontal       |   ✅    | ✅  |      `false`      |
 | password              |   ✅    | ✅  |      `null`       |
@@ -83,6 +84,15 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 Notes:
 - `showScrollIndicators` is ignored on iOS while horizontal page-flipping is active (`pageFling: true` together with `swipeHorizontal: true`).
 - `autoSpacing` only adds gaps between pages. It does not change initial zoom or `fitPolicy` (fixed in [#150](https://github.com/endigo/flutter_pdfview/issues/150)).
+- `pageAlignment` controls where a document that is **shorter than the viewport** sits. The default `PageAlignment.center` matches historical AndroidPdfViewer / PDFKit behavior. Use `PageAlignment.top` so free space is below the page (typical for single-page PDFs — [#250](https://github.com/endigo/flutter_pdfview/issues/250), [#272](https://github.com/endigo/flutter_pdfview/issues/272)):
+
+```dart
+PDFView(
+  filePath: path,
+  pageAlignment: PageAlignment.top,
+  backgroundColor: Colors.grey.shade200,
+)
+```
 
 ### Using PDFView inside a scrollable widget
 
