@@ -1,3 +1,10 @@
+## 1.5.0-beta.3
+
+- Add first-class `onTap` callback (Dart + Android + iOS) so single taps are reported from the
+  native PDF view; prefer this over `gestureRecognizers` + `TapGestureRecognizer`
+  ([#133](https://github.com/endigo/flutter_pdfview/issues/133), [#353](https://github.com/endigo/flutter_pdfview/pull/353))
+- Includes everything in `1.5.0-beta.2`
+
 ## 1.5.0-beta.2
 
 - Document iOS platform-view composition limits for `ColorFiltered` / `ShaderMask` / `BackdropFilter` over `PDFView`, with official Flutter evidence and workarounds ([#213](https://github.com/endigo/flutter_pdfview/issues/213), [#352](https://github.com/endigo/flutter_pdfview/pull/352))
@@ -16,9 +23,7 @@ Native language migration on both platforms. Includes everything in `1.4.5`.
 - Fix a platform-view remount race: late creation callbacks from a disposed or remounted view can no
   longer complete the new controller with a stale instance
 - Harden iOS `setZoomLimits` and align the podspec `swift_version`
-- Add first-class `onTap` callback (Dart + Android + iOS) so single taps are reported from the
-  native PDF view; prefer this over `gestureRecognizers` + `TapGestureRecognizer`
-  ([#133](https://github.com/endigo/flutter_pdfview/issues/133))
+- No public Dart API changes
 
 ## 1.4.5
 

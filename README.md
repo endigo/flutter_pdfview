@@ -20,13 +20,13 @@ dependencies:
 
 #### Trying the 1.5.0 beta
 
-`1.5.0-beta.2` ports the native implementations to Kotlin (Android) and Swift (iOS) with no
-public Dart API changes (same as `1.5.0-beta.1`, plus docs for iOS platform-view filter limits).
-Pre-releases are not picked up by a `^` constraint, so pin it explicitly:
+`1.5.0-beta.3` continues the Kotlin/Swift line and adds a first-class `onTap` callback
+([#133](https://github.com/endigo/flutter_pdfview/issues/133)). Pre-releases are not picked up
+by a `^` constraint, so pin it explicitly:
 
 ```
 dependencies:
-  flutter_pdfview: 1.5.0-beta.2
+  flutter_pdfview: 1.5.0-beta.3
 ```
 
 Feedback is welcome in [#351](https://github.com/endigo/flutter_pdfview/issues/351).
