@@ -1,3 +1,15 @@
+## 1.5.0-beta.5
+
+- Fix load flash / first-layout size / iOS blank open ([#355](https://github.com/endigo/flutter_pdfview/pull/355)):
+  - [#40](https://github.com/endigo/flutter_pdfview/issues/40): keep the native view hidden until the
+    first successful render/fit so transitions do not flash an empty or mid-load surface
+  - [#127](https://github.com/endigo/flutter_pdfview/issues/127): harden first layout fit — defer
+    document open until a non-zero size, re-fit when the platform view settles after the first paint
+  - [#190](https://github.com/endigo/flutter_pdfview/issues/190): iOS defers `PDFDocument` open until
+    usable bounds, reports missing/unreadable/corrupt/empty documents via `onError`, and forces a
+    layout pass after attach so the PDF is not stuck blank until background/foreground
+- Includes everything in `1.5.0-beta.4`
+
 ## 1.5.0-beta.4
 
 - Document Android AcroForm / fillable form field rendering limits: Pdfium paints `/AP` appearance
