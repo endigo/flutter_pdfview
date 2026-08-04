@@ -11,10 +11,15 @@ its README is the user-facing documentation, and it is what is published to
 | Package | Published as | Purpose |
 | --- | --- | --- |
 | [`packages/flutter_pdfview`](packages/flutter_pdfview) | [`flutter_pdfview`][pub] | The app-facing plugin, plus the Android (Kotlin) and iOS (Swift) implementations. |
+| [`packages/flutter_pdfview_platform_interface`](packages/flutter_pdfview_platform_interface) | [`flutter_pdfview_platform_interface`][pub-pi] | The interface every platform implementation implements, plus the shared value types and the default method-channel implementation. |
 
-The repository is a [Dart pub workspace][workspace] driven by [Melos][melos], so
-platform implementations can be split into their own packages later without
-another repository move.
+The repository is a [Dart pub workspace][workspace] driven by [Melos][melos].
+The plugin is [federated][federated]: adding a platform (web, macOS, Windows)
+means writing a package that extends `FlutterPdfViewPlatform` and registers
+itself — the app-facing package does not need to change.
+
+Release order matters: `flutter_pdfview_platform_interface` publishes first,
+because `flutter_pdfview` depends on it.
 
 ## Working on it
 
@@ -46,6 +51,8 @@ The project is [looking for maintainers][maintainers].
 
 [apv]: https://github.com/marain87/AndroidPdfViewer
 [pub]: https://pub.dev/packages/flutter_pdfview
+[pub-pi]: https://pub.dev/packages/flutter_pdfview_platform_interface
+[federated]: https://docs.flutter.dev/packages-and-plugins/developing-packages#federated-plugins
 [workspace]: https://dart.dev/tools/pub/workspaces
 [melos]: https://melos.invertase.dev
 [maintainers]: https://github.com/endigo/flutter_pdfview/issues/270

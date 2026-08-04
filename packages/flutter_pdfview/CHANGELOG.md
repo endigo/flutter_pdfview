@@ -1,3 +1,21 @@
+## 1.5.0-beta.11
+
+- Split the plugin into a federated structure. The shared value types, the settings/creation-param
+  wire format and the method-channel plumbing now live in the new
+  [`flutter_pdfview_platform_interface`](https://pub.dev/packages/flutter_pdfview_platform_interface)
+  package, and `PDFView` reaches the native views through `FlutterPdfViewPlatform.instance`
+- **No public API changes and no changes to the native code.** `PDFView`, `PDFViewController`,
+  every callback, `FitPolicy`, `PageAlignment`, `PdfColorMode` and `PDFPasswordFailure` keep the
+  same names, semantics and import path — the value types are re-exported from
+  `package:flutter_pdfview/flutter_pdfview.dart`, so app code needs no changes. The platform-view
+  type and the per-view method channel are unchanged, so existing native implementations keep
+  working. The full 1.5.0-beta.10 Dart test suite passes unmodified
+- Adding a platform (web, macOS, Windows) no longer requires touching this package: an
+  implementation extends `FlutterPdfViewPlatform` and registers itself
+- The repository is now a Melos + Dart pub workspaces monorepo; the published package moved to
+  `packages/flutter_pdfview/`
+- Includes everything in `1.5.0-beta.10`
+
 ## 1.5.0-beta.10
 
 - Fix [#274](https://github.com/endigo/flutter_pdfview/issues/274): password-protected documents can
