@@ -197,7 +197,8 @@ def main() -> int:
     destination = Path(
         sys.argv[1]
         if len(sys.argv) > 1
-        else Path(__file__).resolve().parent.parent / "example/assets/demo-protected.pdf"
+        else Path(__file__).resolve().parent.parent
+        / "packages/flutter_pdfview/example/assets/demo-protected.pdf"
     )
     destination.write_bytes(build(USER_PASSWORD, OWNER_PASSWORD))
     print(
