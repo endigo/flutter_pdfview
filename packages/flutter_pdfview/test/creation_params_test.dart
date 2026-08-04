@@ -29,6 +29,8 @@ const Set<String> _expectedKeys = <String>{
   'backgroundColor',
   'maxZoom',
   'minZoom',
+  'enableTextSelection',
+  'enableCopy',
 };
 
 /// Runs a body on iOS, where `PDFView` uses the simplest platform view path.
@@ -147,6 +149,8 @@ void main() {
       expect(params['preventLinkNavigation'], isFalse);
       expect(params['maxZoom'], 4.0);
       expect(params['minZoom'], 1.0);
+      expect(params['enableTextSelection'], isTrue);
+      expect(params['enableCopy'], isTrue);
     }, variant: _iOS);
 
     testWidgets('serializes a fully customised widget', (WidgetTester tester) async {
@@ -550,10 +554,7 @@ void main() {
       viewCalls.clear();
       await controller!.setPage(2);
       expect(viewCalls.single.method, 'setPage');
-      expect(viewCalls.single.arguments, <String, Object?>{
-        'page': 2,
-        'withAnimation': false,
-      });
+      expect(viewCalls.single.arguments, <String, Object?>{'page': 2, 'withAnimation': false});
     }, variant: _iOS);
   });
 }

@@ -50,8 +50,11 @@ export 'package:flutter_pdfview_platform_interface/flutter_pdfview_platform_inte
         PageErrorCallback,
         PasswordRequiredCallback,
         PdfColorMode,
+        PdfTextMatch,
         RenderCallback,
-        TapCallback;
+        SearchResultChangedCallback,
+        TapCallback,
+        TextSelectionChangedCallback;
 
 part 'src/pdf_view.dart';
 part 'src/pdf_view_controller.dart';

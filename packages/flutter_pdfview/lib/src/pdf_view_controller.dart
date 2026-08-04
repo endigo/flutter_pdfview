@@ -107,6 +107,64 @@ class PDFViewController {
   Future<bool?> setPage(int page, {bool withAnimation = false}) =>
       _platform.setPage(page, withAnimation: withAnimation);
 
+  /// Whether this platform has a text layer at all.
+  ///
+  /// `true` on iOS. `false` on Android: AndroidPdfViewer does not bind Pdfium's
+  /// `FPDFText_*` API, so there is nothing to select or search
+  /// ([#137](https://github.com/endigo/flutter_pdfview/issues/137),
+  /// [#285](https://github.com/endigo/flutter_pdfview/issues/285)).
+  ///
+  /// Branch on this before offering search or selection UI — the text methods
+  /// below throw [UnsupportedError] rather than quietly reporting no results.
+  Future<bool> isTextLayerSupported() => _platform.isTextLayerSupported();
+
+  /// Searches the document for [query] and returns every match, in document
+  /// order.
+  ///
+  /// The first match becomes active: it is highlighted and scrolled into view,
+  /// and [PDFView.onSearchResultChanged] fires. Each call replaces the previous
+  /// search session; an empty [query] clears it and returns an empty list.
+  ///
+  /// An empty result means the document genuinely contains no match. Throws
+  /// [UnsupportedError] where there is no text layer — see
+  /// [isTextLayerSupported].
+  Future<List<PdfTextMatch>> searchText(String query, {bool caseSensitive = false}) =>
+      _platform.searchText(query, caseSensitive: caseSensitive);
+
+  /// Activates the next match, wrapping to the first at the end.
+  ///
+  /// Returns the newly active match, or `null` when no search is active.
+  /// Throws [UnsupportedError] where there is no text layer.
+  Future<PdfTextMatch?> nextMatch() => _platform.nextMatch();
+
+  /// Activates the previous match, wrapping to the last at the start.
+  ///
+  /// Returns the newly active match, or `null` when no search is active.
+  /// Throws [UnsupportedError] where there is no text layer.
+  Future<PdfTextMatch?> previousMatch() => _platform.previousMatch();
+
+  /// Activates the match at [index] of the last [searchText] result.
+  ///
+  /// Returns the match, or `null` when [index] is out of range.
+  /// Throws [UnsupportedError] where there is no text layer.
+  Future<PdfTextMatch?> setCurrentMatch(int index) => _platform.setCurrentMatch(index);
+
+  /// Clears search highlights and forgets the last [searchText] result.
+  ///
+  /// A no-op — never an error — where there is no text layer.
+  Future<void> clearSearch() => _platform.clearSearch();
+
+  /// Returns the selected text, or `null` when nothing is selected.
+  ///
+  /// Throws [UnsupportedError] where there is no text layer, so that `null`
+  /// keeps meaning "nothing is selected".
+  Future<String?> getSelectedText() => _platform.getSelectedText();
+
+  /// Clears the current text selection, if any.
+  ///
+  /// A no-op — never an error — where there is no text layer.
+  Future<void> clearSelection() => _platform.clearSelection();
+
   Future<void> _updateWidget(PDFView widget, {required PdfColorMode resolvedColorMode}) async {
     // Refresh callbacks even when no setting changed, so the native view never
     // dispatches into closures from a previous build.

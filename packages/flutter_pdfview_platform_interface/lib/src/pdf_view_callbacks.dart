@@ -18,6 +18,8 @@ class PdfViewCallbacks {
     this.onLoadComplete,
     this.onDraw,
     this.onTap,
+    this.onTextSelectionChanged,
+    this.onSearchResultChanged,
   });
 
   /// Invoked when the document has been rendered, with its page count.
@@ -47,4 +49,10 @@ class PdfViewCallbacks {
 
   /// Invoked when the user single-taps the view.
   final TapCallback? onTap;
+
+  /// Invoked when the user changes the text selection.
+  final TextSelectionChangedCallback? onTextSelectionChanged;
+
+  /// Invoked when the active search match changes.
+  final SearchResultChangedCallback? onSearchResultChanged;
 }

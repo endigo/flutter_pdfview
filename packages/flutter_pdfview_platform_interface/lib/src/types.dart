@@ -81,6 +81,79 @@ enum PageAlignment {
   top,
 }
 
+/// One occurrence of a search string inside a PDF document.
+///
+/// Returned by the text-search methods on [PdfViewPlatformController]. See
+/// [kPdfTextLayerUnsupportedCode] for how platforms without a text layer report
+/// that they cannot search at all — an empty match list always means "searched,
+/// found nothing", never "not supported here".
+class PdfTextMatch {
+  /// Creates a match description.
+  const PdfTextMatch({required this.pageIndex, required this.matchIndex, this.text});
+
+  /// Builds a match from its method-channel representation.
+  factory PdfTextMatch.fromMap(Map<Object?, Object?> map) {
+    return PdfTextMatch(
+      pageIndex: (map['pageIndex'] as num?)?.toInt() ?? 0,
+      matchIndex: (map['matchIndex'] as num?)?.toInt() ?? 0,
+      text: map['text'] as String?,
+    );
+  }
+
+  /// Zero-based page that contains this match.
+  final int pageIndex;
+
+  /// Zero-based index of this match in the full search result list.
+  final int matchIndex;
+
+  /// Matched string as reported by the platform, when available.
+  final String? text;
+
+  /// Serializes this match into its method-channel representation.
+  Map<String, Object?> toMap() => <String, Object?>{
+    'pageIndex': pageIndex,
+    'matchIndex': matchIndex,
+    'text': text,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is PdfTextMatch &&
+      other.pageIndex == pageIndex &&
+      other.matchIndex == matchIndex &&
+      other.text == text;
+
+  @override
+  int get hashCode => Object.hash(pageIndex, matchIndex, text);
+
+  @override
+  String toString() => 'PdfTextMatch(pageIndex: $pageIndex, matchIndex: $matchIndex, text: $text)';
+}
+
+/// The `PlatformException.code` a platform implementation must use when it has
+/// no text layer at all.
+///
+/// Implementations must fail this way rather than returning an empty result:
+/// an empty list has to keep meaning "searched, found nothing", otherwise an app
+/// on a platform without text support silently reads as "this document contains
+/// no matches". [MethodChannelPdfViewController] translates this code into an
+/// [UnsupportedError].
+const String kPdfTextLayerUnsupportedCode = 'text_layer_unsupported';
+
+/// Signature for the callback that is invoked when the user changes the text
+/// selection in the PDF view.
+///
+/// [selectedText] is the selected string, or `null` when the selection is
+/// cleared.
+typedef TextSelectionChangedCallback = void Function(String? selectedText);
+
+/// Signature for the callback that is invoked when the active search match
+/// changes.
+///
+/// [currentIndex] is the zero-based index of the active match, or `-1` when
+/// there is no active match. [total] is the number of matches.
+typedef SearchResultChangedCallback = void Function(int currentIndex, int total);
+
 /// Color theme for PDF page content and the gutter behind it.
 ///
 /// - [light]: normal rendering (no inversion).

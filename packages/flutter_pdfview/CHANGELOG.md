@@ -1,3 +1,29 @@
+## 1.5.0-beta.13
+
+- Add the **text layer**: find-in-document
+  ([#137](https://github.com/endigo/flutter_pdfview/issues/137)), text selection
+  ([#285](https://github.com/endigo/flutter_pdfview/issues/285)) and the ability to stop text
+  being copied out ([#108](https://github.com/endigo/flutter_pdfview/issues/108))
+- New on `PDFViewController`: `searchText`, `nextMatch`, `previousMatch`, `setCurrentMatch`,
+  `clearSearch`, `getSelectedText`, `clearSelection`, and `isTextLayerSupported`
+- New on `PDFView`: `enableTextSelection` and `enableCopy` (both default `true`, both update at
+  runtime without remounting), plus the `onTextSelectionChanged` and `onSearchResultChanged`
+  callbacks
+- **iOS**: implemented on PDFKit — `findString` with every match highlighted, the active one
+  scrolled into view, wrapping navigation, and an edit menu that drops copy / share / look-up
+  when `enableCopy` is `false`
+- **Android**: there is no text layer. AndroidPdfViewer's `PdfiumCore` binds none of Pdfium's
+  `FPDFText_*` API in Java, even though the bundled `libpdfium` exports those symbols natively;
+  reaching them needs a JNI shim this plugin does not ship yet. The query methods therefore
+  **throw `UnsupportedError`** rather than returning an empty list, which would be
+  indistinguishable from "this document contains no matches" and would let apps ship broken
+  search unnoticed. Check `isTextLayerSupported()` before offering search or selection UI.
+  `clearSearch` and `clearSelection` remain no-ops everywhere
+- Adds `example/integration_test/text_layer_test.dart`, which drives the real native viewer, and
+  a deterministic text fixture (`scripts/make_text_pdf.py`)
+- Depends on `flutter_pdfview_platform_interface` ^1.1.0
+- Includes everything in `1.5.0-beta.12`
+
 ## 1.5.0-beta.12
 
 - Add optional `withAnimation` to `PDFViewController.setPage` ([#251](https://github.com/endigo/flutter_pdfview/pull/251)):

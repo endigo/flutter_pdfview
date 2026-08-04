@@ -26,6 +26,8 @@ class PDFView extends StatefulWidget {
     this.onLoadComplete,
     this.onDraw,
     this.onTap,
+    this.onTextSelectionChanged,
+    this.onSearchResultChanged,
     this.gestureRecognizers,
     this.enableSwipe = true,
     this.swipeHorizontal = false,
@@ -53,6 +55,8 @@ class PDFView extends StatefulWidget {
     this.backgroundColor,
     this.maxZoom = 4.0,
     this.minZoom = 1.0,
+    this.enableTextSelection = true,
+    this.enableCopy = true,
   }) : assert(filePath != null || pdfData != null),
        assert(maxZoom > 0, 'maxZoom must be greater than 0'),
        assert(minZoom > 0, 'minZoom must be greater than 0'),
@@ -104,6 +108,20 @@ class PDFView extends StatefulWidget {
   /// Double-tap zoom and link handling still work; the native side reports the
   /// single tap without consuming the event for those features.
   final TapCallback? onTap;
+
+  /// Invoked when the user changes the text selection, with the selected string
+  /// or `null` when the selection is cleared.
+  ///
+  /// Only delivered while [enableTextSelection] is `true`, and only on platforms
+  /// with a text layer — see [PDFViewController.isTextLayerSupported].
+  final TextSelectionChangedCallback? onTextSelectionChanged;
+
+  /// Invoked when the active search match changes, after
+  /// [PDFViewController.searchText], [PDFViewController.nextMatch],
+  /// [PDFViewController.previousMatch] or [PDFViewController.setCurrentMatch].
+  ///
+  /// The index is `-1` and the total `0` when the search is cleared.
+  final SearchResultChangedCallback? onSearchResultChanged;
 
   /// Which gestures should be consumed by the pdf view.
   ///
@@ -267,6 +285,28 @@ class PDFView extends StatefulWidget {
 
   /// Minimum zoom level. Defaults to 1.0 (fit to page).
   final double minZoom;
+
+  /// Whether the user may long-press to select text in the document.
+  ///
+  /// Defaults to `true`.
+  ///
+  /// - **iOS**: maps to PDFKit's built-in selection
+  ///   ([#285](https://github.com/endigo/flutter_pdfview/issues/285)). Setting it
+  ///   to `false` disables the long-press recognizers and clears any selection,
+  ///   which is the supported way to stop users copying text out of a document
+  ///   ([#108](https://github.com/endigo/flutter_pdfview/issues/108)).
+  /// - **Android**: AndroidPdfViewer has no selection UI, so `false` only
+  ///   suppresses the long-press callback. There is nothing to select either
+  ///   way. Applied on the next document load rather than immediately.
+  final bool enableTextSelection;
+
+  /// Whether the system edit menu offers copy / share / look-up for a selection.
+  ///
+  /// Defaults to `true`. Set both this and [enableTextSelection] to `false` to
+  /// stop text leaving the document entirely.
+  ///
+  /// **iOS only** — Android has no selection menu to suppress.
+  final bool enableCopy;
 
   @override
   State<PDFView> createState() => _PDFViewState();

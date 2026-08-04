@@ -1,3 +1,16 @@
+## 1.1.0
+
+- Add the text layer to the interface: `PdfTextMatch`, the
+  `TextSelectionChangedCallback` / `SearchResultChangedCallback` signatures, the
+  `enableTextSelection` / `enableCopy` settings, and the search and selection
+  methods on `PdfViewPlatformController`
+- Add `PdfViewPlatformController.isTextLayerSupported`, and
+  `kPdfTextLayerUnsupportedCode` — the `PlatformException.code` an implementation
+  must use when it has no text layer. `MethodChannelPdfViewController` turns it
+  into an `UnsupportedError`, so an empty search result always means "searched,
+  found nothing" and never "not supported here"
+- Non-breaking for existing implementations that extend `FlutterPdfViewPlatform`
+
 ## 1.0.1
 
 - `PdfViewPlatformController.setPage` accepts optional `withAnimation` (default `false`; Android

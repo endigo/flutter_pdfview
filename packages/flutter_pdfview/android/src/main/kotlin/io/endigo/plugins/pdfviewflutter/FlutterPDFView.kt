@@ -91,6 +91,15 @@ class FlutterPDFView(
     /** Remains attached after load so a late size settle can re-fit (#127). */
     private var sizeSettleListener: View.OnLayoutChangeListener? = null
 
+    /**
+     * Whether long-press is left enabled (#285). AndroidPdfViewer has no
+     * selection UI, so `false` only suppresses the long-press callback — there is
+     * nothing to select either way. `disableLongpress()` is Configurator-only, so
+     * a runtime change takes effect on the next document load.
+     */
+    private var enableTextSelection: Boolean =
+        getBoolean(params, "enableTextSelection", DEFAULT_ENABLE_TEXT_SELECTION)
+
     init {
         val view = PDFView(context, null)
         pdfView = view
@@ -300,6 +309,13 @@ class FlutterPDFView(
                     }
                     false
                 }
+                .apply {
+                    // Nothing to select in 3.2.8; this only stops the long-press
+                    // callback from firing (#108, #285).
+                    if (!enableTextSelection) {
+                        disableLongpress()
+                    }
+                }
                 .onPageChange { page, total ->
                     if (disposed) return@onPageChange
                     val args: MutableMap<String, Any> = HashMap()
@@ -411,8 +427,33 @@ class FlutterPDFView(
             "setPage" -> setPage(methodCall, result)
             "updateSettings" -> updateSettings(methodCall, result)
             "setZoomLimits" -> setZoomLimits(methodCall, result)
+            "isTextLayerSupported" -> result.success(false)
+            // #137 / #285: AndroidPdfViewer 3.2.8 ships a libpdfium that exports
+            // the FPDFText_* family, but PdfiumCore binds none of it in Java, so
+            // there is no text to search or select. Fail loudly rather than
+            // returning an empty result, which an app would read as "this
+            // document contains no matches".
+            "searchText",
+            "nextMatch",
+            "previousMatch",
+            "setCurrentMatch",
+            "getSelectedText" -> textLayerUnsupported(result)
+            // Clearing nothing is a truthful outcome, so these stay no-ops.
+            "clearSearch", "clearSelection" -> result.success(null)
             else -> result.notImplemented()
         }
+    }
+
+    /** Reports that this platform has no text layer at all (#137, #285). */
+    private fun textLayerUnsupported(result: Result) {
+        result.error(
+            TEXT_LAYER_UNSUPPORTED_CODE,
+            "flutter_pdfview has no text layer on Android: AndroidPdfViewer " +
+                "$ANDROID_PDF_VIEWER_VERSION does not bind Pdfium's FPDFText_* API in Java. " +
+                "Check PDFViewController.isTextLayerSupported() before offering search or " +
+                "selection UI. See https://github.com/endigo/flutter_pdfview/issues/137",
+            null,
+        )
     }
 
     fun getPageCount(result: Result) {
@@ -982,6 +1023,13 @@ class FlutterPDFView(
                 "maxZoom" -> view.maxZoom = getFloat(settings, key, DEFAULT_MAX_ZOOM)
                 "minZoom" -> view.minZoom = getFloat(settings, key, DEFAULT_MIN_ZOOM)
                 "password" -> applyPassword(settings[key] as? String, null)
+                // disableLongpress() is Configurator-only, so this takes effect
+                // on the next document load rather than immediately.
+                "enableTextSelection" ->
+                    enableTextSelection =
+                        getBoolean(settings, key, DEFAULT_ENABLE_TEXT_SELECTION)
+                // Accepted and ignored: without selection there is no copy menu.
+                "enableCopy" -> Unit
                 else -> throw IllegalArgumentException("Unknown PDFView setting: $key")
             }
         }
@@ -1131,6 +1179,18 @@ class FlutterPDFView(
 
         /** Matches Dart [PDFView.enableRenderDuringScale] default. */
         const val DEFAULT_ENABLE_RENDER_DURING_SCALE = true
+
+        /** Matches Dart [PDFView.enableTextSelection] default. */
+        const val DEFAULT_ENABLE_TEXT_SELECTION = true
+
+        /**
+         * Mirrors `kPdfTextLayerUnsupportedCode` in the platform interface. Dart
+         * turns this code into an `UnsupportedError`.
+         */
+        const val TEXT_LAYER_UNSUPPORTED_CODE = "text_layer_unsupported"
+
+        /** Reported in the unsupported-text-layer message so it stays accurate. */
+        const val ANDROID_PDF_VIEWER_VERSION = "3.2.8"
 
         /**
          * Matches Dart [PDFView.thumbnailRatio] default. AndroidPdfViewer's own

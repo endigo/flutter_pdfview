@@ -33,6 +33,8 @@ PdfViewSettings _settingsFromWidget(PDFView widget, {required PdfColorMode resol
     backgroundColor: widget.backgroundColor,
     maxZoom: widget.maxZoom,
     minZoom: widget.minZoom,
+    enableTextSelection: widget.enableTextSelection,
+    enableCopy: widget.enableCopy,
   );
 }
 
@@ -51,5 +53,7 @@ PdfViewCallbacks _callbacksFromWidget(PDFView widget) {
     onLoadComplete: widget.onLoadComplete,
     onDraw: widget.onDraw,
     onTap: widget.onTap,
+    onTextSelectionChanged: widget.onTextSelectionChanged,
+    onSearchResultChanged: widget.onSearchResultChanged,
   );
 }
