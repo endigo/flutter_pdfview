@@ -14,6 +14,16 @@
   implementation extends `FlutterPdfViewPlatform` and registers itself
 - The repository is now a Melos + Dart pub workspaces monorepo; the published package moved to
   `packages/flutter_pdfview/`
+- **iOS**: declare the `FlutterFramework` dependency in `Package.swift`, which Flutter 3.44+
+  requires plugins to do explicitly instead of inheriting it from the generated Runner package.
+  This clears the "missing a dependency on FlutterFramework" warning printed on every
+  `flutter pub get` and Swift Package Manager build
+- **Android**: prepare for [Built-in Kotlin](https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors).
+  AGP 9 compiles Kotlin itself and Flutter fails the build of any app whose plugins also apply the
+  Kotlin Gradle Plugin, so `kotlin-android` is now applied only on AGP 8, and `kotlinOptions` is
+  replaced by the `kotlin { compilerOptions { jvmTarget } }` form that both toolchains understand.
+  Apps on AGP 8 are unaffected; apps on AGP 9 no longer fail because of this plugin. The KGP
+  warning itself only disappears once your app is on AGP 9 with `android.builtInKotlin=true`
 - Includes everything in `1.5.0-beta.10`
 
 ## 1.5.0-beta.10
