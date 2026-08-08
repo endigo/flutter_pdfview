@@ -1,3 +1,16 @@
+/// Example app for [flutter_pdfview](https://pub.dev/packages/flutter_pdfview).
+///
+/// Home screen demos (see also `example/README.md`):
+/// - Open PDF / landscape / remote / iPad-safe scroll
+/// - Password-protected unlock (`demo-protected.pdf`)
+/// - **Text search** (`TextSearchScreen` + `demo-text.pdf`) — iOS has a text
+///   layer; Android shows an unsupported banner
+/// - Corrupted PDF error path
+///
+/// Integration tests: `integration_test/password_test.dart`,
+/// `integration_test/text_layer_test.dart`.
+library;
+
 import 'dart:async';
 import 'dart:io';
 
@@ -160,7 +173,7 @@ class _MyAppState extends State<MyApp> {
       themeMode: _themeMode,
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Plugin example app'),
+          title: const Text('flutter_pdfview example'),
           actions: <Widget>[
             IconButton(
               tooltip: 'Theme: ${_themeMode.name}',
@@ -172,8 +185,17 @@ class _MyAppState extends State<MyApp> {
         body: Center(
           child: Builder(
             builder: (BuildContext context) {
-              return Column(
+              return ListView(
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 children: <Widget>[
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    child: Text(
+                      'Demos for layout, password unlock, and the iOS text layer '
+                      '(search / selection / copy). See example/README.md.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                   TextButton(
                     child: const Text('Open PDF'),
                     onPressed: () {
@@ -236,7 +258,7 @@ class _MyAppState extends State<MyApp> {
                     },
                   ),
                   TextButton(
-                    child: const Text('Search Text in PDF'),
+                    child: const Text('Search Text in PDF (text layer)'),
                     onPressed: () {
                       if (textPathPDF.isNotEmpty) {
                         Navigator.push(

@@ -388,6 +388,10 @@ Wrapping `PDFView` itself in `ColorFiltered` will keep painting a solid tint
 
 ## Example
 
+Basic viewer (password, color mode, layout). For **search / selection / copy**, see
+[Text layer](#text-layer) and the example app’s `TextSearchScreen`
+(`packages/flutter_pdfview/example` → **Search Text in PDF**).
+
 ```dart
 PDFView(
   filePath: path,
@@ -398,6 +402,8 @@ PDFView(
   showScrollIndicators: true,
   colorMode: PdfColorMode.system, // follows Theme brightness
   backgroundColor: Theme.of(context).colorScheme.surface,
+  // Optional: inter-page gap when autoSpacing is true (dp / points).
+  // spacing: 12,
   onRender: (_pages) {
     setState(() {
       pages = _pages;
@@ -410,8 +416,10 @@ PDFView(
   onPageError: (page, error) {
     print('$page: ${error.toString()}');
   },
-  onViewCreated: (PDFViewController pdfViewController) {
+  onViewCreated: (PDFViewController pdfViewController) async {
     _controller.complete(pdfViewController);
+    // Android can animate; iOS ignores withAnimation.
+    // await pdfViewController.setPage(2, withAnimation: true);
   },
   onPageChanged: (int page, int total) {
     print('page change: $page/$total');
@@ -425,25 +433,38 @@ PDFView(
 ),
 ```
 
+Text-layer sketch (always gate on support):
+
+```dart
+onViewCreated: (PDFViewController c) async {
+  if (!await c.isTextLayerSupported()) return;
+  final matches = await c.searchText('invoice');
+  // nextMatch / previousMatch / clearSearch …
+},
+onSearchResultChanged: (index, total) { /* highlight chrome */ },
+onTextSelectionChanged: (text) { /* selection chrome */ },
+enableTextSelection: true,
+enableCopy: false, // hide copy/share/look-up in the iOS edit menu
+```
+
 # Dependencies
 
 ### Android
 
-[AndroidPdfViewer](https://github.com/barteksc/AndroidPdfViewer)
+[AndroidPdfViewer](https://github.com/barteksc/AndroidPdfViewer) (via
+`com.github.marain87:AndroidPdfViewer`)
 
-### iOS (only support> 12.0)
+### iOS (13.0+)
 
 [PDFKit](https://developer.apple.com/documentation/pdfkit)
 
 # Future plans
 
-- Replace barteksc/AndroidPdfViewer with MuPDF or Android Native PDF Renderer.
-- Improve documentation
-- Support other platforms such as MacOS, Windows, Linux and Web
-- Add search functionality
-- Improve performance on zooming, page changing
-- Improve image quality
-- Write more test
+- Android text layer (JNI shim over Pdfium `FPDFText_*` already present in the AAR)
+- Replace / augment AndroidPdfViewer with MuPDF or the Android native PDF renderer where useful
+- Support other platforms (macOS, Windows, Linux, Web) via the federated interface
+- Improve performance on zooming and page changes
+- More integration tests and device coverage
 
 # Support
 

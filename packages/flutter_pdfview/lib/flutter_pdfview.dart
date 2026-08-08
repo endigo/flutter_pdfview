@@ -14,6 +14,10 @@
 ///   onViewCreated: (PDFViewController controller) async {
 ///     final int? pages = await controller.getPageCount();
 ///     await controller.setPage(0);
+///     // Text search is iOS-only today — always check first.
+///     if (await controller.isTextLayerSupported()) {
+///       await controller.searchText('invoice');
+///     }
 ///   },
 /// )
 /// ```

@@ -21,6 +21,10 @@
   `clearSearch` and `clearSelection` remain no-ops everywhere
 - Adds `example/integration_test/text_layer_test.dart`, which drives the real native viewer, and
   a deterministic text fixture (`scripts/make_text_pdf.py`)
+- Example app: **Search Text in PDF** home action + `TextSearchScreen` (gate on
+  `isTextLayerSupported`, search/next/prev, selection and copy chips)
+- Docs: package README text-layer section and controller table, platform-interface README
+  contract, `Claude.md` features/testing notes, `example/README.md` demo map
 - Depends on `flutter_pdfview_platform_interface` ^1.1.0
 - Includes everything in `1.5.0-beta.12`
 
