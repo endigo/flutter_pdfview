@@ -1,3 +1,16 @@
+/// Example app for [flutter_pdfview](https://pub.dev/packages/flutter_pdfview).
+///
+/// Home screen demos (see also `example/README.md`):
+/// - Open PDF / landscape / remote / iPad-safe scroll
+/// - Password-protected unlock (`demo-protected.pdf`)
+/// - **Text search** (`TextSearchScreen` + `demo-text.pdf`) — iOS has a text
+///   layer; Android shows an unsupported banner
+/// - Corrupted PDF error path
+///
+/// Integration tests: `integration_test/password_test.dart`,
+/// `integration_test/text_layer_test.dart`.
+library;
+
 import 'dart:async';
 import 'dart:io';
 
@@ -32,6 +45,7 @@ class _MyAppState extends State<MyApp> {
   String remotePDFpath = '';
   String corruptedPathPDF = '';
   String protectedPathPDF = '';
+  String textPathPDF = '';
   ThemeMode _themeMode = ThemeMode.system;
 
   @override
@@ -58,6 +72,11 @@ class _MyAppState extends State<MyApp> {
     fromAsset('assets/demo-protected.pdf', 'protected.pdf').then((f) {
       setState(() {
         protectedPathPDF = f.path;
+      });
+    });
+    fromAsset('assets/demo-text.pdf', 'text.pdf').then((f) {
+      setState(() {
+        textPathPDF = f.path;
       });
     });
 
@@ -154,7 +173,7 @@ class _MyAppState extends State<MyApp> {
       themeMode: _themeMode,
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Plugin example app'),
+          title: const Text('flutter_pdfview example'),
           actions: <Widget>[
             IconButton(
               tooltip: 'Theme: ${_themeMode.name}',
@@ -166,8 +185,17 @@ class _MyAppState extends State<MyApp> {
         body: Center(
           child: Builder(
             builder: (BuildContext context) {
-              return Column(
+              return ListView(
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 children: <Widget>[
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    child: Text(
+                      'Demos for layout, password unlock, and the iOS text layer '
+                      '(search / selection / copy). See example/README.md.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                   TextButton(
                     child: const Text('Open PDF'),
                     onPressed: () {
@@ -230,6 +258,19 @@ class _MyAppState extends State<MyApp> {
                     },
                   ),
                   TextButton(
+                    child: const Text('Search Text in PDF (text layer)'),
+                    onPressed: () {
+                      if (textPathPDF.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TextSearchScreen(path: textPathPDF),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  TextButton(
                     child: const Text('Open Corrupted PDF'),
                     onPressed: () {
                       if (pathPDF.isNotEmpty) {
@@ -247,6 +288,171 @@ class _MyAppState extends State<MyApp> {
             },
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Find-in-document demo (#137), plus the copy/selection switches from #108.
+///
+/// Shows the shape apps are expected to use: ask
+/// [PDFViewController.isTextLayerSupported] first and only offer search where it
+/// exists, because the text methods throw [UnsupportedError] elsewhere rather
+/// than pretending the document has no matches.
+class TextSearchScreen extends StatefulWidget {
+  /// Path of the document to display.
+  const TextSearchScreen({super.key, required this.path});
+
+  /// Path of the document to display.
+  final String path;
+
+  @override
+  State<TextSearchScreen> createState() => _TextSearchScreenState();
+}
+
+class _TextSearchScreenState extends State<TextSearchScreen> {
+  final TextEditingController _query = TextEditingController(text: 'searchable');
+  PDFViewController? _controller;
+  bool? _textLayerSupported;
+  int _current = -1;
+  int _total = 0;
+  String? _selection;
+  bool _allowSelection = true;
+  bool _allowCopy = true;
+  String? _error;
+
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  Future<void> _runSearch() async {
+    final PDFViewController? controller = _controller;
+    if (controller == null) return;
+    setState(() => _error = null);
+    try {
+      final List<PdfTextMatch> matches = await controller.searchText(_query.text);
+      if (!mounted) return;
+      setState(() {
+        _total = matches.length;
+        _current = matches.isEmpty ? -1 : 0;
+      });
+    } on UnsupportedError catch (e) {
+      // Reached only if the UI ignored isTextLayerSupported.
+      if (mounted) setState(() => _error = e.message?.toString());
+    }
+  }
+
+  Future<void> _step({required bool forward}) async {
+    final PDFViewController? controller = _controller;
+    if (controller == null || _total == 0) return;
+    final PdfTextMatch? match = forward
+        ? await controller.nextMatch()
+        : await controller.previousMatch();
+    if (mounted && match != null) setState(() => _current = match.matchIndex);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool supported = _textLayerSupported ?? false;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Text search')),
+      body: Column(
+        children: <Widget>[
+          if (_textLayerSupported == false)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                'This platform has no text layer, so search and selection are '
+                'unavailable. On Android, AndroidPdfViewer does not bind '
+                "Pdfium's text API — see issue #137.",
+              ),
+            ),
+          if (_error != null)
+            Padding(padding: const EdgeInsets.all(12), child: Text('Error: $_error')),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: TextField(
+                    controller: _query,
+                    enabled: supported,
+                    decoration: const InputDecoration(labelText: 'Find in document'),
+                    onSubmitted: (_) => _runSearch(),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.search),
+                  onPressed: supported ? _runSearch : null,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_up),
+                  onPressed: supported && _total > 0 ? () => _step(forward: false) : null,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_down),
+                  onPressed: supported && _total > 0 ? () => _step(forward: true) : null,
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: <Widget>[
+                Text(_total == 0 ? 'No matches' : 'Match ${_current + 1} of $_total'),
+                const Spacer(),
+                if (_selection != null)
+                  Flexible(child: Text('Selected: $_selection', overflow: TextOverflow.ellipsis)),
+              ],
+            ),
+          ),
+          Wrap(
+            children: <Widget>[
+              // Together these two are the #108 "stop text leaving the document"
+              // configuration. Both push at runtime, without a remount.
+              FilterChip(
+                label: const Text('Allow selection'),
+                selected: _allowSelection,
+                onSelected: (bool v) => setState(() => _allowSelection = v),
+              ),
+              const SizedBox(width: 8),
+              FilterChip(
+                label: const Text('Allow copy'),
+                selected: _allowCopy,
+                onSelected: (bool v) => setState(() => _allowCopy = v),
+              ),
+            ],
+          ),
+          Expanded(
+            child: PDFView(
+              filePath: widget.path,
+              enableTextSelection: _allowSelection,
+              enableCopy: _allowCopy,
+              onViewCreated: (PDFViewController controller) async {
+                final bool supported = await controller.isTextLayerSupported();
+                if (!mounted) return;
+                setState(() {
+                  _controller = controller;
+                  _textLayerSupported = supported;
+                });
+              },
+              onTextSelectionChanged: (String? text) {
+                if (mounted) setState(() => _selection = text);
+              },
+              onSearchResultChanged: (int index, int total) {
+                if (mounted) {
+                  setState(() {
+                    _current = index;
+                    _total = total;
+                  });
+                }
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -84,6 +84,15 @@ class MethodChannelPdfViewController implements PdfViewPlatformController {
       case 'onTap':
         callbacks.onTap?.call();
         return null;
+      case 'onTextSelectionChanged':
+        callbacks.onTextSelectionChanged?.call(call.arguments['text'] as String?);
+        return null;
+      case 'onSearchResultChanged':
+        callbacks.onSearchResultChanged?.call(
+          (call.arguments['currentIndex'] as num?)?.toInt() ?? -1,
+          (call.arguments['total'] as num?)?.toInt() ?? 0,
+        );
+        return null;
     }
     throw MissingPluginException('${call.method} was invoked but has no handler');
   }
@@ -212,5 +221,66 @@ class MethodChannelPdfViewController implements PdfViewPlatformController {
   @override
   Future<void> updateSettings(Map<String, dynamic> updates) {
     return _channel.invokeMethod('updateSettings', updates);
+  }
+
+  @override
+  Future<bool> isTextLayerSupported() async {
+    return await _channel.invokeMethod<bool>('isTextLayerSupported') ?? false;
+  }
+
+  @override
+  Future<List<PdfTextMatch>> searchText(String query, {bool caseSensitive = false}) async {
+    final Object? raw = await _invokeTextMethod<Object?>('searchText', <String, dynamic>{
+      'query': query,
+      'caseSensitive': caseSensitive,
+    });
+    if (raw is! List) return const <PdfTextMatch>[];
+    return raw.whereType<Map<Object?, Object?>>().map(PdfTextMatch.fromMap).toList(growable: false);
+  }
+
+  @override
+  Future<PdfTextMatch?> nextMatch() => _activateMatch('nextMatch');
+
+  @override
+  Future<PdfTextMatch?> previousMatch() => _activateMatch('previousMatch');
+
+  @override
+  Future<PdfTextMatch?> setCurrentMatch(int index) =>
+      _activateMatch('setCurrentMatch', <String, dynamic>{'index': index});
+
+  @override
+  Future<String?> getSelectedText() => _invokeTextMethod<String?>('getSelectedText');
+
+  // clearSearch / clearSelection deliberately do not go through
+  // _invokeTextMethod: clearing nothing is a truthful outcome on a platform with
+  // no text layer, so they stay no-ops rather than throwing.
+  @override
+  Future<void> clearSearch() async {
+    await _channel.invokeMethod<void>('clearSearch');
+  }
+
+  @override
+  Future<void> clearSelection() async {
+    await _channel.invokeMethod<void>('clearSelection');
+  }
+
+  Future<PdfTextMatch?> _activateMatch(String method, [Map<String, dynamic>? arguments]) async {
+    final Object? raw = await _invokeTextMethod<Object?>(method, arguments);
+    return raw is Map<Object?, Object?> ? PdfTextMatch.fromMap(raw) : null;
+  }
+
+  /// Invokes a text-layer method, turning a platform that has no text layer into
+  /// an [UnsupportedError] instead of a value that reads as a real answer.
+  Future<T?> _invokeTextMethod<T>(String method, [Map<String, dynamic>? arguments]) async {
+    try {
+      return await _channel.invokeMethod<T>(method, arguments);
+    } on PlatformException catch (error) {
+      if (error.code == kPdfTextLayerUnsupportedCode) {
+        throw UnsupportedError(
+          error.message ?? 'The text layer is not supported on this platform.',
+        );
+      }
+      rethrow;
+    }
   }
 }

@@ -136,23 +136,30 @@ is `publish_to: none`. The `Publish to pub.dev` GitHub workflow already sets
 2. Platform view is created via `plugins.endigo.io/pdfview` channel
 3. Native implementation renders PDF and sends callbacks via method channel
 4. Events flow back to Flutter: `onRender`, `onPageChanged`, `onError`, `onTap`,
-   `onPasswordRequired`, etc.
+   `onPasswordRequired`, `onTextSelectionChanged`, `onSearchResultChanged`, etc.
 
 ### Key Features
 
 - **File Loading**: From file path or binary data (Uint8List)
-- **Navigation**: Page navigation, swipe gestures, horizontal/vertical scrolling, page alignment
+- **Navigation**: Page navigation (optional Android `setPage(withAnimation:)`), swipe,
+  horizontal/vertical scrolling, page alignment, optional inter-page `spacing`
 - **Rendering Options**: Color mode (light/dark/system), auto-spacing, page snap, fit policies
 - **Security**: Password-protected PDF support with `onPasswordRequired` / `unlock()`
-- **Callbacks**: Page change, render complete, error handling, link handling, tap
+- **Text layer (iOS)**: find-in-document (`searchText` / next/previous match), selection,
+  and `enableCopy` to suppress the edit-menu copy path (#137 #285 #108). Android has no text
+  layer yet — `isTextLayerSupported()` is `false` and query methods throw `UnsupportedError`
+  (check first; never treat empty results as “unsupported”)
+- **Callbacks**: Page change, render complete, error handling, link handling, tap, search /
+  selection (iOS)
 - **Controller Methods**: `getPageCount()`, `getCurrentPage()`, `setPage()`, `setZoomLimits()`,
-  `getScreenshot()`, `unlock()`
+  `getScreenshot()`, `unlock()`, plus text-layer methods when supported
 
 ## Platform-Specific Considerations
 
 ### iOS
 - Minimum iOS version: 13.0 (as of v1.4.5)
 - Swift 5.9; verified against both Swift Package Manager and CocoaPods
+- PDFKit text layer: search highlights, selection, copy control
 - Platform-view compositing limits apply: `ColorFiltered` / `ShaderMask` / `BackdropFilter`
   ancestors do not affect the native view (see #213)
 
@@ -161,21 +168,27 @@ is `publish_to: none`. The `Publish to pub.dev` GitHub workflow already sets
 - Kotlin, KGP 2.0.0, JVM target 17
 - True hybrid composition (`initExpensiveAndroidView`)
 - Uses AndroidX libraries; ProGuard rules included for release builds
+- Text search/selection not implemented (Pdfium `FPDFText_*` needs a JNI shim; see README
+  “Text layer”)
 
 ## Testing Approach
 
 Dart tests live in `test/` and cover creation params, settings diffing, fit/scale math, page
 alignment, password handling, and the controller. The platform interface has its own suite under
-`packages/flutter_pdfview_platform_interface/test/` covering the wire format, the token check, and
-the method-channel controller. `melos run test` runs both.
+`packages/flutter_pdfview_platform_interface/test/` covering the wire format, the token check,
+the method-channel controller, and text-layer method-channel decoding
+(`test/text_layer_test.dart`). `melos run test` runs both.
 
 Android has a Robolectric/JUnit suite run via `melos run test:android` (wraps
-`scripts/run_android_unit_tests.sh`). Keep it green.
+`scripts/run_android_unit_tests.sh`), including `FlutterPDFViewTextLayerTest` for the
+unsupported-path codes. Keep it green.
 
-`example/integration_test/` drives the real native viewers end to end.
+`example/integration_test/` drives the real native viewers end to end (`password_test.dart`,
+`text_layer_test.dart`). Text fixtures: `scripts/make_text_pdf.py` → `assets/demo-text.pdf`.
 
 The example app (`example/lib/main.dart`) provides comprehensive testing scenarios:
 - Loading from assets and from URL
+- Text search / selection / copy toggles (`TextSearchScreen` + `demo-text.pdf`)
 - Corrupted PDF handling
 - Landscape PDF rendering
 - PDF with links

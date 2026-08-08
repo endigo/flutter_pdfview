@@ -14,11 +14,13 @@ void main() {
       await tester.pumpWidget(const MyApp(loadDocuments: false));
       await tester.pump();
 
-      expect(find.text('Plugin example app'), findsOneWidget);
+      expect(find.text('flutter_pdfview example'), findsOneWidget);
       expect(find.text('Open PDF'), findsOneWidget);
       expect(find.text('Open Landscape PDF'), findsOneWidget);
       expect(find.text('Remote PDF'), findsOneWidget);
       expect(find.text('Open PDF (iPad Safe Mode)'), findsOneWidget);
+      expect(find.text('Open Password Protected PDF'), findsOneWidget);
+      expect(find.text('Search Text in PDF (text layer)'), findsOneWidget);
       expect(find.text('Open Corrupted PDF'), findsOneWidget);
       // Theme toggle lives in the home AppBar.
       expect(find.byTooltip('Theme: system'), findsOneWidget);
@@ -52,7 +54,23 @@ void main() {
       await tester.tap(openPdf);
       await tester.pump();
       expect(find.text('Document'), findsNothing);
-      expect(find.text('Plugin example app'), findsOneWidget);
+      expect(find.text('flutter_pdfview example'), findsOneWidget);
+    });
+  });
+
+  group('TextSearchScreen', () {
+    testWidgets('shows search chrome and unsupported banner until layer is known', (
+      tester,
+    ) async {
+      await tester.pumpWidget(const MaterialApp(home: TextSearchScreen(path: 'demo-text.pdf')));
+      await tester.pump();
+
+      expect(find.text('Text search'), findsOneWidget);
+      expect(find.text('Find in document'), findsOneWidget);
+      expect(find.text('Allow selection'), findsOneWidget);
+      expect(find.text('Allow copy'), findsOneWidget);
+      // No controller yet → treat as unsupported UI (buttons disabled via supported flag).
+      expect(find.byIcon(Icons.search), findsOneWidget);
     });
   });
 

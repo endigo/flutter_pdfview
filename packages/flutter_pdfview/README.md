@@ -20,16 +20,16 @@ dependencies:
 
 #### Trying the 1.5.0 beta
 
-`1.5.0-beta.10` continues the Kotlin/Swift line by letting password-protected
-documents be unlocked from the app ([#274](https://github.com/endigo/flutter_pdfview/issues/274)),
-on top of the luminance-preserving `PdfColorMode` dark theming in `beta.9`
-([#215](https://github.com/endigo/flutter_pdfview/issues/215),
-[#138](https://github.com/endigo/flutter_pdfview/issues/138)). Pre-releases are not
-picked up by a `^` constraint, so pin it explicitly:
+`1.5.0-beta.13` continues the Kotlin/Swift line with a PDFKit **text layer** —
+search, selection, and copy control on iOS ([#137](https://github.com/endigo/flutter_pdfview/issues/137),
+[#285](https://github.com/endigo/flutter_pdfview/issues/285),
+[#108](https://github.com/endigo/flutter_pdfview/issues/108)) — on top of password unlock,
+`PdfColorMode`, spacing, and animated `setPage`. Pre-releases are not picked up by a
+`^` constraint, so pin it explicitly:
 
 ```
 dependencies:
-  flutter_pdfview: 1.5.0-beta.10
+  flutter_pdfview: 1.5.0-beta.13
 ```
 
 Feedback is welcome in [#351](https://github.com/endigo/flutter_pdfview/issues/351).
@@ -65,6 +65,10 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | onLoadComplete        |   ✅    | ✅  |      `null`       |
 | onDraw                |   ✅    | ✅  |      `null`       |
 | onTap                 |   ✅    | ✅  |      `null`       |
+| onTextSelectionChanged |   ❌    | ✅  |      `null`       |
+| onSearchResultChanged |   ❌    | ✅  |      `null`       |
+| enableTextSelection   |   ⚠️    | ✅  |      `true`       |
+| enableCopy            |   ❌    | ✅  |      `true`       |
 | onError               |   ✅    | ✅  |      `null`       |
 | onPageError           |   ✅    | ❌  |      `null`       |
 | onPasswordRequired    |   ✅    | ✅  |      `null`       |
@@ -94,6 +98,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | thumbnailRatio*       |   ✅    | ❌  |        0.8        |
 
 Notes:
+- ⚠️ `enableTextSelection` on Android only suppresses the long-press callback — AndroidPdfViewer has no selection UI to disable. See [Text layer](#text-layer) for why selection and search are iOS-only, and always check `isTextLayerSupported()` before offering that UI.
 - `colorMode` themes page content and the gutter on both platforms. Values: `PdfColorMode.light`, `PdfColorMode.dark`, `PdfColorMode.system` (default). `system` follows the app `Theme` brightness (or platform brightness when no `Theme` is present) and is resolved in Dart before being sent to the native view. Dark mode uses a luminance-preserving inversion (hue kept; photos do not become pure negatives). Live updates apply without remounting the platform view.
 - `nightMode` is **deprecated**. Prefer `colorMode`. When `colorMode` is left at `system` and `nightMode: true`, the resolved mode is `dark`. An explicit `colorMode` always wins.
 - `backgroundColor` can be updated at runtime together with `colorMode`. Setting it back to `null` after a non-null value leaves the previous color on screen.
@@ -225,6 +230,69 @@ password can be retried as often as needed without rebuilding the viewer.
 `onError` still fires alongside `onPasswordRequired`, so viewers written before
 this callback existed keep working.
 
+### Text layer
+
+Text selection ([#285](https://github.com/endigo/flutter_pdfview/issues/285)),
+find-in-document ([#137](https://github.com/endigo/flutter_pdfview/issues/137))
+and blocking copy ([#108](https://github.com/endigo/flutter_pdfview/issues/108))
+all need the document's text layer.
+
+**This is iOS-only today.** PDFKit provides text on iOS. On Android,
+AndroidPdfViewer's `PdfiumCore` binds none of Pdfium's `FPDFText_*` API in Java,
+so there is no text to search or select — even though the bundled `libpdfium`
+does export those symbols natively. Reaching them would require a JNI shim this
+plugin does not yet ship.
+
+**Always branch on `isTextLayerSupported()`.** The query methods throw
+`UnsupportedError` where there is no text layer, deliberately: returning an empty
+list would be indistinguishable from "this document contains no matches", and
+apps would ship broken search without noticing. `clearSearch` and
+`clearSelection` stay no-ops everywhere, because clearing nothing is truthful.
+
+```dart
+late PDFViewController controller;
+
+if (await controller.isTextLayerSupported()) {
+  final List<PdfTextMatch> matches = await controller.searchText('invoice');
+  // The first match is already highlighted and scrolled into view.
+  for (final PdfTextMatch match in matches) {
+    debugPrint('match ${match.matchIndex} on page ${match.pageIndex}: ${match.text}');
+  }
+  await controller.nextMatch();     // wraps at the end
+  await controller.clearSearch();
+} else {
+  // Hide the search UI rather than calling and catching.
+}
+```
+
+Track the active match with `onSearchResultChanged`, and the user's selection
+with `onTextSelectionChanged`:
+
+```dart
+PDFView(
+  filePath: path,
+  onSearchResultChanged: (int index, int total) => ..., // index is -1 when cleared
+  onTextSelectionChanged: (String? text) => ...,        // null when cleared
+)
+```
+
+#### Stopping text from leaving the document (#108)
+
+```dart
+PDFView(
+  filePath: path,
+  enableTextSelection: false, // no long-press selection
+  enableCopy: false,          // no copy / share / look-up in the edit menu
+)
+```
+
+Both update at runtime without remounting the view. `enableCopy` needs a
+selection to suppress, so `enableTextSelection: false` disables copying too.
+On Android, `enableTextSelection: false` only suppresses the long-press callback
+(there is nothing to select either way), and `enableCopy` has no effect. Note
+that neither prevents screenshots, nor a user extracting text from a copy of the
+file obtained elsewhere.
+
 ### Using PDFView inside a scrollable widget
 
 When a `PDFView` is embedded in a scrollable parent (`SingleChildScrollView`,
@@ -309,8 +377,20 @@ Wrapping `PDFView` itself in `ColorFiltered` will keep painting a solid tint
 | setZoomLimits      |                  Set the minimum, maximum and mid bounds of the zoom limits                  | `double minZoom, double midZoom, double maxZoom` |        -         |
 | unlock             |            Reopen the document with a password, for encrypted PDFs ([#274](https://github.com/endigo/flutter_pdfview/issues/274))            |                `String password`                 |  `Future<bool>`  |
 | reload             |                            Reload the PDF document in the PDFView                            |                        -                         |  `Future<bool>`  |
+| isTextLayerSupported | Whether this platform can search/select text — see [Text layer](#text-layer) | - | `Future<bool>` |
+| searchText         | Find every occurrence of a string; activates the first match | `String query, {bool caseSensitive}` | `Future<List<PdfTextMatch>>` |
+| nextMatch          | Activate the next match, wrapping at the end | - | `Future<PdfTextMatch?>` |
+| previousMatch      | Activate the previous match, wrapping at the start | - | `Future<PdfTextMatch?>` |
+| setCurrentMatch    | Activate a match by index | `int index` | `Future<PdfTextMatch?>` |
+| clearSearch        | Clear highlights and forget the last search | - | `Future<void>` |
+| getSelectedText    | The currently selected text, or null | - | `Future<String?>` |
+| clearSelection     | Clear the current text selection | - | `Future<void>` |
 
 ## Example
+
+Basic viewer (password, color mode, layout). For **search / selection / copy**, see
+[Text layer](#text-layer) and the example app’s `TextSearchScreen`
+(`packages/flutter_pdfview/example` → **Search Text in PDF**).
 
 ```dart
 PDFView(
@@ -322,6 +402,8 @@ PDFView(
   showScrollIndicators: true,
   colorMode: PdfColorMode.system, // follows Theme brightness
   backgroundColor: Theme.of(context).colorScheme.surface,
+  // Optional: inter-page gap when autoSpacing is true (dp / points).
+  // spacing: 12,
   onRender: (_pages) {
     setState(() {
       pages = _pages;
@@ -334,8 +416,10 @@ PDFView(
   onPageError: (page, error) {
     print('$page: ${error.toString()}');
   },
-  onViewCreated: (PDFViewController pdfViewController) {
+  onViewCreated: (PDFViewController pdfViewController) async {
     _controller.complete(pdfViewController);
+    // Android can animate; iOS ignores withAnimation.
+    // await pdfViewController.setPage(2, withAnimation: true);
   },
   onPageChanged: (int page, int total) {
     print('page change: $page/$total');
@@ -349,25 +433,38 @@ PDFView(
 ),
 ```
 
+Text-layer sketch (always gate on support):
+
+```dart
+onViewCreated: (PDFViewController c) async {
+  if (!await c.isTextLayerSupported()) return;
+  final matches = await c.searchText('invoice');
+  // nextMatch / previousMatch / clearSearch …
+},
+onSearchResultChanged: (index, total) { /* highlight chrome */ },
+onTextSelectionChanged: (text) { /* selection chrome */ },
+enableTextSelection: true,
+enableCopy: false, // hide copy/share/look-up in the iOS edit menu
+```
+
 # Dependencies
 
 ### Android
 
-[AndroidPdfViewer](https://github.com/barteksc/AndroidPdfViewer)
+[AndroidPdfViewer](https://github.com/barteksc/AndroidPdfViewer) (via
+`com.github.marain87:AndroidPdfViewer`)
 
-### iOS (only support> 12.0)
+### iOS (13.0+)
 
 [PDFKit](https://developer.apple.com/documentation/pdfkit)
 
 # Future plans
 
-- Replace barteksc/AndroidPdfViewer with MuPDF or Android Native PDF Renderer.
-- Improve documentation
-- Support other platforms such as MacOS, Windows, Linux and Web
-- Add search functionality
-- Improve performance on zooming, page changing
-- Improve image quality
-- Write more test
+- Android text layer (JNI shim over Pdfium `FPDFText_*` already present in the AAR)
+- Replace / augment AndroidPdfViewer with MuPDF or the Android native PDF renderer where useful
+- Support other platforms (macOS, Windows, Linux, Web) via the federated interface
+- Improve performance on zooming and page changes
+- More integration tests and device coverage
 
 # Support
 

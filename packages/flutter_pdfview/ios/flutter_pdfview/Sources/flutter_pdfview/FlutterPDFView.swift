@@ -172,6 +172,22 @@ final class PDFViewController: NSObject, FlutterPlatformView, PDFViewDelegate {
             pdfView.unlock(call, result: result)
         case "getScreenshot":
             pdfView.getScreenshot(call, result: result)
+        case "isTextLayerSupported":
+            result(true)
+        case "searchText":
+            pdfView.searchText(call, result: result)
+        case "nextMatch":
+            pdfView.nextMatch(call, result: result)
+        case "previousMatch":
+            pdfView.previousMatch(call, result: result)
+        case "setCurrentMatch":
+            pdfView.setCurrentMatch(call, result: result)
+        case "clearSearch":
+            pdfView.clearSearch(call, result: result)
+        case "getSelectedText":
+            pdfView.getSelectedText(call, result: result)
+        case "clearSelection":
+            pdfView.clearSelection(call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -189,6 +205,34 @@ final class PDFViewController: NSObject, FlutterPlatformView, PDFViewDelegate {
         // Unregister from the messenger; otherwise the engine keeps one dead
         // handler per created platform view for the app's lifetime (#261).
         channel.setMethodCallHandler(nil)
+    }
+}
+
+// MARK: - PDFKit view with copy / selection control
+
+/// PDFKit's `PDFView` always offers the system edit menu for selected text.
+/// Subclassing lets #108 refuse the copy-ish actions without tearing down the
+/// text layer, so selection can stay usable while copying is blocked.
+final class FPVPDFView: PDFView {
+    /// When false, copy / cut / share / look-up actions are refused (#108).
+    var enableCopy = true
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        guard !enableCopy else {
+            return super.canPerformAction(action, withSender: sender)
+        }
+        // `copy:` and `cut:` are public selectors. The share / define / look-up
+        // entries are private and have been renamed across iOS releases, so they
+        // are matched by substring — a miss only means an extra menu entry, never
+        // a crash.
+        if action == #selector(copy(_:)) || action == #selector(cut(_:)) {
+            return false
+        }
+        let name = action.description.lowercased()
+        for blocked in ["share", "define", "lookup", "translate"] where name.contains(blocked) {
+            return false
+        }
+        return super.canPerformAction(action, withSender: sender)
     }
 }
 
@@ -213,7 +257,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
 
     private weak var controller: PDFViewController?
 
-    private let pdfView: PDFView
+    private let pdfView: FPVPDFView
     private var document: PDFDocument?
     private var scrollView: UIScrollView?
     private var pageCount: NSNumber?
@@ -268,6 +312,18 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
     /// re-render. `nil` until Dart updates it.
     private var swipeEnabledOverride: Bool?
 
+    /// Whether the user may long-press to select text (#285).
+    private var enableTextSelection = true
+    /// Whether the system edit menu offers copy / share for a selection (#108).
+    private var enableCopy = true
+
+    /// Results of the active `findString` session (#137), in document order.
+    private var searchSelections: [PDFSelection] = []
+    /// Index into [searchSelections] of the active match, or -1 when none.
+    private var currentSearchIndex = -1
+    /// Last text reported through `onTextSelectionChanged`, to suppress repeats.
+    private var lastReportedSelectionText: String?
+
     init(frame: CGRect, arguments args: Any?, controller: PDFViewController) {
         self.controller = controller
 
@@ -278,7 +334,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         if pdfFrame.isEmpty || pdfFrame.size.width <= 0 || pdfFrame.size.height <= 0 {
             pdfFrame = CGRect(x: 0, y: 0, width: 100, height: 100)
         }
-        pdfView = PDFView(frame: pdfFrame)
+        pdfView = FPVPDFView(frame: pdfFrame)
 
         super.init(frame: frame)
 
@@ -295,6 +351,15 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         // PDFKit is vector, but ensure the host layer is not stuck at 1× when the
         // Flutter platform view attaches before a window is available (#158).
         applyDisplayScale()
+
+        // Removed by the existing deinit, which already calls
+        // NotificationCenter.default.removeObserver(self).
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSelectionChanged(_:)),
+            name: .PDFViewSelectionChanged,
+            object: pdfView
+        )
 
         pendingLoadArguments = args as? [String: Any]
         // If Flutter already handed us a non-zero frame, open immediately;
@@ -385,6 +450,10 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         let pageFling = args?.bool("pageFling") ?? false
         let enableSwipe = args?.bool("enableSwipe") ?? false
         preventLinkNavigation = args?.bool("preventLinkNavigation") ?? false
+        // Default to true when the key is absent, matching Dart.
+        enableTextSelection = args?.number("enableTextSelection")?.boolValue ?? true
+        enableCopy = args?.number("enableCopy")?.boolValue ?? true
+        applyTextInteractionSettings()
         setColorMode(Self.colorMode(fromSettings: args) ?? .light)
 
         defaultPageIndex = args?.integer("defaultPage") ?? 0
@@ -563,6 +632,14 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         }
 
         defaultPage = document.page(at: defaultPageIndex)
+
+        // PDFKit installs its long-press recognizers as the document attaches, so
+        // re-apply the selection / copy policy afterwards (#108, #285). A second
+        // pass after the run loop catches nested page views.
+        applyTextInteractionSettings()
+        DispatchQueue.main.async { [weak self] in
+            self?.applyTextInteractionSettings()
+        }
 
         // Configure scroll view with defensive handling for iPad.
         // PDFKit may not expose its scroll view immediately; retry a few
@@ -1314,9 +1391,203 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
             setNeedsLayout()
         }
 
+        var textInteractionChanged = false
+        if settings.keys.contains("enableTextSelection") {
+            enableTextSelection = settings.bool("enableTextSelection")
+            textInteractionChanged = true
+        }
+        if settings.keys.contains("enableCopy") {
+            enableCopy = settings.bool("enableCopy")
+            textInteractionChanged = true
+        }
+        if textInteractionChanged {
+            applyTextInteractionSettings()
+        }
+
         if needsRerender {
             rerenderPreservingPosition()
         }
+        result(nil)
+    }
+
+    // MARK: - Text layer (#285 selection, #137 search, #108 copy)
+
+    /// Pushes the selection / copy policy onto the PDFKit view.
+    private func applyTextInteractionSettings() {
+        // Copy needs something selected, so disabling selection disables copy too.
+        pdfView.enableCopy = enableCopy && enableTextSelection
+        setLongPressGesturesEnabled(enableTextSelection)
+        if !enableTextSelection {
+            clearActiveSelection(notify: true)
+        }
+    }
+
+    /// Enables or disables the long-press recognizers that start text selection.
+    ///
+    /// PDFKit spreads them across nested page views, so the whole subtree is
+    /// walked rather than just `pdfView` itself.
+    private func setLongPressGesturesEnabled(_ enabled: Bool) {
+        func apply(to view: UIView) {
+            for recognizer in view.gestureRecognizers ?? []
+                where recognizer is UILongPressGestureRecognizer
+            {
+                recognizer.isEnabled = enabled
+            }
+            for subview in view.subviews {
+                apply(to: subview)
+            }
+        }
+        apply(to: pdfView)
+    }
+
+    @objc private func handleSelectionChanged(_: Notification) {
+        guard enableTextSelection else {
+            // Clear anything that slipped through after selection was disabled.
+            if pdfView.currentSelection != nil {
+                pdfView.clearSelection()
+            }
+            return
+        }
+        let text = pdfView.currentSelection?.string
+        guard text != lastReportedSelectionText else { return }
+        lastReportedSelectionText = text
+        reportSelectionChanged(text)
+    }
+
+    /// Sends `onTextSelectionChanged`, encoding "no selection" as `NSNull`.
+    private func reportSelectionChanged(_ text: String?) {
+        var arguments: [String: Any] = [:]
+        arguments["text"] = text ?? NSNull()
+        controller?.invokeChannelMethod("onTextSelectionChanged", arguments: arguments)
+    }
+
+    private func clearActiveSelection(notify: Bool) {
+        pdfView.clearSelection()
+        let hadSelection = lastReportedSelectionText != nil
+        lastReportedSelectionText = nil
+        if notify, hadSelection {
+            reportSelectionChanged(nil)
+        }
+    }
+
+    /// Describes the match at [index] for Dart, or nil when out of range.
+    private func matchMap(at index: Int) -> [String: Any]? {
+        guard index >= 0, index < searchSelections.count else { return nil }
+        let selection = searchSelections[index]
+        var pageIndex = 0
+        if let page = selection.pages.first, let document {
+            // `index(for:)` is non-optional and reports NSNotFound on a miss.
+            let found = document.index(for: page)
+            if found != NSNotFound {
+                pageIndex = found
+            }
+        }
+        var map: [String: Any] = ["pageIndex": pageIndex, "matchIndex": index]
+        map["text"] = selection.string ?? NSNull()
+        return map
+    }
+
+    @discardableResult
+    private func activateSearchMatch(at index: Int, animate: Bool) -> [String: Any]? {
+        guard index >= 0, index < searchSelections.count else { return nil }
+        currentSearchIndex = index
+        let selection = searchSelections[index]
+        // Highlight every match; currentSelection marks the active one.
+        pdfView.highlightedSelections = searchSelections
+        pdfView.setCurrentSelection(selection, animate: animate)
+        pdfView.go(to: selection)
+        let map = matchMap(at: index)
+        reportSearchResultChanged(currentIndex: index, total: searchSelections.count)
+        return map
+    }
+
+    private func reportSearchResultChanged(currentIndex: Int, total: Int) {
+        controller?.invokeChannelMethod(
+            "onSearchResultChanged",
+            arguments: ["currentIndex": currentIndex, "total": total]
+        )
+    }
+
+    private func clearSearchState(notify: Bool) {
+        searchSelections = []
+        currentSearchIndex = -1
+        pdfView.highlightedSelections = nil
+        // Deliberately leaves any user text selection alone.
+        if notify {
+            reportSearchResultChanged(currentIndex: -1, total: 0)
+        }
+    }
+
+    func searchText(_ call: FlutterMethodCall, result: FlutterResult) {
+        let arguments = call.arguments as? [String: Any]
+        let query = arguments?["query"] as? String ?? ""
+        let caseSensitive = arguments?.number("caseSensitive")?.boolValue ?? false
+
+        guard !query.isEmpty, let document, !document.isLocked else {
+            clearSearchState(notify: true)
+            result([])
+            return
+        }
+
+        var options: NSString.CompareOptions = []
+        if !caseSensitive {
+            options.insert(.caseInsensitive)
+        }
+        searchSelections = document.findString(query, withOptions: options)
+
+        guard !searchSelections.isEmpty else {
+            currentSearchIndex = -1
+            pdfView.highlightedSelections = nil
+            reportSearchResultChanged(currentIndex: -1, total: 0)
+            result([])
+            return
+        }
+
+        // Activate the first hit so the user sees a result immediately.
+        activateSearchMatch(at: 0, animate: true)
+        result((0 ..< searchSelections.count).compactMap { matchMap(at: $0) })
+    }
+
+    func nextMatch(_: FlutterMethodCall, result: FlutterResult) {
+        guard !searchSelections.isEmpty else {
+            result(nil)
+            return
+        }
+        let next = (currentSearchIndex + 1) % searchSelections.count
+        result(activateSearchMatch(at: next, animate: true))
+    }
+
+    func previousMatch(_: FlutterMethodCall, result: FlutterResult) {
+        guard !searchSelections.isEmpty else {
+            result(nil)
+            return
+        }
+        let previous = currentSearchIndex <= 0
+            ? searchSelections.count - 1
+            : currentSearchIndex - 1
+        result(activateSearchMatch(at: previous, animate: true))
+    }
+
+    func setCurrentMatch(_ call: FlutterMethodCall, result: FlutterResult) {
+        let index = (call.arguments as? [String: Any])?.integer("index") ?? -1
+        result(activateSearchMatch(at: index, animate: true))
+    }
+
+    func clearSearch(_: FlutterMethodCall, result: FlutterResult) {
+        clearSearchState(notify: true)
+        result(nil)
+    }
+
+    func getSelectedText(_: FlutterMethodCall, result: FlutterResult) {
+        guard enableTextSelection else {
+            result(nil)
+            return
+        }
+        result(pdfView.currentSelection?.string)
+    }
+
+    func clearSelection(_: FlutterMethodCall, result: FlutterResult) {
+        clearActiveSelection(notify: true)
         result(nil)
     }
 
