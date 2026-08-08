@@ -1,0 +1,28 @@
+name: flutter_pdfview_platform_interface
+description: A common platform interface for the flutter_pdfview plugin.
+version: 1.0.0
+homepage: https://github.com/endigo/flutter_pdfview
+repository: https://github.com/endigo/flutter_pdfview
+issue_tracker: https://github.com/endigo/flutter_pdfview/issues
+
+# Resolved as part of the workspace declared in the repository-root pubspec.
+resolution: workspace
+
+topics:
+  - pdf
+  - viewer
+  - native
+
+environment:
+  sdk: ">=3.8.0 <4.0.0"
+  flutter: ">=3.32.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.8
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

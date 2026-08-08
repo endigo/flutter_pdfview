@@ -1,8 +1,5 @@
 part of '../flutter_pdfview.dart';
 
-/// The view type registered by the native plugins on both platforms.
-const String _viewType = 'plugins.endigo.io/pdfview';
-
 /// A widget that renders a PDF document using the platform's native viewer.
 ///
 /// Exactly one document source must be supplied: either [filePath], pointing at
@@ -411,73 +408,37 @@ class _PDFViewState extends State<PDFView> {
     // dependencies register correctly: StatefulElement.performRebuild clears
     // _dependencies before build().
     final PdfColorMode resolvedColorMode = _resolveColorMode(context);
-    final Map<String, dynamic> creationParams = _CreationParams.fromWidget(
-      widget,
-      resolvedColorMode: resolvedColorMode,
-    ).toMap();
 
     // Capture generation at build time so platform-view creation callbacks
     // from a previous mount cannot complete the current Completer.
     final int generation = _viewGeneration;
-    final Key viewKey = ValueKey<int>(generation);
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return PlatformViewLink(
-        key: viewKey,
-        viewType: _viewType,
-        surfaceFactory: (BuildContext context, PlatformViewController controller) {
-          return AndroidViewSurface(
-            controller: controller as AndroidViewController,
-            gestureRecognizers:
-                widget.gestureRecognizers ?? const <Factory<OneSequenceGestureRecognizer>>{},
-            hitTestBehavior: PlatformViewHitTestBehavior.opaque,
-          );
-        },
-        onCreatePlatformView: (PlatformViewCreationParams params) {
-          // True hybrid composition embeds the real android.view.View instead of
-          // mirroring via SurfaceTexture. Texture mode (initSurfaceAndroidView)
-          // crashes under load ("Surface was already locked!", EGL_NO_DISPLAY)
-          // and blanks/glitches on rotation, dialogs, and some GPUs
-          // (#9, #182, #263, #280, #298, #306).
-          return PlatformViewsService.initExpensiveAndroidView(
-              id: params.id,
-              viewType: _viewType,
-              layoutDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
-              creationParams: creationParams,
-              creationParamsCodec: const StandardMessageCodec(),
-            )
-            ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
-            ..addOnPlatformViewCreatedListener((int id) {
-              _onPlatformViewCreated(
-                id,
-                generation: generation,
-                resolvedColorMode: resolvedColorMode,
-              );
-            })
-            ..create();
-        },
-      );
-    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-      return UiKitView(
-        key: viewKey,
-        viewType: _viewType,
-        onPlatformViewCreated: (int id) {
-          _onPlatformViewCreated(id, generation: generation, resolvedColorMode: resolvedColorMode);
-        },
-        gestureRecognizers: widget.gestureRecognizers,
-        creationParams: creationParams,
-        creationParamsCodec: const StandardMessageCodec(),
-      );
-    }
-    return Text('$defaultTargetPlatform is not yet supported by the pdfview_flutter plugin');
+    return FlutterPdfViewPlatform.instance.buildView(
+      key: ValueKey<int>(generation),
+      creationParams: PdfViewCreationParams(
+        filePath: widget.filePath,
+        pdfData: widget.pdfData,
+        settings: _settingsFromWidget(widget, resolvedColorMode: resolvedColorMode),
+      ),
+      callbacks: _callbacksFromWidget(widget),
+      gestureRecognizers: widget.gestureRecognizers,
+      layoutDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
+      onPlatformViewCreated: (PdfViewPlatformController platformController) {
+        _onPlatformViewCreated(
+          platformController,
+          generation: generation,
+          resolvedColorMode: resolvedColorMode,
+        );
+      },
+    );
   }
 
   void _onPlatformViewCreated(
-    int id, {
+    PdfViewPlatformController platformController, {
     required int generation,
     required PdfColorMode resolvedColorMode,
   }) {
     final PDFViewController controller = PDFViewController._(
-      id,
+      platformController,
       widget,
       resolvedColorMode: resolvedColorMode,
     );
@@ -517,31 +478,5 @@ class _PDFViewState extends State<PDFView> {
       _controller.future.then((PDFViewController controller) => controller.dispose());
     }
     super.dispose();
-  }
-}
-
-/// The parameters handed to the native view when it is first created.
-class _CreationParams {
-  _CreationParams({this.filePath, this.pdfData, this.settings});
-
-  static _CreationParams fromWidget(PDFView widget, {required PdfColorMode resolvedColorMode}) {
-    return _CreationParams(
-      filePath: widget.filePath,
-      pdfData: widget.pdfData,
-      settings: _PDFViewSettings.fromWidget(widget, resolvedColorMode: resolvedColorMode),
-    );
-  }
-
-  final String? filePath;
-  final Uint8List? pdfData;
-
-  final _PDFViewSettings? settings;
-
-  Map<String, dynamic> toMap() {
-    final Map<String, dynamic> params = <String, dynamic>{'filePath': filePath, 'pdfData': pdfData};
-
-    params.addAll(settings!.toMap());
-
-    return params;
   }
 }

@@ -2,7 +2,7 @@
 # Run Robolectric/JUnit tests for the Android plugin module.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT/android"
+cd "$ROOT/packages/flutter_pdfview/android"
 
 if [[ -z "${JAVA_HOME:-}" ]]; then
   if [[ -d /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ]]; then
@@ -28,7 +28,7 @@ if [[ ! -f local.properties ]]; then
     echo "sdk.dir=$ANDROID_SDK"
     echo "flutter.sdk=$FLUTTER_SDK"
   } > local.properties
-  echo "Wrote android/local.properties"
+  echo "Wrote packages/flutter_pdfview/android/local.properties"
 fi
 
 ./gradlew testDebugUnitTest --console=plain "$@"

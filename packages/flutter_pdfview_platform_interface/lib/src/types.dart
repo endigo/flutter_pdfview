@@ -1,13 +1,7 @@
-part of '../flutter_pdfview.dart';
-
 // The `FitPolicy` values have been SCREAMING_CAPS since the first release of the
 // plugin. Renaming them would break every existing user, so the naming lint is
 // suppressed for this file instead.
 // ignore_for_file: constant_identifier_names
-
-/// Signature for the callback that is invoked once the native PDF view has been
-/// created and its [PDFViewController] is ready to be used.
-typedef PDFViewCreatedCallback = void Function(PDFViewController controller);
 
 /// Signature for the callback that is invoked when the document has been
 /// rendered, reporting the number of [pages] it contains.
@@ -41,7 +35,7 @@ typedef PasswordRequiredCallback = void Function(PDFPasswordFailure failure);
 /// Signature for the callback that is invoked when a link inside the document is
 /// tapped, reporting the target [uri].
 ///
-/// Only called when [PDFView.preventLinkNavigation] is `true`.
+/// Only called when link navigation is prevented.
 typedef LinkHandlerCallback = void Function(String? uri);
 
 /// Signature for the callback that is invoked once the document has finished
@@ -55,10 +49,10 @@ typedef DrawCallback = void Function(double pdfXOffset, double pdfYOffset, doubl
 /// Signature for the callback that is invoked when the user single-taps the
 /// PDF view.
 ///
-/// Prefer this over [PDFView.gestureRecognizers] with a [TapGestureRecognizer]
-/// when you only need a reliable tap notification — Flutter platform-view
-/// gesture arenas often fail to deliver `onTap` for embedded native views
-/// ([#133](https://github.com/endigo/flutter_pdfview/issues/133)).
+/// Flutter platform-view gesture arenas often fail to deliver `onTap` for
+/// embedded native views
+/// ([#133](https://github.com/endigo/flutter_pdfview/issues/133)), so the tap is
+/// detected natively and reported through this callback instead.
 typedef TapCallback = void Function();
 
 /// Determines how the pages of a document are scaled to fit the viewport.
@@ -91,9 +85,9 @@ enum PageAlignment {
 ///
 /// - [light]: normal rendering (no inversion).
 /// - [dark]: luminance-preserving inversion (white↔black, hue kept).
-/// - [system]: follows the app [Theme] brightness (or platform brightness when
-///   no [Theme] ancestor is present). Resolved in Dart before the value is
-///   sent to the native view.
+/// - [system]: follows the ambient app theme brightness. Resolved to [light] or
+///   [dark] by the app-facing package before it reaches a platform
+///   implementation, so implementations never observe this value.
 enum PdfColorMode {
   /// Normal light rendering.
   light,

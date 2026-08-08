@@ -1,33 +1,28 @@
-part of '../flutter_pdfview.dart';
+import 'dart:async';
 
-/// Controls a [PDFView] that has been created on the native side.
+import 'package:flutter/services.dart';
+
+import '../pdf_view_callbacks.dart';
+import '../pdf_view_platform_controller.dart';
+import '../types.dart';
+
+/// Drives one native PDF view over its per-view method channel.
 ///
-/// An instance is handed to [PDFView.onViewCreated] once the platform view is
-/// ready. The controller becomes inert after [dispose] has been called, which
-/// happens automatically when the owning [PDFView] leaves the tree or loads a
-/// different document.
-class PDFViewController {
-  PDFViewController._(int id, PDFView widget, {PdfColorMode resolvedColorMode = PdfColorMode.light})
+/// The channel name is `plugins.endigo.io/pdfview_<id>`, where `id` is the
+/// platform view id. Both bundled implementations register it.
+class MethodChannelPdfViewController implements PdfViewPlatformController {
+  /// Connects to the view with the given platform view [id] and dispatches its
+  /// events to [callbacks].
+  MethodChannelPdfViewController(int id, PdfViewCallbacks callbacks)
     : _channel = MethodChannel('plugins.endigo.io/pdfview_$id'),
-      _widget = widget {
-    _settings = _PDFViewSettings.fromWidget(widget, resolvedColorMode: resolvedColorMode);
+      _callbacks = callbacks {
     _channel.setMethodCallHandler(_onMethodCall);
   }
 
-  /// Test-only constructor so unit tests can exercise the method channel
-  /// without a real platform view.
-  @visibleForTesting
-  factory PDFViewController.test(
-    int id,
-    PDFView widget, {
-    PdfColorMode resolvedColorMode = PdfColorMode.light,
-  }) => PDFViewController._(id, widget, resolvedColorMode: resolvedColorMode);
-
   final MethodChannel _channel;
 
-  late _PDFViewSettings _settings;
-
-  PDFView? _widget;
+  /// Null once [dispose] has run, which makes in-flight calls no-ops.
+  PdfViewCallbacks? _callbacks;
 
   /// Serializes concurrent [setPosition] calls (and [getPosition] waits) so
   /// platform order matches call order for any number of overlapping callers.
@@ -36,95 +31,91 @@ class PDFViewController {
   /// Serializes concurrent [setScale] calls (and [getScale] waits).
   Future<void> _setScaleQueue = Future<void>.value();
 
-  /// Detaches the controller from the native view and stops delivering
-  /// callbacks.
-  ///
-  /// Called automatically by [PDFView]; there is normally no need to call it
-  /// directly.
+  @override
+  void updateCallbacks(PdfViewCallbacks callbacks) {
+    // Only replace while live; after dispose the controller stays inert.
+    if (_callbacks == null) return;
+    _callbacks = callbacks;
+  }
+
+  @override
   void dispose() {
     _channel.setMethodCallHandler(null);
-    _widget = null;
+    _callbacks = null;
   }
 
   Future<bool?> _onMethodCall(MethodCall call) async {
-    final PDFView? widget = _widget;
-    if (widget == null) return null;
+    final PdfViewCallbacks? callbacks = _callbacks;
+    if (callbacks == null) return null;
 
     switch (call.method) {
       case 'onRender':
-        widget.onRender?.call(call.arguments['pages']);
+        callbacks.onRender?.call(call.arguments['pages']);
         return null;
       case 'onPageChanged':
-        widget.onPageChanged?.call(call.arguments['page'], call.arguments['total']);
+        callbacks.onPageChanged?.call(call.arguments['page'], call.arguments['total']);
         return null;
       case 'onError':
-        widget.onError?.call(call.arguments['error']);
+        callbacks.onError?.call(call.arguments['error']);
         return null;
       case 'onPageError':
-        widget.onPageError?.call(call.arguments['page'], call.arguments['error']);
+        callbacks.onPageError?.call(call.arguments['page'], call.arguments['error']);
         return null;
       case 'onPasswordRequired':
-        widget.onPasswordRequired?.call(
+        callbacks.onPasswordRequired?.call(
           call.arguments['incorrect'] == true
               ? PDFPasswordFailure.incorrect
               : PDFPasswordFailure.missing,
         );
         return null;
       case 'onLinkHandler':
-        widget.onLinkHandler?.call(call.arguments);
+        callbacks.onLinkHandler?.call(call.arguments);
         return null;
       case 'onLoadComplete':
-        widget.onLoadComplete?.call(call.arguments['pages']);
+        callbacks.onLoadComplete?.call(call.arguments['pages']);
         return null;
       case 'onDraw':
-        widget.onDraw?.call(
+        callbacks.onDraw?.call(
           call.arguments['pdfXOffset'],
           call.arguments['pdfYOffset'],
           call.arguments['pdfScale'],
         );
         return null;
       case 'onTap':
-        widget.onTap?.call();
+        callbacks.onTap?.call();
         return null;
     }
     throw MissingPluginException('${call.method} was invoked but has no handler');
   }
 
-  /// Returns the number of pages in the loaded document.
+  @override
   Future<int?> getPageCount() async {
     final int? pageCount = await _channel.invokeMethod('pageCount');
     return pageCount;
   }
 
-  /// Returns the size, in points, of the page that is currently displayed.
+  @override
   Future<Size> getCurrentPageSize() async {
     return _channel
         .invokeMethod('currentPageSize')
         .then((pageSize) => Size(pageSize[0] ?? 0, pageSize[1] ?? 0));
   }
 
-  /// Returns the current scroll offset of the document.
-  ///
-  /// Waits for any pending [setPosition] calls to settle first, so the returned
-  /// value always reflects the latest requested position.
+  @override
   Future<Offset> getPosition() async {
     await _setPositionQueue;
     final position = await _channel.invokeMethod('getPosition');
     return Offset(position[0] ?? 0, position[1] ?? 0);
   }
 
-  /// Returns the current zoom scale of the document.
-  ///
-  /// Waits for any pending [setScale] calls to settle first, so the returned
-  /// value always reflects the latest requested scale.
+  @override
   Future<double> getScale() async {
     await _setScaleQueue;
     final scale = await _channel.invokeMethod('getScale');
     return scale ?? 1;
   }
 
-  /// Scrolls the document to [position] and returns whether the native view
-  /// accepted the new offset.
+  @override
   Future<bool> setPosition(Offset position) {
     final Completer<bool> result = Completer<bool>();
     _setPositionQueue = _setPositionQueue.then((_) async {
@@ -149,8 +140,7 @@ class PDFViewController {
     return result.future;
   }
 
-  /// Zooms the document to [scale] and returns whether the native view accepted
-  /// the new scale.
+  @override
   Future<bool> setScale(double scale) {
     final Completer<bool> result = Completer<bool>();
     _setScaleQueue = _setScaleQueue.then((_) async {
@@ -172,9 +162,7 @@ class PDFViewController {
     return result.future;
   }
 
-  /// Sets the minimum, middle and maximum zoom levels of the native view.
-  ///
-  /// Returns whether the limits were applied.
+  @override
   Future<bool> setZoomLimits(double minZoom, double midZoom, double maxZoom) async {
     return await _channel.invokeMethod<bool>('setZoomLimits', <String, dynamic>{
           'minZoom': minZoom,
@@ -184,9 +172,7 @@ class PDFViewController {
         false;
   }
 
-  /// Captures the currently visible page and writes it to [fileName].
-  ///
-  /// Returns the path of the written image, or an empty string on failure.
+  @override
   Future<String> getScreenshot(String fileName) async {
     final String imageFileName =
         await _channel.invokeMethod<String>('getScreenshot', <String, dynamic>{
@@ -196,50 +182,32 @@ class PDFViewController {
     return imageFileName;
   }
 
-  /// Reopens the current document with [password] and returns whether it is now
-  /// unlocked.
-  ///
-  /// The document is reloaded in place, so a wrong password can be retried
-  /// without recreating the platform view; each failure reports
-  /// [PDFPasswordFailure.incorrect] through [PDFView.onPasswordRequired].
-  /// Resolves once the native viewer has finished reloading. An unencrypted
-  /// document simply reloads and returns `true`.
+  @override
   Future<bool> unlock(String password) async {
     return await _channel.invokeMethod<bool>('unlock', <String, dynamic>{'password': password}) ??
         false;
   }
 
-  /// Reloads the current document and returns whether the reload succeeded.
+  @override
   Future<bool> reload() async {
     final bool result = await _channel.invokeMethod<bool>('reload') ?? false;
     return result;
   }
 
-  /// Returns the zero-based index of the page that is currently displayed.
+  @override
   Future<int?> getCurrentPage() async {
     final int? currentPage = await _channel.invokeMethod('currentPage');
     return currentPage;
   }
 
-  /// Jumps to the zero-based [page] and returns whether the jump succeeded.
+  @override
   Future<bool?> setPage(int page) async {
     final bool? isSet = await _channel.invokeMethod('setPage', <String, dynamic>{'page': page});
     return isSet;
   }
 
-  Future<void> _updateWidget(PDFView widget, {required PdfColorMode resolvedColorMode}) async {
-    _widget = widget;
-    await _updateSettings(
-      _PDFViewSettings.fromWidget(widget, resolvedColorMode: resolvedColorMode),
-    );
-  }
-
-  Future<void> _updateSettings(_PDFViewSettings setting) async {
-    final Map<String, dynamic> updateMap = _settings.updatesMap(setting);
-    if (updateMap.isEmpty) {
-      return;
-    }
-    _settings = setting;
-    return _channel.invokeMethod('updateSettings', updateMap);
+  @override
+  Future<void> updateSettings(Map<String, dynamic> updates) {
+    return _channel.invokeMethod('updateSettings', updates);
   }
 }

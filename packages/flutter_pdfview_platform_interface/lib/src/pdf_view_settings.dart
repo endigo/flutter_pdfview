@@ -1,15 +1,20 @@
-part of '../flutter_pdfview.dart';
+import 'dart:ui' show Color;
 
-/// A snapshot of the mutable [PDFView] settings.
+import 'types.dart';
+
+/// A snapshot of the mutable settings of a PDF view.
 ///
 /// Used both to build the creation parameters for the native view and to compute
-/// the delta that has to be pushed over the method channel when the widget is
-/// rebuilt with different settings.
+/// the delta that has to be pushed to it when the owning widget is rebuilt with
+/// different settings. The key names produced by [toMap] and [updatesMap] are the
+/// wire format shared by every platform implementation.
 ///
-/// [colorMode] is always the **resolved** mode (`light` or `dark`); [PdfColorMode.system]
-/// is resolved in Dart from the ambient [Theme] before a settings snapshot is taken.
-class _PDFViewSettings {
-  _PDFViewSettings({
+/// [colorMode] is always the **resolved** mode ([PdfColorMode.light] or
+/// [PdfColorMode.dark]); [PdfColorMode.system] is resolved by the app-facing
+/// package from the ambient theme before a settings snapshot is taken.
+class PdfViewSettings {
+  /// Creates a settings snapshot.
+  PdfViewSettings({
     this.enableSwipe,
     this.swipeHorizontal,
     this.showScrollIndicators,
@@ -30,67 +35,72 @@ class _PDFViewSettings {
     this.backgroundColor,
     this.maxZoom,
     this.minZoom,
-  });
+  }) : assert(
+         colorMode != PdfColorMode.system,
+         'system must be resolved to light or dark before building settings',
+       );
 
-  /// Builds a settings snapshot from [widget].
-  ///
-  /// [resolvedColorMode] must already be [PdfColorMode.light] or
-  /// [PdfColorMode.dark] (never [PdfColorMode.system]).
-  static _PDFViewSettings fromWidget(PDFView widget, {required PdfColorMode resolvedColorMode}) {
-    assert(
-      resolvedColorMode != PdfColorMode.system,
-      'system must be resolved before building settings',
-    );
-    return _PDFViewSettings(
-      enableSwipe: widget.enableSwipe,
-      swipeHorizontal: widget.swipeHorizontal,
-      showScrollIndicators: widget.showScrollIndicators,
-      password: widget.password,
-      nightMode: widget.nightMode,
-      colorMode: resolvedColorMode,
-      autoSpacing: widget.autoSpacing,
-      pageFling: widget.pageFling,
-      pageSnap: widget.pageSnap,
-      enableAntialiasing: widget.enableAntialiasing,
-      useBestQuality: widget.useBestQuality,
-      enableRenderDuringScale: widget.enableRenderDuringScale,
-      thumbnailRatio: widget.thumbnailRatio,
-      defaultPage: widget.defaultPage,
-      fitPolicy: widget.fitPolicy,
-      pageAlignment: widget.pageAlignment,
-      preventLinkNavigation: widget.preventLinkNavigation,
-      backgroundColor: widget.backgroundColor,
-      maxZoom: widget.maxZoom,
-      minZoom: widget.minZoom,
-    );
-  }
-
+  /// Whether the user can swipe to change pages.
   final bool? enableSwipe;
+
+  /// Whether swiping changes pages horizontally rather than vertically.
   final bool? swipeHorizontal;
+
+  /// Whether the native viewer shows scroll indicators.
   final bool? showScrollIndicators;
+
+  /// The password used to open an encrypted document.
   final String? password;
+
+  /// Legacy night-mode flag, kept for native builds that predate [colorMode].
   final bool? nightMode;
 
-  /// Resolved color mode (`light` or `dark`) sent to the native view.
+  /// Resolved color mode ([PdfColorMode.light] or [PdfColorMode.dark]).
   final PdfColorMode colorMode;
 
+  /// Whether the viewer adds spacing (page breaks) between pages.
   final bool? autoSpacing;
+
+  /// Whether pages can be flung.
   final bool? pageFling;
+
+  /// Whether the viewer snaps to a page after scrolling.
   final bool? pageSnap;
+
+  /// Whether page bitmaps are composited with anti-aliasing (Android only).
   final bool? enableAntialiasing;
+
+  /// Whether full-color ARGB_8888 page bitmaps are used (Android only).
   final bool? useBestQuality;
+
+  /// Whether page tiles are re-rasterized during a pinch (Android only).
   final bool? enableRenderDuringScale;
+
+  /// Full-page preview scale used while high-res tiles load (Android only).
   final double? thumbnailRatio;
+
+  /// The zero-based page displayed when the document is loaded.
   final int? defaultPage;
+
+  /// How each page is scaled to the viewport.
   final FitPolicy? fitPolicy;
+
+  /// How a document shorter than the viewport is placed inside it.
   final PageAlignment? pageAlignment;
+
+  /// Whether tapping a link reports it instead of opening it.
   final bool? preventLinkNavigation;
 
+  /// The background color drawn behind the document.
   final Color? backgroundColor;
 
+  /// Maximum zoom level.
   final double? maxZoom;
+
+  /// Minimum zoom level.
   final double? minZoom;
 
+  /// Serializes every setting into the creation-parameter wire format.
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'enableSwipe': enableSwipe,
@@ -124,7 +134,7 @@ class _PDFViewSettings {
   ///
   /// [backgroundColor] is omitted from the map when the new value is `null`
   /// (clearing back to null at runtime leaves the last color on screen).
-  Map<String, dynamic> updatesMap(_PDFViewSettings newSettings) {
+  Map<String, dynamic> updatesMap(PdfViewSettings newSettings) {
     final Map<String, dynamic> updates = <String, dynamic>{};
     if (enableSwipe != newSettings.enableSwipe) {
       updates['enableSwipe'] = newSettings.enableSwipe;

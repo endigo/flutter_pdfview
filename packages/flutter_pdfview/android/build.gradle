@@ -3,7 +3,9 @@ version '1.0-SNAPSHOT'
 
 buildscript {
     // Matches the KGP that the Flutter tooling puts on the root build classpath,
-    // so an app build resolves a single Kotlin compiler.
+    // so an app build resolves a single Kotlin compiler. Still needed for AGP 8,
+    // where Kotlin compilation comes from KGP rather than from AGP itself; see
+    // the Built-in Kotlin note further down.
     ext.kotlin_version = '2.0.0'
 
     repositories {
@@ -38,7 +40,21 @@ rootProject.allprojects {
 }
 
 apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
+
+// Built-in Kotlin migration (Flutter 3.44+ / AGP 9+).
+//
+// AGP 9 compiles Kotlin itself, and Flutter fails the build of any app whose
+// plugins also apply the Kotlin Gradle Plugin. Applying it unconditionally
+// would therefore break future Flutter releases; removing it unconditionally
+// would break every user still on AGP 8, which this plugin supports because
+// pubspec.yaml only requires Flutter >= 3.32. So it is applied only where it is
+// still the thing that provides Kotlin compilation.
+//
+// https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
+def agpMajor = com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')[0] as int
+if (agpMajor < 9) {
+    apply plugin: 'kotlin-android'
+}
 
 android {
     compileSdk 36
@@ -46,10 +62,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = '17'
     }
 
     defaultConfig {
@@ -84,6 +96,14 @@ android {
         jniLibs {
             pickFirsts += ['**/libc++_shared.so']
         }
+    }
+}
+
+// Replaces the `kotlinOptions` block, which Built-in Kotlin removes. This form
+// is understood both by KGP (AGP 8) and by AGP 9's own Kotlin support.
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }
 
