@@ -15,6 +15,7 @@ const Set<String> _expectedKeys = <String>{
   'nightMode',
   'colorMode',
   'autoSpacing',
+  'spacing',
   'pageFling',
   'pageSnap',
   'enableAntialiasing',
@@ -133,6 +134,7 @@ void main() {
       // Default colorMode is system; MaterialApp Theme is light → light.
       expect(params['colorMode'], 'light');
       expect(params['autoSpacing'], isTrue);
+      expect(params['spacing'], isNull);
       expect(params['pageFling'], isTrue);
       expect(params['pageSnap'], isTrue);
       expect(params['enableAntialiasing'], isTrue);
@@ -158,6 +160,7 @@ void main() {
           password: 's3cret',
           colorMode: PdfColorMode.dark,
           autoSpacing: false,
+          spacing: 12,
           pageFling: false,
           pageSnap: false,
           enableAntialiasing: false,
@@ -181,6 +184,7 @@ void main() {
       expect(params['showScrollIndicators'], isTrue);
       expect(params['colorMode'], 'dark');
       expect(params['autoSpacing'], isFalse);
+      expect(params['spacing'], 12);
       expect(params['pageFling'], isFalse);
       expect(params['pageSnap'], isFalse);
       expect(params['enableAntialiasing'], isFalse);
@@ -546,7 +550,10 @@ void main() {
       viewCalls.clear();
       await controller!.setPage(2);
       expect(viewCalls.single.method, 'setPage');
-      expect(viewCalls.single.arguments, <String, Object?>{'page': 2});
+      expect(viewCalls.single.arguments, <String, Object?>{
+        'page': 2,
+        'withAnimation': false,
+      });
     }, variant: _iOS);
   });
 }

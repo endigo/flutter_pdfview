@@ -326,6 +326,7 @@ void main() {
       expect(log.map((c) => c.method), containsAll(['pageCount', 'currentPage', 'setPage']));
       final setPageCall = log.firstWhere((c) => c.method == 'setPage');
       expect(setPageCall.arguments['page'], 5);
+      expect(setPageCall.arguments['withAnimation'], isFalse);
     });
 
     test('getCurrentPageSize / getPosition / getScale', () async {

@@ -14,7 +14,11 @@ abstract class PdfViewPlatformController {
   Future<int?> getCurrentPage();
 
   /// Jumps to the zero-based [page] and returns whether the jump succeeded.
-  Future<bool?> setPage(int page);
+  ///
+  /// When [withAnimation] is true, Android animates the scroll via
+  /// `PDFView.jumpTo(page, withAnimation)`. iOS has no equivalent API and
+  /// ignores the flag (instant jump either way). Defaults to `false`.
+  Future<bool?> setPage(int page, {bool withAnimation = false});
 
   /// Returns the size, in points, of the page that is currently displayed.
   Future<Size> getCurrentPageSize();

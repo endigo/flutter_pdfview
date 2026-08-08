@@ -216,6 +216,47 @@ public class FlutterPDFViewParamsTest {
                 FlutterPDFView.getPageAlignment(params("pageAlignment", "PageAlignment.bottom")));
     }
 
+    // ---------------------------------------------------------------- getIntOrNull / spacing (#335)
+
+    @Test
+    public void getIntOrNull_presentInt() {
+        assertEquals(Integer.valueOf(12), FlutterPDFView.getIntOrNull(params("spacing", 12), "spacing"));
+    }
+
+    @Test
+    public void getIntOrNull_missingKey_isNull() {
+        assertNull(FlutterPDFView.getIntOrNull(empty(), "spacing"));
+    }
+
+    @Test
+    public void getIntOrNull_nullValue_isNull() {
+        Map<String, Object> params = new HashMap<>();
+        params.put("spacing", null);
+        assertNull(FlutterPDFView.getIntOrNull(params, "spacing"));
+    }
+
+    @Test
+    public void resolveInterPageSpacingDp_autoSpacingOff_isZero() {
+        assertEquals(0, FlutterPDFView.resolveInterPageSpacingDp(false, true, 20));
+        assertEquals(0, FlutterPDFView.resolveInterPageSpacingDp(false, false, null));
+    }
+
+    @Test
+    public void resolveInterPageSpacingDp_userOverrideWins() {
+        assertEquals(16, FlutterPDFView.resolveInterPageSpacingDp(true, false, 16));
+        assertEquals(0, FlutterPDFView.resolveInterPageSpacingDp(true, true, 0));
+    }
+
+    @Test
+    public void resolveInterPageSpacingDp_topAlignDefault_isEight() {
+        assertEquals(8, FlutterPDFView.resolveInterPageSpacingDp(true, true, null));
+    }
+
+    @Test
+    public void resolveInterPageSpacingDp_centerDefault_isZero() {
+        assertEquals(0, FlutterPDFView.resolveInterPageSpacingDp(true, false, null));
+    }
+
     /**
      * #197: secondary-axis centering math used after setPage / jumpTo.
      * When the page strip is narrower than the viewport the offset is positive

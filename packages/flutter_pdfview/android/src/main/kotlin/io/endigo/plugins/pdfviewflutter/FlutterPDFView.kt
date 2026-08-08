@@ -261,11 +261,16 @@ class FlutterPDFView(
         if (config != null) {
             // PageAlignment.top disables AndroidPdfViewer's autoSpacing "center each
             // page in the viewport" pads (#250). Keep a small fixed gap when the user
-            // still asked for spacing between multi-page documents.
+            // still asked for spacing between multi-page documents. Optional Dart
+            // `spacing` (#335) overrides the historical default when present.
             val userAutoSpacing = getBoolean(params, "autoSpacing")
             val topAlign = pageAlignment == PageAlignment.TOP
             val effectiveAutoSpacing = userAutoSpacing && !topAlign
-            val interPageSpacingDp = if (topAlign && userAutoSpacing) TOP_ALIGN_SPACING_DP else 0
+            val interPageSpacingDp = resolveInterPageSpacingDp(
+                autoSpacing = userAutoSpacing,
+                topAlign = topAlign,
+                spacing = getIntOrNull(params, "spacing"),
+            )
             // Do not call nightMode() — hardware-layer colorMode is applied via
             // applyColorTheme(); composing both would double-invert.
             config
@@ -786,6 +791,8 @@ class FlutterPDFView(
         }
         val pageObj = call.argument<Int>("page")
         val page = pageObj ?: 0
+        // #251: optional animated scroll; default false matches historical jumpTo(page).
+        val withAnimation = call.argument<Boolean>("withAnimation") ?: false
         // #182: After an AlertDialog the Hybrid Composition surface may still
         // be reattaching; jump on the next frame so the page change sticks.
         // Complete the method channel only after jumpTo so await setPage()
@@ -797,7 +804,7 @@ class FlutterPDFView(
                 return@Runnable
             }
             try {
-                current.jumpTo(page)
+                current.jumpTo(page, withAnimation)
                 // #197: jumpTo keeps the previous secondary-axis offset, so after
                 // a pan/zoom the new page can sit left-aligned. Re-center X (or Y
                 // in horizontal mode) and re-apply PageAlignment.top when needed.
@@ -1270,6 +1277,48 @@ class FlutterPDFView(
             val keyObj = params[key] as Int?
             val intKey: Int = keyObj ?: 0
             return if (params.containsKey(key)) intKey else 0
+        }
+
+        /**
+         * Reads an optional integer creation param. Missing / null → null so the
+         * caller can keep a platform default (#335 spacing).
+         */
+        @JvmStatic
+        @VisibleForTesting
+        fun getIntOrNull(params: Map<String, Any?>, key: String): Int? {
+            if (!params.containsKey(key)) {
+                return null
+            }
+            val value = params[key] ?: return null
+            return when (value) {
+                is Int -> value
+                is Number -> value.toInt()
+                else -> null
+            }
+        }
+
+        /**
+         * Resolves the fixed inter-page gap in dp for AndroidPdfViewer.spacing().
+         *
+         * - [autoSpacing] false → 0 (no gaps).
+         * - [spacing] non-null → that value (user override, #335).
+         * - else with [topAlign] → [TOP_ALIGN_SPACING_DP] (historical #250/#272).
+         * - else → 0 (library autoSpacing pads handle center mode).
+         */
+        @JvmStatic
+        @VisibleForTesting
+        fun resolveInterPageSpacingDp(
+            autoSpacing: Boolean,
+            topAlign: Boolean,
+            spacing: Int?,
+        ): Int {
+            if (!autoSpacing) {
+                return 0
+            }
+            if (spacing != null) {
+                return maxOf(0, spacing)
+            }
+            return if (topAlign) TOP_ALIGN_SPACING_DP else 0
         }
 
         @JvmStatic

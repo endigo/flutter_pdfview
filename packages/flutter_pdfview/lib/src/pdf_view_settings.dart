@@ -19,6 +19,7 @@ PdfViewSettings _settingsFromWidget(PDFView widget, {required PdfColorMode resol
     nightMode: widget.nightMode,
     colorMode: resolvedColorMode,
     autoSpacing: widget.autoSpacing,
+    spacing: widget.spacing,
     pageFling: widget.pageFling,
     pageSnap: widget.pageSnap,
     enableAntialiasing: widget.enableAntialiasing,

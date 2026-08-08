@@ -80,6 +80,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | colorMode             |   ✅    | ✅  | `PdfColorMode.system` |
 | nightMode*            |   ✅    | ✅  |      `false`      |
 | autoSpacing*          |   ✅    | ✅  |      `true`       |
+| spacing*              |   ✅    | ✅  |      `null`       |
 | pageFling             |   ✅    | ✅  |      `true`       |
 | pageSnap              |   ✅    | ❌  |      `true`       |
 | preventLinkNavigation |   ✅    | ✅  |      `false`      |
@@ -97,6 +98,7 @@ Notes:
 - `nightMode` is **deprecated**. Prefer `colorMode`. When `colorMode` is left at `system` and `nightMode: true`, the resolved mode is `dark`. An explicit `colorMode` always wins.
 - `backgroundColor` can be updated at runtime together with `colorMode`. Setting it back to `null` after a non-null value leaves the previous color on screen.
 - `password` can be changed after the first build: the document is reopened in place, so the platform view is not recreated. See [Password-protected documents](#password-protected-documents).
+- `spacing` sets the gap between pages when `autoSpacing` is true (dp on Android, points on iOS). `null` keeps each platform's historical default (Android 0 / 8 with top alignment; iOS 4 top+bottom / 8 bottom-only with top alignment). Creation-time only — remount the view to change it ([#335](https://github.com/endigo/flutter_pdfview/pull/335)).
 - `showScrollIndicators` is ignored on iOS while horizontal page-flipping is active (`pageFling: true` together with `swipeHorizontal: true`).
 - `autoSpacing` only adds gaps between pages. It does not change initial zoom or `fitPolicy` (fixed in [#150](https://github.com/endigo/flutter_pdfview/issues/150)).
 - `thumbnailRatio` must be in `(0, 1]`. Higher values look sharper while tiles load but use more memory.
@@ -297,7 +299,7 @@ Wrapping `PDFView` itself in `ColorFiltered` will keep painting a solid tint
 |:-------------------|:--------------------------------------------------------------------------------------------:|:------------------------------------------------:|:----------------:|
 | getPageCount       |                                     Get total page count                                     |                        -                         |  `Future<int>`   |
 | getCurrentPage     |                                       Get current page                                       |                        -                         |  `Future<int>`   |
-| setPage            |                                        Go to/Set page                                        |                    `int page`                    |  `Future<bool>`  |
+| setPage            |                                        Go to/Set page                                        | `int page`, `withAnimation` (optional, **Android only**, default `false`) |  `Future<bool>`  |
 | getCurrentPageSize |                        Return the width and height of the loaded page                        |                        -                         |  `Future<Size>`  |
 | getScreenshot      |               Create a PNG of the contents of the PDFView and save to fileName               |                `String fileName`                 | `Future<String>` |
 | getPosition        | Get the position of the top left of the PDF with respect to the origin (top left of PDFView) |                        -                         | `Future<Offset>` |

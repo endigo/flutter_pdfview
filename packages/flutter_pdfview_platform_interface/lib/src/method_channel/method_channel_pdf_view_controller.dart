@@ -201,8 +201,11 @@ class MethodChannelPdfViewController implements PdfViewPlatformController {
   }
 
   @override
-  Future<bool?> setPage(int page) async {
-    final bool? isSet = await _channel.invokeMethod('setPage', <String, dynamic>{'page': page});
+  Future<bool?> setPage(int page, {bool withAnimation = false}) async {
+    final bool? isSet = await _channel.invokeMethod('setPage', <String, dynamic>{
+      'page': page,
+      'withAnimation': withAnimation,
+    });
     return isSet;
   }
 

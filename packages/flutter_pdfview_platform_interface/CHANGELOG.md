@@ -1,3 +1,9 @@
+## 1.0.1
+
+- `PdfViewPlatformController.setPage` accepts optional `withAnimation` (default `false`; Android
+  only — iOS ignores it)
+- `PdfViewSettings.spacing` — optional inter-page gap (creation-time; not in `updatesMap`)
+
 ## 1.0.0
 
 - Initial release, extracted from `flutter_pdfview` 1.5.0.

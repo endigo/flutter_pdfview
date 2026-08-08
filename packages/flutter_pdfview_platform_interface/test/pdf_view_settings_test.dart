@@ -14,6 +14,7 @@ void main() {
         nightMode: false,
         colorMode: PdfColorMode.dark,
         autoSpacing: true,
+        spacing: 12,
         pageFling: false,
         pageSnap: true,
         enableAntialiasing: false,
@@ -37,6 +38,7 @@ void main() {
         'nightMode': false,
         'colorMode': 'dark',
         'autoSpacing': true,
+        'spacing': 12,
         'pageFling': false,
         'pageSnap': true,
         'enableAntialiasing': false,
@@ -72,16 +74,21 @@ void main() {
     });
 
     test('omits settings the native side cannot update in place', () {
-      // swipeHorizontal, defaultPage and fitPolicy are creation-time only.
+      // swipeHorizontal, defaultPage, fitPolicy, autoSpacing and spacing are
+      // creation-time only.
       final PdfViewSettings a = PdfViewSettings(
         swipeHorizontal: false,
         defaultPage: 0,
         fitPolicy: FitPolicy.WIDTH,
+        autoSpacing: true,
+        spacing: 0,
       );
       final PdfViewSettings b = PdfViewSettings(
         swipeHorizontal: true,
         defaultPage: 7,
         fitPolicy: FitPolicy.HEIGHT,
+        autoSpacing: false,
+        spacing: 16,
       );
       expect(a.updatesMap(b), isEmpty);
     });

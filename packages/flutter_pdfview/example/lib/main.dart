@@ -453,7 +453,7 @@ class _PDFScreenState extends State<PDFScreen> {
             return FloatingActionButton.extended(
               label: Text('Go to $targetPage'),
               onPressed: () async {
-                await snapshot.data!.setPage(targetPage);
+                await snapshot.data!.setPage(targetPage, withAnimation: true);
               },
             );
           }

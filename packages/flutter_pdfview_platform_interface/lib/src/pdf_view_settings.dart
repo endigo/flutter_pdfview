@@ -22,6 +22,7 @@ class PdfViewSettings {
     this.nightMode,
     this.colorMode = PdfColorMode.light,
     this.autoSpacing,
+    this.spacing,
     this.pageFling,
     this.pageSnap,
     this.enableAntialiasing,
@@ -60,6 +61,14 @@ class PdfViewSettings {
 
   /// Whether the viewer adds spacing (page breaks) between pages.
   final bool? autoSpacing;
+
+  /// Gap between pages in density-independent pixels (Android) / points (iOS).
+  ///
+  /// Applied only when [autoSpacing] is true. `null` keeps each platform's
+  /// historical default (Android: 0, or 8 with [PageAlignment.top]; iOS: 4pt
+  /// top+bottom, or 8pt bottom-only with top alignment). Creation-time only —
+  /// not included in [updatesMap].
+  final int? spacing;
 
   /// Whether pages can be flung.
   final bool? pageFling;
@@ -111,6 +120,7 @@ class PdfViewSettings {
       'nightMode': nightMode,
       'colorMode': colorMode.name,
       'autoSpacing': autoSpacing,
+      'spacing': spacing,
       'pageFling': pageFling,
       'pageSnap': pageSnap,
       'enableAntialiasing': enableAntialiasing,

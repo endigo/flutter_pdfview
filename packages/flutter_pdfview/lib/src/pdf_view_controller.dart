@@ -99,7 +99,13 @@ class PDFViewController {
   Future<int?> getCurrentPage() => _platform.getCurrentPage();
 
   /// Jumps to the zero-based [page] and returns whether the jump succeeded.
-  Future<bool?> setPage(int page) => _platform.setPage(page);
+  ///
+  /// When [withAnimation] is true, Android animates the scroll
+  /// ([#251](https://github.com/endigo/flutter_pdfview/pull/251)). iOS has no
+  /// equivalent PDFKit API and ignores the flag (instant jump). Defaults to
+  /// `false` so existing callers keep the previous behaviour.
+  Future<bool?> setPage(int page, {bool withAnimation = false}) =>
+      _platform.setPage(page, withAnimation: withAnimation);
 
   Future<void> _updateWidget(PDFView widget, {required PdfColorMode resolvedColorMode}) async {
     // Refresh callbacks even when no setting changed, so the native view never

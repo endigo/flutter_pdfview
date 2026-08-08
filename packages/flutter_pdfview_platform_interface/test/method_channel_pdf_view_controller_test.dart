@@ -54,10 +54,16 @@ void main() {
       expect(log.single.method, 'pageCount');
     });
 
-    test('setPage passes the page index', () async {
+    test('setPage passes the page index and default withAnimation false', () async {
       mockPlatform((_) async => true);
       expect(await controller.setPage(4), isTrue);
-      expect(log.single.arguments, <String, dynamic>{'page': 4});
+      expect(log.single.arguments, <String, dynamic>{'page': 4, 'withAnimation': false});
+    });
+
+    test('setPage forwards withAnimation when requested', () async {
+      mockPlatform((_) async => true);
+      expect(await controller.setPage(2, withAnimation: true), isTrue);
+      expect(log.single.arguments, <String, dynamic>{'page': 2, 'withAnimation': true});
     });
 
     test('getCurrentPageSize builds a Size from the returned pair', () async {

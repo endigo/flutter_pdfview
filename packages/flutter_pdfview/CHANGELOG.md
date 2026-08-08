@@ -1,3 +1,14 @@
+## 1.5.0-beta.12
+
+- Add optional `withAnimation` to `PDFViewController.setPage` ([#251](https://github.com/endigo/flutter_pdfview/pull/251)):
+  Android animates via `jumpTo(page, withAnimation)`; iOS ignores the flag (PDFKit has no
+  equivalent). Defaults to `false`, so existing callers keep the previous instant jump
+- Add optional `PDFView.spacing` ([#335](https://github.com/endigo/flutter_pdfview/pull/335)): gap
+  between pages when `autoSpacing` is true (dp on Android, points on iOS). `null` preserves
+  historical platform defaults and top-alignment gaps from beta.8
+- Depends on `flutter_pdfview_platform_interface` ^1.0.1
+- Includes everything in `1.5.0-beta.11`
+
 ## 1.5.0-beta.11
 
 - Split the plugin into a federated structure. The shared value types, the settings/creation-param

@@ -220,6 +220,9 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
     private var currentPageIndex: NSNumber?
     private var preventLinkNavigation = false
     private var autoSpacing = false
+    /// User-supplied inter-page gap in points (#335). `nil` keeps historical
+    /// platform defaults (4 top+bottom, or 8 bottom-only with top alignment).
+    private var spacing: CGFloat?
     private var defaultPage: PDFPage?
     private var currentPage: PDFPage?
     private var pageNo: Int32 = 0
@@ -470,18 +473,15 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
             ? .singlePageContinuous
             : .singlePage
         // autoSpacing only controls gaps between pages — never zoom/fit (#150).
-        // With PageAlignment.top, put the break margin only after each page so
-        // free space (and gaps) sit below rather than sandwiching the page (#272).
-        pdfView.displaysPageBreaks = autoSpacing
-        if autoSpacing {
-            if pageAlignment == .top {
-                pdfView.pageBreakMargins = UIEdgeInsets(top: 0, left: 0, bottom: 8, right: 0)
-            } else {
-                pdfView.pageBreakMargins = UIEdgeInsets(top: 4, left: 0, bottom: 4, right: 0)
-            }
+        // Optional Dart `spacing` (#335) overrides historical defaults; with
+        // PageAlignment.top the break sits only after each page (#272).
+        if let spacingNumber = args?.number("spacing") {
+            let value = CGFloat(spacingNumber.doubleValue)
+            spacing = value >= 0 ? value : 0
         } else {
-            pdfView.pageBreakMargins = .zero
+            spacing = nil
         }
+        applyPageBreakMargins()
         pdfView.document = document
 
         var maxZoomArg = args?.double("maxZoom") ?? 0
@@ -1193,6 +1193,9 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         // Objective-C read this as an NSUInteger, so a negative index wrapped
         // around and failed the bounds check below.
         let requestedPage = arguments?.number("page")?.int64Value ?? 0
+        // #251: Android animates via jumpTo(page, withAnimation). PDFKit has no
+        // equivalent scroll animation for go(to:), so the flag is accepted and
+        // ignored — the jump is always instant.
         let pageCount = pdfView.document?.pageCount ?? 0
         guard requestedPage >= 0, requestedPage < Int64(pageCount),
               let page = pdfView.document?.page(at: Int(requestedPage))
@@ -1212,6 +1215,23 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
             pinContentToTop(animated: false)
         }
         result(NSNumber(value: true))
+    }
+
+    /// Applies `displaysPageBreaks` + `pageBreakMargins` from [autoSpacing],
+    /// [pageAlignment], and optional user [spacing] (#335 / #272 / #150).
+    private func applyPageBreakMargins() {
+        pdfView.displaysPageBreaks = autoSpacing
+        guard autoSpacing else {
+            pdfView.pageBreakMargins = .zero
+            return
+        }
+        if pageAlignment == .top {
+            let gap = spacing ?? 8
+            pdfView.pageBreakMargins = UIEdgeInsets(top: 0, left: 0, bottom: gap, right: 0)
+        } else {
+            let gap = spacing ?? 4
+            pdfView.pageBreakMargins = UIEdgeInsets(top: gap, left: 0, bottom: gap, right: 0)
+        }
     }
 
     /// Applies the settings Dart pushes when a `PDFView` is rebuilt with
@@ -1282,14 +1302,8 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
 
         if settings.keys.contains("pageAlignment") {
             pageAlignment = Self.pageAlignment(fromArguments: settings)
-            // Update page-break margins to match top vs center (#272 gaps).
-            if autoSpacing {
-                if pageAlignment == .top {
-                    pdfView.pageBreakMargins = UIEdgeInsets(top: 0, left: 0, bottom: 8, right: 0)
-                } else {
-                    pdfView.pageBreakMargins = UIEdgeInsets(top: 4, left: 0, bottom: 4, right: 0)
-                }
-            }
+            // Update page-break margins to match top vs center (#272 / #335).
+            applyPageBreakMargins()
             if pageAlignment == .top {
                 pinContentToTop(animated: false)
             } else if let scrollView {

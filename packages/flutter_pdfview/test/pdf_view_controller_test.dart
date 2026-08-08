@@ -74,10 +74,16 @@ void main() {
       expect(log.single.arguments, isNull);
     });
 
-    test('setPage sends {page: n}', () async {
+    test('setPage sends {page: n, withAnimation: false} by default', () async {
       expect(await controller.setPage(5), isTrue);
       expect(log.single.method, 'setPage');
-      expect(log.single.arguments, <String, Object?>{'page': 5});
+      expect(log.single.arguments, <String, Object?>{'page': 5, 'withAnimation': false});
+    });
+
+    test('setPage sends withAnimation when requested', () async {
+      expect(await controller.setPage(3, withAnimation: true), isTrue);
+      expect(log.single.method, 'setPage');
+      expect(log.single.arguments, <String, Object?>{'page': 3, 'withAnimation': true});
     });
 
     test('getCurrentPageSize decodes [width, height] into a Size', () async {

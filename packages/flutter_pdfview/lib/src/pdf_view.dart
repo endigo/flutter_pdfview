@@ -38,6 +38,7 @@ class PDFView extends StatefulWidget {
     this.nightMode = false,
     this.colorMode = PdfColorMode.system,
     this.autoSpacing = true,
+    this.spacing,
     this.pageFling = true,
     this.pageSnap = true,
     this.enableAntialiasing = true,
@@ -56,6 +57,7 @@ class PDFView extends StatefulWidget {
        assert(maxZoom > 0, 'maxZoom must be greater than 0'),
        assert(minZoom > 0, 'minZoom must be greater than 0'),
        assert(maxZoom >= minZoom, 'maxZoom must be >= minZoom'),
+       assert(spacing == null || spacing >= 0, 'spacing must be >= 0'),
        assert(
          thumbnailRatio == null || (thumbnailRatio > 0 && thumbnailRatio <= 1),
          'thumbnailRatio must be within (0, 1]',
@@ -169,6 +171,18 @@ class PDFView extends StatefulWidget {
   /// On both platforms this only controls gaps between pages. It does **not**
   /// change initial zoom or [fitPolicy] — that was a historical iOS bug (#150).
   final bool autoSpacing;
+
+  /// Gap between pages when [autoSpacing] is true.
+  ///
+  /// Units are density-independent pixels on Android and points on iOS.
+  /// `null` (the default) keeps each platform's historical gap:
+  /// - Android: `0` with centered [pageAlignment], or `8` with [PageAlignment.top]
+  /// - iOS: `4` top+bottom with centered alignment, or `8` bottom-only with top
+  ///
+  /// Creation-time only (like [autoSpacing]): changing it after the view is
+  /// created requires remounting the [PDFView]. See
+  /// [#335](https://github.com/endigo/flutter_pdfview/pull/335).
+  final int? spacing;
 
   /// Indicates whether or not the user can "fling" pages in the PDF document. If set to true, page
   /// flinging is enabled.
