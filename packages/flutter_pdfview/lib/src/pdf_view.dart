@@ -1,0 +1,496 @@
+part of '../flutter_pdfview.dart';
+
+/// A widget that renders a PDF document using the platform's native viewer.
+///
+/// Exactly one document source must be supplied: either [filePath], pointing at
+/// a file on disk, or [pdfData], holding the raw bytes of the document.
+///
+/// Changing [filePath] or [pdfData] recreates the underlying platform view so
+/// that the new document is loaded. Changing any other setting is forwarded to
+/// the native view over the method channel without recreating it.
+class PDFView extends StatefulWidget {
+  /// Creates a widget that displays a PDF document.
+  ///
+  /// Either [filePath] or [pdfData] must be non-null.
+  const PDFView({
+    super.key,
+    this.filePath,
+    this.pdfData,
+    this.onViewCreated,
+    this.onRender,
+    this.onPageChanged,
+    this.onError,
+    this.onPageError,
+    this.onPasswordRequired,
+    this.onLinkHandler,
+    this.onLoadComplete,
+    this.onDraw,
+    this.onTap,
+    this.gestureRecognizers,
+    this.enableSwipe = true,
+    this.swipeHorizontal = false,
+    this.showScrollIndicators = false,
+    this.password,
+    @Deprecated(
+      'Use colorMode instead. nightMode: true maps to PdfColorMode.dark when '
+      'colorMode is left at PdfColorMode.system.',
+    )
+    this.nightMode = false,
+    this.colorMode = PdfColorMode.system,
+    this.autoSpacing = true,
+    this.spacing,
+    this.pageFling = true,
+    this.pageSnap = true,
+    this.enableAntialiasing = true,
+    this.useBestQuality = true,
+    this.enableRenderDuringScale = true,
+    this.thumbnailRatio = 0.8,
+    this.fitEachPage = true,
+    this.defaultPage = 0,
+    this.fitPolicy = FitPolicy.WIDTH,
+    this.pageAlignment = PageAlignment.center,
+    this.preventLinkNavigation = false,
+    this.backgroundColor,
+    this.maxZoom = 4.0,
+    this.minZoom = 1.0,
+  }) : assert(filePath != null || pdfData != null),
+       assert(maxZoom > 0, 'maxZoom must be greater than 0'),
+       assert(minZoom > 0, 'minZoom must be greater than 0'),
+       assert(maxZoom >= minZoom, 'maxZoom must be >= minZoom'),
+       assert(spacing == null || spacing >= 0, 'spacing must be >= 0'),
+       assert(
+         thumbnailRatio == null || (thumbnailRatio > 0 && thumbnailRatio <= 1),
+         'thumbnailRatio must be within (0, 1]',
+       );
+
+  /// If not null invoked once the PDFView is created.
+  final PDFViewCreatedCallback? onViewCreated;
+
+  /// Returns the PDF page count as a parameter.
+  final RenderCallback? onRender;
+
+  /// Returns the current page and the page count as parameters.
+  final PageChangedCallback? onPageChanged;
+
+  /// Invoked on an error that was handled in native code.
+  final ErrorCallback? onError;
+
+  /// Invoked when a page cannot be rendered or something else goes wrong.
+  final PageErrorCallback? onPageError;
+
+  /// Invoked when the document is encrypted and [password] did not open it.
+  ///
+  /// Prompt the user and pass what they type to [PDFViewController.unlock], or
+  /// rebuild with the new [password]. [onError] also fires.
+  final PasswordRequiredCallback? onPasswordRequired;
+
+  /// Used with `preventLinkNavigation: true`. Helpful to customize link
+  /// navigation.
+  final LinkHandlerCallback? onLinkHandler;
+
+  /// Invoked once the document has finished loading, with its page count.
+  final LoadCompleteCallback? onLoadComplete;
+
+  /// Invoked while the document is drawn, with the current offsets and scale.
+  final DrawCallback? onDraw;
+
+  /// Invoked when the user single-taps the PDF (native-side detection).
+  ///
+  /// This is the recommended way to react to taps. Using a [TapGestureRecognizer]
+  /// in [gestureRecognizers] is unreliable on platform views — the Flutter gesture
+  /// arena often loses the tap to the embedded native PDF control
+  /// ([#133](https://github.com/endigo/flutter_pdfview/issues/133)).
+  ///
+  /// Double-tap zoom and link handling still work; the native side reports the
+  /// single tap without consuming the event for those features.
+  final TapCallback? onTap;
+
+  /// Which gestures should be consumed by the pdf view.
+  ///
+  /// It is possible for other gesture recognizers to be competing with the pdf view on pointer
+  /// events, e.g if the pdf view is inside a [ListView] the [ListView] will want to handle
+  /// vertical drags. The pdf view will claim gestures that are recognized by any of the
+  /// recognizers on this list.
+  ///
+  /// When this set is empty or null, the pdf view will only handle pointer events for gestures that
+  /// were not claimed by any other gesture recognizer.
+  ///
+  /// **Tap detection:** prefer [onTap] instead of adding a [TapGestureRecognizer]
+  /// here. Platform-view gesture arenas frequently drop Flutter-side `onTap`
+  /// callbacks ([#133](https://github.com/endigo/flutter_pdfview/issues/133)). Use
+  /// this set for parent-scroll conflicts (e.g. [EagerGestureRecognizer]).
+  final Set<Factory<OneSequenceGestureRecognizer>>? gestureRecognizers;
+
+  /// The path of the document to load from disk.
+  final String? filePath;
+
+  /// The binary data of a PDF document.
+  final Uint8List? pdfData;
+
+  /// Indicates whether or not the user can swipe to change pages in the PDF document. If set to
+  /// true, swiping is enabled.
+  final bool enableSwipe;
+
+  /// Indicates whether or not the user can swipe horizontally to change pages in the PDF document.
+  /// If set to true, horizontal swiping is enabled.
+  final bool swipeHorizontal;
+
+  /// Indicates whether or not the PDF viewer should show scroll indicators - scroll handles on
+  /// Android and scrollbars on iOS.
+  ///
+  /// NB: on iOS, if [pageFling] is set to true, scroll indicators will not show.
+  final bool showScrollIndicators;
+
+  /// The password for a password-protected PDF document. It can be nullable.
+  ///
+  /// Changing it reopens the document without recreating the platform view.
+  /// [onPasswordRequired] reports when it did not open the document.
+  final String? password;
+
+  /// Indicates whether or not the PDF viewer is in night mode. If set to true, the viewer is in
+  /// night mode.
+  ///
+  /// Deprecated: use [colorMode] instead. When [colorMode] is [PdfColorMode.system] (the default)
+  /// and this is `true`, the resolved mode is [PdfColorMode.dark]. An explicit [colorMode] always
+  /// wins.
+  @Deprecated(
+    'Use colorMode instead. nightMode: true maps to PdfColorMode.dark when '
+    'colorMode is left at PdfColorMode.system.',
+  )
+  final bool nightMode;
+
+  /// Color theme for page content and the gutter.
+  ///
+  /// Defaults to [PdfColorMode.system], which follows the app [Theme] brightness
+  /// (or [MediaQuery] platform brightness when no [Theme] ancestor exists).
+  /// Resolved in Dart to `light` or `dark` before being sent to the native view.
+  final PdfColorMode colorMode;
+
+  /// Whether the viewer adds spacing (page breaks) between pages.
+  ///
+  /// On both platforms this only controls gaps between pages. It does **not**
+  /// change initial zoom or [fitPolicy] — that was a historical iOS bug (#150).
+  final bool autoSpacing;
+
+  /// Gap between pages when [autoSpacing] is true.
+  ///
+  /// Units are density-independent pixels on Android and points on iOS.
+  /// `null` (the default) keeps each platform's historical gap:
+  /// - Android: `0` with centered [pageAlignment], or `8` with [PageAlignment.top]
+  /// - iOS: `4` top+bottom with centered alignment, or `8` bottom-only with top
+  ///
+  /// Creation-time only (like [autoSpacing]): changing it after the view is
+  /// created requires remounting the [PDFView]. See
+  /// [#335](https://github.com/endigo/flutter_pdfview/pull/335).
+  final int? spacing;
+
+  /// Indicates whether or not the user can "fling" pages in the PDF document. If set to true, page
+  /// flinging is enabled.
+  final bool pageFling;
+
+  /// Indicates whether or not the viewer snaps to a page after the user has scrolled to it.
+  ///
+  /// If set to true, snapping is enabled. No effect on iOS.
+  final bool pageSnap;
+
+  /// Controls whether the PDF renderer uses anti-aliasing when compositing
+  /// page bitmaps (Android only; default `true`).
+  ///
+  /// No effect on iOS (PDFKit is vector). See the README "Render quality"
+  /// section and [#158](https://github.com/endigo/flutter_pdfview/issues/158).
+  final bool enableAntialiasing;
+
+  /// Uses full-color ARGB_8888 page bitmaps instead of RGB_565 (Android only;
+  /// default `true`).
+  ///
+  /// This improves color fidelity and text edges slightly. It does **not**
+  /// increase spatial resolution — AndroidPdfViewer still rasterizes at view
+  /// pixel size. Prefer raising [thumbnailRatio] for sharper low-res previews.
+  /// No effect on iOS.
+  final bool useBestQuality;
+
+  /// Re-rasterizes page tiles while the user pinches to zoom (Android only;
+  /// default `true`).
+  ///
+  /// Without this, zoomed regions stay blurry until the gesture ends. Costs
+  /// more CPU/GPU during the pinch. No effect on iOS.
+  final bool enableRenderDuringScale;
+
+  /// Full-page preview scale used by AndroidPdfViewer while high-res tiles
+  /// load (Android only).
+  ///
+  /// Library default inside AndroidPdfViewer is `0.3`; this plugin defaults to
+  /// `0.8` for a sharper first paint. Must be within `(0, 1]` when non-null.
+  /// `1.0` is sharpest but uses more memory (one full-page bitmap per cached
+  /// page). No effect on iOS.
+  final double? thumbnailRatio;
+
+  /// The page to display when the PDF document is loaded.
+  final int defaultPage;
+
+  /// How each page is scaled to the viewport on load and when the view resizes.
+  ///
+  /// - [FitPolicy.WIDTH]: scale so the page width fills the viewport width.
+  /// - [FitPolicy.HEIGHT]: scale so the page height fills the viewport height.
+  /// - [FitPolicy.BOTH]: scale so the entire page is visible (letterbox if needed).
+  ///
+  /// Supported on Android and iOS.
+  final FitPolicy fitPolicy;
+
+  /// How a document that is shorter than the viewport is placed inside it.
+  ///
+  /// Defaults to [PageAlignment.center] (historical behavior of AndroidPdfViewer
+  /// and PDFKit). Use [PageAlignment.top] so free space sits below the page —
+  /// typical for single-page PDFs ([#250](https://github.com/endigo/flutter_pdfview/issues/250),
+  /// [#272](https://github.com/endigo/flutter_pdfview/issues/272)).
+  ///
+  /// Supported on Android and iOS.
+  final PageAlignment pageAlignment;
+
+  /// Whether each page is fitted individually.
+  @Deprecated('will be removed next version')
+  final bool fitEachPage;
+
+  /// Indicates whether or not clicking on links in the PDF document will open the link in a new
+  /// page. If set to true, link navigation is prevented and [onLinkHandler] is called instead.
+  final bool preventLinkNavigation;
+
+  /// The background color drawn behind the document.
+  ///
+  /// When changed at runtime, the new color is pushed to the native view. Setting
+  /// this back to `null` after a non-null value leaves the previous color on
+  /// screen (the key is omitted from the settings diff).
+  final Color? backgroundColor;
+
+  /// Maximum zoom level. Defaults to 4.0.
+  final double maxZoom;
+
+  /// Minimum zoom level. Defaults to 1.0 (fit to page).
+  final double minZoom;
+
+  @override
+  State<PDFView> createState() => _PDFViewState();
+}
+
+class _PDFViewState extends State<PDFView> {
+  Completer<PDFViewController> _controller = Completer<PDFViewController>();
+
+  /// Bumped when the native platform view must be recreated (new document).
+  int _viewGeneration = 0;
+
+  /// Identity / FNV-1a digest of the last accepted [PDFView.pdfData], so rebuilds
+  /// with a new [Uint8List] of equal content avoid a full per-byte scan after the
+  /// first hash of each instance.
+  Object? _pdfDataIdentity;
+  int? _pdfDataDigest;
+
+  /// Whether the first [didChangeDependencies] has already been observed.
+  ///
+  /// The initial dependency pass must not schedule an [updateSettings] (there is
+  /// no controller yet, and creation params already carry the resolved mode).
+  bool _dependenciesReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cachePdfData(widget.pdfData);
+  }
+
+  /// FNV-1a 32-bit content digest used as a constant-time document identity key
+  /// once computed for a given [Uint8List] instance.
+  static int _digestPdfData(Uint8List data) {
+    int hash = 0x811c9dc5;
+    for (int i = 0; i < data.length; i++) {
+      hash ^= data[i];
+      // Keep within 32 bits without depending on platform int width.
+      hash = (hash * 0x01000193) & 0xFFFFFFFF;
+    }
+    return hash;
+  }
+
+  int _digestFor(Uint8List data) {
+    if (identical(data, _pdfDataIdentity) && _pdfDataDigest != null) {
+      return _pdfDataDigest!;
+    }
+    return _digestPdfData(data);
+  }
+
+  void _cachePdfData(Uint8List? data) {
+    if (data == null) {
+      _pdfDataIdentity = null;
+      _pdfDataDigest = null;
+      return;
+    }
+    if (identical(data, _pdfDataIdentity) && _pdfDataDigest != null) {
+      return;
+    }
+    _pdfDataIdentity = data;
+    _pdfDataDigest = _digestPdfData(data);
+  }
+
+  bool _documentChanged(PDFView oldWidget) {
+    if (widget.filePath != oldWidget.filePath) {
+      return true;
+    }
+    final Uint8List? a = widget.pdfData;
+    final Uint8List? b = oldWidget.pdfData;
+    if (identical(a, b)) {
+      return false;
+    }
+    if (a == null || b == null || a.length != b.length) {
+      return true;
+    }
+    // Same length, different instances: compare cached digests (O(1) when the
+    // previous list is still the cached identity; O(n) once to hash a new list).
+    return _digestFor(a) != _digestFor(b);
+  }
+
+  /// Resolves [PDFView.colorMode] to [PdfColorMode.light] or [PdfColorMode.dark].
+  ///
+  /// Called from [build] so [Theme]/[MediaQuery] dependencies stick. Also used
+  /// when pushing settings updates after [didUpdateWidget]/[didChangeDependencies].
+  PdfColorMode _resolveColorMode(BuildContext context) {
+    // Explicit colorMode always wins over the deprecated nightMode flag.
+    if (widget.colorMode != PdfColorMode.system) {
+      return widget.colorMode;
+    }
+    // Legacy: nightMode: true with the default colorMode ⇒ dark.
+    // ignore: deprecated_member_use_from_same_package
+    if (widget.nightMode) {
+      return PdfColorMode.dark;
+    }
+    // Prefer Theme when a Theme widget is actually an ancestor. Theme.of alone
+    // returns ThemeData.fallback() (light) when none is present, which would
+    // hide platform dark mode.
+    final Theme? themeWidget = context.findAncestorWidgetOfExactType<Theme>();
+    if (themeWidget != null) {
+      return Theme.of(context).brightness == Brightness.dark
+          ? PdfColorMode.dark
+          : PdfColorMode.light;
+    }
+    return MediaQuery.platformBrightnessOf(context) == Brightness.dark
+        ? PdfColorMode.dark
+        : PdfColorMode.light;
+  }
+
+  /// Coalesces didUpdateWidget + didChangeDependencies in one frame: both schedule
+  /// through the same [_controller] future and re-read [widget]/theme at callback
+  /// time so the first send carries the union and a second sees an empty diff.
+  void _scheduleSettingsUpdate() {
+    _controller.future.then((PDFViewController controller) {
+      if (!mounted) {
+        return;
+      }
+      controller._updateWidget(widget, resolvedColorMode: _resolveColorMode(context));
+    });
+  }
+
+  void _remountPlatformView() {
+    if (!mounted) {
+      return;
+    }
+    // Dispose the previous controller so native resources are released (#261).
+    // Bump generation first so any late creation callback from the old platform
+    // view is ignored and disposes its controller instead of completing the
+    // new Completer (stale onPlatformViewCreated race).
+    final Completer<PDFViewController> previous = _controller;
+    _viewGeneration++;
+    if (previous.isCompleted) {
+      previous.future.then((PDFViewController c) => c.dispose());
+    }
+    setState(() {
+      _controller = Completer<PDFViewController>();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Theme may change without didUpdateWidget (e.g. a const PDFView under a
+    // new ThemeMode). Skip the first pass — creation params already include the
+    // resolved mode from build().
+    if (_dependenciesReady) {
+      _scheduleSettingsUpdate();
+    } else {
+      _dependenciesReady = true;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Resolve here (not only in didChangeDependencies) so Theme/MediaQuery
+    // dependencies register correctly: StatefulElement.performRebuild clears
+    // _dependencies before build().
+    final PdfColorMode resolvedColorMode = _resolveColorMode(context);
+
+    // Capture generation at build time so platform-view creation callbacks
+    // from a previous mount cannot complete the current Completer.
+    final int generation = _viewGeneration;
+    return FlutterPdfViewPlatform.instance.buildView(
+      key: ValueKey<int>(generation),
+      creationParams: PdfViewCreationParams(
+        filePath: widget.filePath,
+        pdfData: widget.pdfData,
+        settings: _settingsFromWidget(widget, resolvedColorMode: resolvedColorMode),
+      ),
+      callbacks: _callbacksFromWidget(widget),
+      gestureRecognizers: widget.gestureRecognizers,
+      layoutDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
+      onPlatformViewCreated: (PdfViewPlatformController platformController) {
+        _onPlatformViewCreated(
+          platformController,
+          generation: generation,
+          resolvedColorMode: resolvedColorMode,
+        );
+      },
+    );
+  }
+
+  void _onPlatformViewCreated(
+    PdfViewPlatformController platformController, {
+    required int generation,
+    required PdfColorMode resolvedColorMode,
+  }) {
+    final PDFViewController controller = PDFViewController._(
+      platformController,
+      widget,
+      resolvedColorMode: resolvedColorMode,
+    );
+    // Ignore late callbacks from a remounted/disposed platform view so they
+    // cannot complete the new Completer with a stale controller.
+    if (!mounted || generation != _viewGeneration) {
+      controller.dispose();
+      return;
+    }
+    if (_controller.isCompleted) {
+      controller.dispose();
+      return;
+    }
+    _controller.complete(controller);
+    widget.onViewCreated?.call(controller);
+  }
+
+  @override
+  void didUpdateWidget(PDFView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // #181: filePath / pdfData changes must load a new document. Settings-only
+    // updates go through the method channel; document changes remount the view.
+    final bool documentChanged = _documentChanged(oldWidget);
+    _cachePdfData(widget.pdfData);
+    if (documentChanged) {
+      _remountPlatformView();
+      return;
+    }
+    _scheduleSettingsUpdate();
+  }
+
+  @override
+  void dispose() {
+    // Invalidate in-flight creation callbacks before tearing down the controller.
+    _viewGeneration++;
+    if (_controller.isCompleted) {
+      _controller.future.then((PDFViewController controller) => controller.dispose());
+    }
+    super.dispose();
+  }
+}

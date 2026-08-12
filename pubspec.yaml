@@ -1,34 +1,47 @@
-name: flutter_pdfview
-description: A Flutter plugin that provides a PDFView widget on Android and iOS.
-version: 1.4.5
-homepage: https://github.com/endigo/flutter_pdfview
-
-topics:
-  - pdf
-  - viewer
-  - native
+# Workspace root for the flutter_pdfview monorepo. This package is never
+# published; it exists so Dart pub workspaces and Melos can resolve every
+# package under packages/ against a single lockfile.
+#
+# The published package is packages/flutter_pdfview. See melos.scripts below
+# for the common workflows (`melos run test`, `melos run analyze`, ...).
+name: flutter_pdfview_workspace
+publish_to: none
 
 environment:
-  # flutter_lints ^6 requires Dart >=3.8; formatter.page_width needs Dart >=3.7;
-  # Color.toARGB32() is used for backgroundColor serialization (Flutter >=3.27,
-  # raised here with the lints toolchain).
-  sdk: ">=3.8.0 <4.0.0"
-  flutter: ">=3.32.0"
+  sdk: ^3.8.0
 
-dependencies:
-  flutter:
-    sdk: flutter
+# Pub workspaces do not support globs yet, so members are listed explicitly.
+# Every member also needs `resolution: workspace` in its own pubspec.
+workspace:
+  - packages/flutter_pdfview
+  - packages/flutter_pdfview/example
+  - packages/flutter_pdfview_platform_interface
 
 dev_dependencies:
-  flutter_lints: ^6.0.0
-  flutter_test:
-    sdk: flutter
+  melos: ^7.0.0
 
-flutter:
-  plugin:
-    platforms:
-      android:
-        package: io.endigo.plugins.pdfviewflutter
-        pluginClass: PDFViewFlutterPlugin
-      ios:
-        pluginClass: FLTPDFViewFlutterPlugin
+melos:
+  scripts:
+    analyze:
+      description: Analyze every package in the workspace.
+      run: melos exec -- flutter analyze .
+
+    format:
+      description: Format Dart sources using the shared 100-column page width.
+      run: melos exec -- dart format .
+
+    format-check:
+      description: Fail if any Dart source is not formatted.
+      run: melos exec -- dart format --set-exit-if-changed --output=none .
+
+    test:
+      description: Run Dart unit tests for packages that have a test/ directory.
+      run: melos exec --dir-exists=test --ignore="*example*" -- flutter test
+
+    test:android:
+      description: Run the Robolectric/JUnit suite for the Android plugin module.
+      run: ./scripts/run_android_unit_tests.sh
+
+    publish:dry-run:
+      description: Dry-run publishing the app-facing package.
+      run: melos exec --scope=flutter_pdfview -- flutter pub publish --dry-run
