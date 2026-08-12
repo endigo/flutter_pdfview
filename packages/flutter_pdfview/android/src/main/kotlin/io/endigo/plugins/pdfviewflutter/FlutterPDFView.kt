@@ -487,9 +487,7 @@ class FlutterPDFView(
         val scaleObj = call.argument<Double>("scale")
         val zoom = scaleObj ?: 1.0
 
-        if (zoom != 1.0) {
-            view.zoomTo(zoom.toFloat())
-        }
+        view.zoomTo(zoom.toFloat())
         view.loadPages()
         result.success(true)
     }
@@ -651,7 +649,6 @@ class FlutterPDFView(
         } else {
             canvas.drawColor(Color.WHITE)
         }
-        val previousLayerType = view.layerType
         try {
             // LAYER_TYPE_SOFTWARE rebuilds the display list into a CPU bitmap so
             // subsequent draw() copies real page content instead of an empty HW layer.
@@ -670,7 +667,9 @@ class FlutterPDFView(
                 view.draw(canvas)
             }
         } finally {
-            view.setLayerType(previousLayerType, null)
+            // Restoring only the layer type would drop the color-filter paint
+            // used by dark themes. Reapply the complete theme configuration.
+            applyColorTheme(reloadPages = false)
         }
         return bitmap
     }
