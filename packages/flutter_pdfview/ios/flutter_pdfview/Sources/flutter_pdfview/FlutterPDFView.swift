@@ -249,6 +249,17 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
     private var defaultPageIndex = 0
     private var showScrollIndicators = false
     private var useHorizontalPaging = false
+    /// Creation-time paging inputs, kept so a runtime `enableSwipe` update can
+    /// re-derive the display mode exactly like `loadDocument` does.
+    private var pageFling = false
+    private var swipeHorizontal = false
+    /// `enableSwipe` from the creation args, superseded by
+    /// [swipeEnabledOverride] once Dart pushes an update.
+    private var swipeEnabledAtCreation = false
+    /// Bottom `contentInset` the top-alignment path added on its last pass, so a
+    /// later pass can recompute from the inset the system owns instead of only
+    /// ever growing it.
+    private var topAlignmentBottomInset: CGFloat = 0
     /// Creation args held until the view has a non-zero size (#190 / #127).
     private var pendingLoadArguments: [String: Any]?
     /// Ensures the document is opened at most once from creation args.
@@ -267,6 +278,8 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
     /// Last `enableSwipe` pushed through `updateSettings`, re-applied after a
     /// re-render. `nil` until Dart updates it.
     private var swipeEnabledOverride: Bool?
+    /// The swipe state currently in force: the update wins over creation.
+    private var isSwipeEnabled: Bool { swipeEnabledOverride ?? swipeEnabledAtCreation }
 
     init(frame: CGRect, arguments args: Any?, controller: PDFViewController) {
         self.controller = controller
@@ -382,8 +395,8 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         autoSpacing = args?.bool("autoSpacing") ?? false
         fitPolicy = Self.fitPolicy(fromArguments: args)
         pageAlignment = Self.pageAlignment(fromArguments: args)
-        let pageFling = args?.bool("pageFling") ?? false
-        let enableSwipe = args?.bool("enableSwipe") ?? false
+        pageFling = args?.bool("pageFling") ?? false
+        swipeEnabledAtCreation = args?.bool("enableSwipe") ?? false
         preventLinkNavigation = args?.bool("preventLinkNavigation") ?? false
         setColorMode(Self.colorMode(fromSettings: args) ?? .light)
 
@@ -454,7 +467,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         pdfView.backgroundColor = background
         backgroundColor = background
 
-        let swipeHorizontal = args?.bool("swipeHorizontal") ?? false
+        swipeHorizontal = args?.bool("swipeHorizontal") ?? false
         pdfView.displayDirection = swipeHorizontal ? .horizontal : .vertical
 
         showScrollIndicators = args?.bool("showScrollIndicators") ?? false
@@ -464,14 +477,10 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         // incorrectly tied to autoSpacing.
         pdfView.autoScales = false
 
-        // UIPageViewController flips one page at a time — only match the API
-        // for horizontal book-style paging. Vertical layouts scroll
-        // continuously so iOS behaves like Android (#204).
-        useHorizontalPaging = pageFling && swipeHorizontal && enableSwipe
+        let paging = derivedPagingConfiguration()
+        useHorizontalPaging = paging.usePageViewController
         pdfView.usePageViewController(useHorizontalPaging, withViewOptions: nil)
-        pdfView.displayMode = (enableSwipe && !useHorizontalPaging)
-            ? .singlePageContinuous
-            : .singlePage
+        pdfView.displayMode = paging.displayMode
         // autoSpacing only controls gaps between pages — never zoom/fit (#150).
         // Optional Dart `spacing` (#335) overrides historical defaults; with
         // PageAlignment.top the break sits only after each page (#272).
@@ -588,25 +597,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
                 }
 
                 if let scrollView {
-                    if strongSelf.isIPad {
-                        scrollView.contentInsetAdjustmentBehavior = .automatic
-                        if scrollView.delegate == nil {
-                            scrollView.delegate = strongSelf
-                        }
-                    } else {
-                        scrollView.contentInsetAdjustmentBehavior = .never
-                        scrollView.automaticallyAdjustsScrollIndicatorInsets = false
-                    }
-
-                    scrollView.delaysContentTouches = true
-                    scrollView.canCancelContentTouches = true
-                    // Indicators cannot be shown while the page-view
-                    // controller manages paging (swaps scroll views).
-                    let shouldShow = strongSelf.showScrollIndicators
-                        && !strongSelf.useHorizontalPaging
-                    scrollView.showsHorizontalScrollIndicator = shouldShow
-                    scrollView.showsVerticalScrollIndicator = shouldShow
-                    strongSelf.scrollView = scrollView
+                    strongSelf.adopt(scrollView: scrollView)
                 }
             } onException: { error in
                 NSLog(
@@ -723,6 +714,49 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
             }
         }
         return nil
+    }
+
+    /// Applies the scroll-view configuration the plugin depends on and caches
+    /// the reference. Runs for the scroll view PDFKit installs on load, and
+    /// again whenever a display-mode change swaps that view out.
+    private func adopt(scrollView: UIScrollView) {
+        if isIPad {
+            scrollView.contentInsetAdjustmentBehavior = .automatic
+            if scrollView.delegate == nil {
+                scrollView.delegate = self
+            }
+        } else {
+            scrollView.contentInsetAdjustmentBehavior = .never
+            scrollView.automaticallyAdjustsScrollIndicatorInsets = false
+        }
+
+        scrollView.delaysContentTouches = true
+        scrollView.canCancelContentTouches = true
+        // Indicators cannot be shown while the page-view controller manages
+        // paging (swaps scroll views).
+        let shouldShow = showScrollIndicators && !useHorizontalPaging
+        scrollView.showsHorizontalScrollIndicator = shouldShow
+        scrollView.showsVerticalScrollIndicator = shouldShow
+        self.scrollView = scrollView
+    }
+
+    /// Re-discovers the scroll view after PDFKit rebuilds its hierarchy
+    /// (`usePageViewController` swaps it out), moving the delegate and the
+    /// content-offset observation onto the replacement.
+    private func rebindScrollView() {
+        guard let found = findScrollView(pdfView), found !== scrollView else { return }
+        let wasObserving = contentOffsetObservation != nil
+        stopObserving()
+        if let previous = scrollView, previous.delegate === self {
+            previous.delegate = nil
+        }
+        // The replacement carries PDFKit's own insets, so nothing of our
+        // top-alignment contribution survives on it.
+        topAlignmentBottomInset = 0
+        adopt(scrollView: found)
+        if wasObserving {
+            startObserving()
+        }
     }
 
     /// Block-based replacement for the old manual `addObserver(forKeyPath:)`.
@@ -994,23 +1028,42 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
 
         guard let scrollView else { return }
 
+        // Everything in the bottom inset except the free space added on the last
+        // pass. Recomputing from this base instead of growing the inset lets it
+        // shrink again after a rotation or a zoom past the viewport height, and
+        // leaves the iPad's automatic adjustment (safe area) untouched — that
+        // lands in `adjustedContentInset`, not here.
+        let baseBottom = max(0, scrollView.contentInset.bottom - topAlignmentBottomInset)
+
         // If the document is shorter than the viewport, PDFKit centers it via
         // content offset / insets. Force free space below the page.
         let contentHeight = scrollView.contentSize.height
         let viewHeight = scrollView.bounds.height
+        var inset = scrollView.contentInset
         if contentHeight > 0, contentHeight < viewHeight - 0.5 {
             let extra = viewHeight - contentHeight
-            var inset = scrollView.contentInset
             // Keep horizontal insets untouched; put leftover height at the bottom.
             inset.top = 0
-            inset.bottom = max(inset.bottom, extra)
-            scrollView.contentInset = inset
+            inset.bottom = baseBottom + extra
+            topAlignmentBottomInset = extra
+            if inset != scrollView.contentInset {
+                scrollView.contentInset = inset
+            }
             let topY = -scrollView.adjustedContentInset.top
             let offset = CGPoint(x: scrollView.contentOffset.x, y: topY)
             scrollView.setContentOffset(offset, animated: animated)
         } else {
-            // Tall document: still ensure we are at the top of the current page
-            // destination (go(to:) above), without rewriting insets.
+            // Tall document: drop the free space a previous short-content pass
+            // added, otherwise a blank scroll region stays below the content.
+            if topAlignmentBottomInset != 0 {
+                inset.bottom = baseBottom
+                topAlignmentBottomInset = 0
+                if inset != scrollView.contentInset {
+                    scrollView.contentInset = inset
+                }
+            }
+            // Still ensure we are at the top of the current page destination
+            // (go(to:) above), without rewriting the remaining insets.
             let topY = -scrollView.adjustedContentInset.top
             if scrollView.contentOffset.y < topY - 0.5 {
                 scrollView.setContentOffset(
@@ -1280,6 +1333,10 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         if settings.keys.contains("enableSwipe") {
             swipeEnabledOverride = settings.bool("enableSwipe")
             applySwipeEnabled()
+            // Scrolling alone is not swiping: a view created with
+            // `enableSwipe: false` sits in `.singlePage`, so the layout has to
+            // be re-derived too or the update cannot move between pages.
+            applyPagingConfiguration()
         }
 
         if settings.keys.contains("minZoom") || settings.keys.contains("maxZoom") {
@@ -1307,8 +1364,11 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
             if pageAlignment == .top {
                 pinContentToTop(animated: false)
             } else if let scrollView {
+                // Give back only what top alignment added; an inset the system
+                // owns is not ours to clear.
                 var inset = scrollView.contentInset
-                inset.bottom = 0
+                inset.bottom = max(0, inset.bottom - topAlignmentBottomInset)
+                topAlignmentBottomInset = 0
                 scrollView.contentInset = inset
             }
             setNeedsLayout()
@@ -1369,6 +1429,76 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         // a fresh lookup if the update lands first.
         let target = scrollView ?? findScrollView(pdfView)
         target?.isScrollEnabled = enabled
+    }
+
+    /// The page layout the current swipe state implies.
+    ///
+    /// UIPageViewController flips one page at a time — only match the API for
+    /// horizontal book-style paging. Vertical layouts scroll continuously so iOS
+    /// behaves like Android (#204). With swiping off, a single page is shown and
+    /// the neighbouring pages stay out of reach.
+    private func derivedPagingConfiguration() -> (usePageViewController: Bool, displayMode: PDFDisplayMode) {
+        let enableSwipe = isSwipeEnabled
+        let paging = pageFling && swipeHorizontal && enableSwipe
+        return (paging, (enableSwipe && !paging) ? .singlePageContinuous : .singlePage)
+    }
+
+    /// Re-applies [derivedPagingConfiguration] after `enableSwipe` changed at
+    /// runtime, keeping the reader's page and zoom.
+    ///
+    /// PDFKit rebuilds its view hierarchy for either change — and
+    /// `usePageViewController` replaces the scroll view outright — so the
+    /// position is captured first and the scroll view re-adopted afterwards.
+    private func applyPagingConfiguration() {
+        // Before the document opens, `loadDocument` derives this from the same
+        // state, so there is nothing to re-apply yet.
+        guard pdfView.document != nil else { return }
+
+        let paging = derivedPagingConfiguration()
+        guard paging.usePageViewController != useHorizontalPaging
+            || paging.displayMode != pdfView.displayMode
+        else {
+            return
+        }
+
+        let savedScale = pdfView.scaleFactor
+        let savedDestination = pdfView.currentDestination
+        let savedPage = pdfView.currentPage
+
+        // The page churn a rebuild causes is not a page change for Dart.
+        isRerendering = true
+        catchingNSException {
+            if paging.usePageViewController != useHorizontalPaging {
+                useHorizontalPaging = paging.usePageViewController
+                pdfView.usePageViewController(useHorizontalPaging, withViewOptions: nil)
+            }
+            pdfView.displayMode = paging.displayMode
+            rebindScrollView()
+
+            // A rebuild resets PDFKit's own scale factors, so re-derive them
+            // before restoring the scale or the restore is clamped away.
+            applyZoomLimits(minZoom: minScaleFactor, maxZoom: maxScaleFactor)
+            if savedScale.isFinite, savedScale > 0 {
+                pdfView.scaleFactor = savedScale
+            }
+            if let savedDestination {
+                pdfView.go(to: savedDestination)
+            } else if let savedPage {
+                pdfView.go(to: savedPage)
+            }
+        } onException: { error in
+            NSLog(
+                "Warning: Failed to apply swipe display mode: %@",
+                error.pdfExceptionReason
+            )
+        }
+        isRerendering = false
+
+        applySwipeEnabled()
+        if pageAlignment == .top {
+            pinContentToTop(animated: false)
+        }
+        setNeedsLayout()
     }
 
     // MARK: - Color mode
@@ -1579,7 +1709,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         // 1) Preferred: rasterize the PDFKit layer (includes zoom/scroll).
         let layerImage = renderer.image { ctx in
             let cg = ctx.cgContext
-            (pdfView.backgroundColor ?? .white).setFill()
+            captureBackgroundColor.setFill()
             ctx.fill(CGRect(origin: .zero, size: size))
             pdfView.layer.render(in: cg)
         }
@@ -1592,7 +1722,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         //    is not snapshot-friendly.
         return renderer.image { ctx in
             let cg = ctx.cgContext
-            (pdfView.backgroundColor ?? .white).setFill()
+            captureBackgroundColor.setFill()
             ctx.fill(CGRect(origin: .zero, size: size))
 
             guard let page = pdfView.currentPage else { return }
@@ -1617,7 +1747,38 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         }
     }
 
-    /// True when the image is effectively solid white/empty (failed snapshot).
+    /// The color both capture passes fill behind the page — and the reference
+    /// the blank check measures against.
+    private var captureBackgroundColor: UIColor {
+        pdfView.backgroundColor ?? .white
+    }
+
+    /// The 8-bit components a full-coverage fill with `color` leaves in the
+    /// opaque capture bitmap. Falls back to white, the color
+    /// `capturePDFImage` fills with when the view has no background.
+    private static func sampleComponents(
+        of color: UIColor,
+        for traits: UITraitCollection
+    ) -> (r: Int, g: Int, b: Int) {
+        var red: CGFloat = 1
+        var green: CGFloat = 1
+        var blue: CGFloat = 1
+        var alpha: CGFloat = 1
+        guard color.resolvedColor(with: traits)
+            .getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        else {
+            return (255, 255, 255)
+        }
+        // The capture context is opaque and starts black, so a translucent
+        // background composites down toward black.
+        let component = { (value: CGFloat) -> Int in
+            Int((min(max(value * alpha, 0), 1) * 255).rounded())
+        }
+        return (component(red), component(green), component(blue))
+    }
+
+    /// True when the image is effectively the configured background color, i.e.
+    /// a failed snapshot with no page content in it.
     private func isMostlyBlank(_ image: UIImage) -> Bool {
         guard let cgImage = image.cgImage else { return true }
         // Downscale into a tiny buffer so we only inspect a handful of pixels.
@@ -1640,19 +1801,29 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         context.interpolationQuality = .low
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: sampleW, height: sampleH))
 
-        var nonWhite = 0
+        // Ink is anything that differs from the background the capture filled
+        // with — comparing against white instead made every sample of a dark
+        // or tinted background look like content, so a solid-color snapshot
+        // was returned rather than the page fallback (#175).
+        let background = Self.sampleComponents(of: captureBackgroundColor, for: traitCollection)
+        // Same slack the old fixed 250/255 white threshold allowed.
+        let tolerance = 5
+        var inkPixels = 0
         let total = sampleW * sampleH
         for i in 0..<total {
             let offset = i * bytesPerPixel
-            let r = data[offset]
-            let g = data[offset + 1]
-            let b = data[offset + 2]
-            if r < 250 || g < 250 || b < 250 {
-                nonWhite += 1
+            let r = Int(data[offset])
+            let g = Int(data[offset + 1])
+            let b = Int(data[offset + 2])
+            if abs(r - background.r) > tolerance
+                || abs(g - background.g) > tolerance
+                || abs(b - background.b) > tolerance
+            {
+                inkPixels += 1
             }
         }
         // If fewer than ~2% of samples have ink, treat as a blank capture.
-        return total == 0 || (Double(nonWhite) / Double(total)) < 0.02
+        return total == 0 || (Double(inkPixels) / Double(total)) < 0.02
     }
 
     // MARK: - Callbacks
