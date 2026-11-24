@@ -301,31 +301,7 @@ class _PDFScreenState extends State<PDFScreen> {
       final String? password = await showDialog<String>(
         context: context,
         barrierDismissible: false,
-        builder: (BuildContext context) {
-          final TextEditingController field = TextEditingController();
-          return AlertDialog(
-            title: const Text('Password required'),
-            content: TextField(
-              controller: field,
-              autofocus: true,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                errorText: failure == PDFPasswordFailure.incorrect
-                    ? 'That password did not open the document'
-                    : null,
-              ),
-              onSubmitted: (String value) => Navigator.pop(context, value),
-            ),
-            actions: <Widget>[
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-              TextButton(
-                onPressed: () => Navigator.pop(context, field.text),
-                child: const Text('Open'),
-              ),
-            ],
-          );
-        },
+        builder: (BuildContext context) => _PasswordDialog(failure: failure),
       );
       if (password == null || !mounted) {
         return;
@@ -461,6 +437,53 @@ class _PDFScreenState extends State<PDFScreen> {
           return Container();
         },
       ),
+    );
+  }
+}
+
+/// Password prompt that owns its [TextEditingController], so the controller
+/// is disposed only after the dialog route (and its exit animation) is gone.
+class _PasswordDialog extends StatefulWidget {
+  const _PasswordDialog({required this.failure});
+
+  final PDFPasswordFailure failure;
+
+  @override
+  State<_PasswordDialog> createState() => _PasswordDialogState();
+}
+
+class _PasswordDialogState extends State<_PasswordDialog> {
+  final TextEditingController _field = TextEditingController();
+
+  @override
+  void dispose() {
+    _field.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Password required'),
+      content: TextField(
+        controller: _field,
+        autofocus: true,
+        obscureText: true,
+        decoration: InputDecoration(
+          labelText: 'Password',
+          errorText: widget.failure == PDFPasswordFailure.incorrect
+              ? 'That password did not open the document'
+              : null,
+        ),
+        onSubmitted: (String value) => Navigator.pop(context, value),
+      ),
+      actions: <Widget>[
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _field.text),
+          child: const Text('Open'),
+        ),
+      ],
     );
   }
 }

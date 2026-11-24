@@ -72,6 +72,17 @@ Future<void> settleFor(
   }
 }
 
+
+/// Runs a platform-channel call in real async time so a native reply that
+/// needs a real event-loop turn cannot stall inside the fake-async test zone.
+Future<T> onPlatform<T>(WidgetTester tester, Future<T> Function() call) async {
+  late T value;
+  await tester.runAsync(() async {
+    value = await call();
+  });
+  return value;
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -184,7 +195,7 @@ void main() {
       expect(reported.renderedPages, protectedPageCount);
       expect(await waitFor(tester, () => reported.loadedPages != null), isTrue);
       expect(reported.passwordFailures, isEmpty);
-      expect(await reported.controller!.getPageCount(), protectedPageCount);
+      expect(await onPlatform(tester, reported.controller!.getPageCount), protectedPageCount);
 
       await unmount(tester);
     });
@@ -241,7 +252,7 @@ void main() {
       expect(await waitFor(tester, () => reported.didRender), isTrue);
       expect(reported.renderedPages, protectedPageCount);
       expect(reported.passwordFailures, isEmpty);
-      expect(await controller.getPageCount(), protectedPageCount);
+      expect(await onPlatform(tester, controller.getPageCount), protectedPageCount);
       expect(
         identical(controller, reported.controller),
         isTrue,
@@ -320,7 +331,7 @@ void main() {
         expect(await controller.setPage(1), isTrue);
       });
       await settleFor(tester, const Duration(seconds: 1));
-      expect(await controller.getCurrentPage(), 1);
+      expect(await onPlatform(tester, controller.getCurrentPage), 1);
 
       await unmount(tester);
     });
