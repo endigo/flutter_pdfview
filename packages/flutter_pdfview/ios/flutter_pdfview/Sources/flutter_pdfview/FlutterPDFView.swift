@@ -540,8 +540,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
 
         // First-class single-tap callback for Dart onTap (#133). Platform-view
         // gestureRecognizers are unreliable for TapGestureRecognizer; report
-        // taps from the native PDF view instead. Do not require the double-tap
-        // to fail so the callback stays responsive (double-tap zoom still works).
+        // taps from the native PDF view instead.
         let singleTapGestureRecognizer = UITapGestureRecognizer(
             target: self,
             action: #selector(onSingleTap(_:))
@@ -552,6 +551,9 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         singleTapGestureRecognizer.delaysTouchesBegan = false
         singleTapGestureRecognizer.delaysTouchesEnded = false
         singleTapGestureRecognizer.cancelsTouchesInView = false
+        // Like Android (single-tap-confirmed), a double-tap zoom is not also
+        // reported as two taps.
+        singleTapGestureRecognizer.require(toFail: doubleTapGestureRecognizer)
         pdfView.addGestureRecognizer(singleTapGestureRecognizer)
         addSubview(pdfView)
 
@@ -1235,10 +1237,6 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         lastLayoutSize = .zero
         isContentRevealed = false
         pdfView.isHidden = true
-        // Android re-runs its configurator on reload, firing onRender,
-        // onLoadComplete and onPageChanged again; mirror that contract.
-        didLoadComplete = false
-        hasSentInitialPage = false
         if let document, document.pageCount > 0, let firstPage = document.page(at: 0) {
             pdfView.go(to: firstPage)
 
@@ -1258,13 +1256,18 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
             }
         }
 
-        if let document {
-            // When PDFKit has not laid out yet the fit scale is 0 and the view is
-            // still hidden; handleRenderCompleted reveals it once the view has a
-            // usable size and schedules the layout pass that applies the fit.
-            handleRenderCompleted(NSNumber(value: document.pageCount))
-        }
+        // iOS reload has never fired render/load callbacks (1.4.5 behaviour, kept
+        // for existing apps). When the fit scale was not computable yet the view
+        // is still hidden: let the next layout pass apply the fit, and reveal
+        // after it regardless so the document cannot stay blank.
         setNeedsLayout()
+        if !isContentRevealed {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.hasUsableSize(self.bounds.size) else { return }
+                self.layoutIfNeeded()
+                self.revealContentIfNeeded()
+            }
+        }
         result(NSNumber(value: true))
     }
 
@@ -1756,49 +1759,68 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
 
             // Draw each visible page where PDFKit currently shows it, so zoom
             // and scroll offset match what the user sees.
+            let box = pdfView.displayBox
             var drewVisiblePage = false
             for page in pdfView.visiblePages {
-                let pageRect = page.bounds(for: .mediaBox)
-                guard pageRect.width > 0, pageRect.height > 0 else { continue }
-                let viewRect = pdfView.convert(pageRect, from: page)
+                let viewRect = pdfView.convert(page.bounds(for: box), from: page)
                 guard viewRect.width > 0, viewRect.height > 0,
                       viewRect.intersects(CGRect(origin: .zero, size: size))
                 else { continue }
-                cg.saveGState()
-                // PDFKit page coordinates are bottom-up; flip to UIKit space.
-                cg.translateBy(x: viewRect.minX, y: viewRect.maxY)
-                cg.scaleBy(
-                    x: viewRect.width / pageRect.width,
-                    y: -viewRect.height / pageRect.height
-                )
-                cg.translateBy(x: -pageRect.origin.x, y: -pageRect.origin.y)
-                page.draw(with: .mediaBox, to: cg)
-                cg.restoreGState()
-                drewVisiblePage = true
+                if Self.draw(page, box: box, into: viewRect, of: cg) {
+                    drewVisiblePage = true
+                }
             }
             if drewVisiblePage { return }
 
-            // Last resort (no layout yet): fit the current page into the viewport.
+            // Last resort (no layout yet): fit the current page into the viewport,
+            // preserving aspect and centering it.
             guard let page = pdfView.currentPage else { return }
-            let pageRect = page.bounds(for: .mediaBox)
-            guard pageRect.width > 0, pageRect.height > 0 else { return }
-
-            // Fit the page into the viewport the same way PDFView would for a
-            // single-page snapshot (preserve aspect, center).
-            let scale = min(size.width / pageRect.width, size.height / pageRect.height)
-            let drawWidth = pageRect.width * scale
-            let drawHeight = pageRect.height * scale
-            let originX = (size.width - drawWidth) / 2
-            let originY = (size.height - drawHeight) / 2
-
-            cg.saveGState()
-            // PDFKit page coordinates are bottom-up; flip to UIKit space.
-            cg.translateBy(x: originX, y: originY + drawHeight)
-            cg.scaleBy(x: scale, y: -scale)
-            cg.translateBy(x: -pageRect.origin.x, y: -pageRect.origin.y)
-            page.draw(with: .mediaBox, to: cg)
-            cg.restoreGState()
+            let pageSize = Self.rotatedSize(of: page, box: box)
+            guard pageSize.width > 0, pageSize.height > 0 else { return }
+            let scale = min(size.width / pageSize.width, size.height / pageSize.height)
+            let drawWidth = pageSize.width * scale
+            let drawHeight = pageSize.height * scale
+            let target = CGRect(
+                x: (size.width - drawWidth) / 2,
+                y: (size.height - drawHeight) / 2,
+                width: drawWidth,
+                height: drawHeight
+            )
+            _ = Self.draw(page, box: box, into: target, of: cg)
         }
+    }
+
+    /// Size of `box` as displayed, i.e. with width and height swapped for a
+    /// page rotated by 90° or 270°.
+    private static func rotatedSize(of page: PDFPage, box: PDFDisplayBox) -> CGSize {
+        let bounds = page.bounds(for: box)
+        let quarterTurns = ((page.rotation % 360) + 360) % 360 / 90
+        return quarterTurns % 2 == 1
+            ? CGSize(width: bounds.height, height: bounds.width)
+            : bounds.size
+    }
+
+    /// Draws `page` so its displayed (rotated) `box` exactly fills `rect`, given
+    /// in UIKit (top-left origin) coordinates of `context`.
+    ///
+    /// `PDFPage.transform(_:for:)` maps the box — rotation included — onto
+    /// `(0, 0, rotatedWidth, rotatedHeight)` in bottom-up PDF space; the flip and
+    /// scale before it place that square onto `rect`.
+    private static func draw(
+        _ page: PDFPage,
+        box: PDFDisplayBox,
+        into rect: CGRect,
+        of context: CGContext
+    ) -> Bool {
+        let pageSize = rotatedSize(of: page, box: box)
+        guard pageSize.width > 0, pageSize.height > 0 else { return false }
+        context.saveGState()
+        context.translateBy(x: rect.minX, y: rect.maxY)
+        context.scaleBy(x: rect.width / pageSize.width, y: -rect.height / pageSize.height)
+        page.transform(context, for: box)
+        page.draw(with: box, to: context)
+        context.restoreGState()
+        return true
     }
 
     /// The color both capture passes fill behind the page — and the reference
@@ -1969,7 +1991,10 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
     @objc private func onSingleTap(_ recognizer: UITapGestureRecognizer) {
         guard recognizer.state == .ended else { return }
         // Skip while scrolling so page-fling / drag does not look like a tap.
-        if isScrolling {
+        // `isScrolling` is only maintained on iPad, where the plugin is the
+        // scroll view's delegate, so the scroll view's own state covers iPhone
+        // (a tap that stops a fling is caught while still decelerating).
+        if isScrolling || scrollView?.isDragging == true || scrollView?.isDecelerating == true {
             return
         }
         controller?.invokeChannelMethod("onTap", arguments: nil)
