@@ -28,6 +28,8 @@ void main() {
         backgroundColor: const Color(0xFF102030),
         maxZoom: 4,
         minZoom: 1,
+        enableTextSelection: false,
+        enableCopy: false,
       );
 
       expect(settings.toMap(), <String, dynamic>{
@@ -52,6 +54,8 @@ void main() {
         'backgroundColor': 0xFF102030,
         'maxZoom': 4.0,
         'minZoom': 1.0,
+        'enableTextSelection': false,
+        'enableCopy': false,
       });
     });
 

@@ -26,7 +26,7 @@ dependencies:
   # The shared platform interface. Inside this workspace the constraint resolves
   # to packages/flutter_pdfview_platform_interface; on pub.dev it resolves to the
   # published package, so that one must be released first.
-  flutter_pdfview_platform_interface: ^1.0.1
+  flutter_pdfview_platform_interface: ^1.1.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0

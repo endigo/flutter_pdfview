@@ -1,6 +1,7 @@
 import 'dart:ui' show Offset, Size;
 
 import 'pdf_view_callbacks.dart';
+import 'types.dart';
 
 /// Drives a single PDF view that a platform implementation has created.
 ///
@@ -67,6 +68,47 @@ abstract class PdfViewPlatformController {
   /// The map uses the same key names that `PdfViewSettings.toMap` produces.
   /// Implementations may assume it is non-empty.
   Future<void> updateSettings(Map<String, dynamic> updates);
+
+  /// Whether this platform exposes a text layer at all.
+  ///
+  /// When `false`, every text method below throws [UnsupportedError] except
+  /// [clearSearch] and [clearSelection], which stay no-ops because "clear
+  /// nothing" is a truthful outcome.
+  Future<bool> isTextLayerSupported();
+
+  /// Searches the document for [query] and returns every match.
+  ///
+  /// The first match becomes the active one. An empty [query] clears the search
+  /// and returns an empty list.
+  ///
+  /// An empty result always means "searched, found nothing". Implementations
+  /// without a text layer must throw instead — see
+  /// [kPdfTextLayerUnsupportedCode].
+  Future<List<PdfTextMatch>> searchText(String query, {bool caseSensitive = false});
+
+  /// Activates the next match, wrapping at the end.
+  ///
+  /// Returns `null` when there is no active search session.
+  Future<PdfTextMatch?> nextMatch();
+
+  /// Activates the previous match, wrapping at the start.
+  ///
+  /// Returns `null` when there is no active search session.
+  Future<PdfTextMatch?> previousMatch();
+
+  /// Activates the match at [index] of the last [searchText] result.
+  ///
+  /// Returns `null` when [index] is out of range.
+  Future<PdfTextMatch?> setCurrentMatch(int index);
+
+  /// Clears search highlights and forgets the last [searchText] result.
+  Future<void> clearSearch();
+
+  /// Returns the selected text, or `null` when nothing is selected.
+  Future<String?> getSelectedText();
+
+  /// Clears the current text selection, if any.
+  Future<void> clearSelection();
 
   /// Replaces the callbacks this controller dispatches native events to.
   void updateCallbacks(PdfViewCallbacks callbacks);

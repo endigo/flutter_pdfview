@@ -14,6 +14,10 @@
 ///   onViewCreated: (PDFViewController controller) async {
 ///     final int? pages = await controller.getPageCount();
 ///     await controller.setPage(0);
+///     // Text search is iOS-only today — always check first.
+///     if (await controller.isTextLayerSupported()) {
+///       await controller.searchText('invoice');
+///     }
 ///   },
 /// )
 /// ```
@@ -50,8 +54,11 @@ export 'package:flutter_pdfview_platform_interface/flutter_pdfview_platform_inte
         PageErrorCallback,
         PasswordRequiredCallback,
         PdfColorMode,
+        PdfTextMatch,
         RenderCallback,
-        TapCallback;
+        SearchResultChangedCallback,
+        TapCallback,
+        TextSelectionChangedCallback;
 
 part 'src/pdf_view.dart';
 part 'src/pdf_view_controller.dart';

@@ -36,6 +36,8 @@ class PdfViewSettings {
     this.backgroundColor,
     this.maxZoom,
     this.minZoom,
+    this.enableTextSelection,
+    this.enableCopy,
   }) : assert(
          colorMode != PdfColorMode.system,
          'system must be resolved to light or dark before building settings',
@@ -109,6 +111,12 @@ class PdfViewSettings {
   /// Minimum zoom level.
   final double? minZoom;
 
+  /// Whether the user may select text in the native viewer.
+  final bool? enableTextSelection;
+
+  /// Whether the copy / share actions are offered for selected text.
+  final bool? enableCopy;
+
   /// Serializes every setting into the creation-parameter wire format.
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -134,6 +142,8 @@ class PdfViewSettings {
       'backgroundColor': backgroundColor?.toARGB32(),
       'maxZoom': maxZoom,
       'minZoom': minZoom,
+      'enableTextSelection': enableTextSelection,
+      'enableCopy': enableCopy,
     };
   }
 
@@ -179,6 +189,12 @@ class PdfViewSettings {
         updates['backgroundColor'] = bg.toARGB32();
       }
       // Present-with-null is omitted; natives keep the previous color.
+    }
+    if (enableTextSelection != newSettings.enableTextSelection) {
+      updates['enableTextSelection'] = newSettings.enableTextSelection;
+    }
+    if (enableCopy != newSettings.enableCopy) {
+      updates['enableCopy'] = newSettings.enableCopy;
     }
     return updates;
   }
