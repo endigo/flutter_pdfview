@@ -1,3 +1,44 @@
+## 2.0.0-beta.1
+
+First 2.0.0 pre-release. It ships the whole `1.5.0-beta.1` → `1.5.0-beta.12` line under a new
+major version, because a few defaults and behaviours change for apps upgrading from `1.4.5`.
+Pre-releases are not picked up by a `^` constraint; pin `flutter_pdfview: 2.0.0-beta.1` to try it.
+
+### Breaking changes
+
+- **BREAKING**: `PDFView.colorMode` defaults to `PdfColorMode.system`, so pages follow the app's
+  theme. An app with a dark theme now shows inverted (dark) pages where `1.4.5` always rendered
+  them light. Pass `colorMode: PdfColorMode.light` to keep the old look. `nightMode` still works
+  but is deprecated in favour of `colorMode`
+  ([#215](https://github.com/endigo/flutter_pdfview/issues/215),
+  [#138](https://github.com/endigo/flutter_pdfview/issues/138))
+- **BREAKING (iOS)**: settings changed when `PDFView` is rebuilt (`enableSwipe`, `colorMode`,
+  `backgroundColor`, `password`, `minZoom` / `maxZoom`, `pageAlignment`,
+  `preventLinkNavigation`) are now applied on iOS. `1.4.5` silently ignored them there; Android
+  already applied them
+- **BREAKING (build)**: the Android plugin is written in Kotlin (Kotlin Gradle plugin 2.0.0,
+  JVM 17) and the iOS plugin in Swift 5.9. Public Dart API, import path and the registered
+  native class names are unchanged
+
+### Fixes since `1.5.0-beta.12`
+
+- Settings changed while the native view was still being created are no longer dropped: they are
+  sent once the view exists
+- Android: a `setPage` call still queued when the view is disposed now completes with `false`
+  instead of never completing
+- Android: a runtime `minZoom` above `maxZoom` is clamped the same way as at creation
+- iOS: `reload()` can no longer leave the document hidden when the fit scale is not ready yet. As
+  in `1.4.5`, it fires no render callbacks
+- iOS: `onTap` no longer fires for the tap that stops a scroll, nor twice for a double-tap zoom
+- iOS: the `getScreenshot` fallback respects zoom, scroll offset and page rotation
+- iOS: `PDFView.password` cleared back to `null` at runtime keeps the document open (Android
+  reopens it); documented on `PDFView.password`
+- Equal `pdfData` passed as a new `Uint8List` is compared byte for byte instead of hashed twice
+  per rebuild
+
+Everything in `1.5.0-beta.1` → `1.5.0-beta.12` below is included. Feedback is welcome in
+[#351](https://github.com/endigo/flutter_pdfview/issues/351).
+
 ## 1.5.0-beta.12
 
 - Add optional `withAnimation` to `PDFViewController.setPage` ([#251](https://github.com/endigo/flutter_pdfview/pull/251)):

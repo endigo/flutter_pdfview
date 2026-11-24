@@ -18,19 +18,20 @@ dependencies:
   flutter_pdfview: ^1.4.5
 ```
 
-#### Trying the 1.5.0 beta
+#### Trying the 2.0.0 beta
 
-`1.5.0-beta.12` adds optional animated page navigation and configurable page
-spacing, and includes password-protected document unlocking
-([#274](https://github.com/endigo/flutter_pdfview/issues/274)) and the
-luminance-preserving `PdfColorMode` dark theming from earlier betas
-([#215](https://github.com/endigo/flutter_pdfview/issues/215),
-[#138](https://github.com/endigo/flutter_pdfview/issues/138)). Pre-releases are not
+`2.0.0-beta.1` is the Kotlin/Swift rewrite with password unlock
+([#274](https://github.com/endigo/flutter_pdfview/issues/274)), luminance-preserving
+`PdfColorMode` dark theming ([#215](https://github.com/endigo/flutter_pdfview/issues/215),
+[#138](https://github.com/endigo/flutter_pdfview/issues/138)), animated page navigation and
+configurable page spacing. It is a new major version: pages now follow the app's theme by
+default (pass `colorMode: PdfColorMode.light` for the `1.4.5` look), and iOS now applies settings
+changed on rebuild. See the [CHANGELOG](CHANGELOG.md) for the full list. Pre-releases are not
 picked up by a `^` constraint, so pin it explicitly:
 
-```
+```yaml
 dependencies:
-  flutter_pdfview: 1.5.0-beta.12
+  flutter_pdfview: 2.0.0-beta.1
 ```
 
 Feedback is welcome in [#351](https://github.com/endigo/flutter_pdfview/issues/351).
