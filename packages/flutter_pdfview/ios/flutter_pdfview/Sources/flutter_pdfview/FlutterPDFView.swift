@@ -1397,7 +1397,7 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
     /// Applies the settings Dart pushes when a `PDFView` is rebuilt with
     /// different values.
     ///
-    /// Until 1.5.0 this was a no-op stub and every key was silently dropped, so
+    /// Until 2.0.0 this was a no-op stub and every key was silently dropped, so
     /// apps that relied on updates not taking effect will now see them applied.
     /// Keys iOS cannot honour (`pageFling`, `pageSnap`) and keys it does not know
     /// are accepted and ignored — never rejected — because a `FlutterError` here
