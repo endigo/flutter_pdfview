@@ -13,7 +13,7 @@ Native PDF View for iOS and Android
 
 Add this to your package's pubspec.yaml file:
 
-```
+```yaml
 dependencies:
   flutter_pdfview: ^1.4.5
 ```
@@ -27,7 +27,7 @@ search, selection, and copy control on iOS ([#137](https://github.com/endigo/flu
 `PdfColorMode`, spacing, and animated `setPage`. Pre-releases are not picked up by a
 `^` constraint, so pin it explicitly:
 
-```
+```yaml
 dependencies:
   flutter_pdfview: 1.5.0-beta.13
 ```
