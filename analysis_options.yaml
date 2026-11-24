@@ -1,18 +1,6 @@
-# This file configures the analyzer, which statically analyzes Dart code to
-# check for errors, warnings, and lints.
-#
-# The lints in `package:flutter_lints` are the recommended baseline for Flutter
-# apps, packages, and plugins. See https://pub.dev/packages/flutter_lints.
-include: package:flutter_lints/flutter.yaml
-
-# `dart format` reads the page width from here so every contributor produces the
-# same layout as the existing sources (~100 columns).
+# Workspace-root analyzer settings. There is no Dart source at the root, so
+# this only pins the formatter page width for tooling invoked from here; each
+# package under packages/ carries its own analysis_options.yaml with the full
+# flutter_lints rule set.
 formatter:
   page_width: 100
-
-linter:
-  rules:
-    # Keep the published API fully documented.
-    - public_member_api_docs
-    - prefer_single_quotes
-    - unawaited_futures

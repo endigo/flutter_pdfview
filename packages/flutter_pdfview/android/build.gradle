@@ -1,0 +1,122 @@
+group 'io.endigo.plugins.pdfview'
+version '1.0-SNAPSHOT'
+
+buildscript {
+    // Matches the KGP that the Flutter tooling puts on the root build classpath,
+    // so an app build resolves a single Kotlin compiler. Still needed for AGP 8,
+    // where Kotlin compilation comes from KGP rather than from AGP itself; see
+    // the Built-in Kotlin note further down.
+    ext.kotlin_version = '2.0.0'
+
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+// Resolve Flutter SDK for standalone `./gradlew testDebugUnitTest` (not via an app).
+// When the plugin is built as a dependency of a Flutter app, the embedding is
+// provided by the host; compileOnly avoids packing flutter.jar into the AAR.
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+def flutterSdkPath = localProperties.getProperty('flutter.sdk')
+def flutterJar = flutterSdkPath != null
+        ? file("${flutterSdkPath}/bin/cache/artifacts/engine/android-x64/flutter.jar")
+        : null
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+}
+
+apply plugin: 'com.android.library'
+
+// Built-in Kotlin migration (Flutter 3.44+ / AGP 9+).
+//
+// AGP 9 compiles Kotlin itself, and Flutter fails the build of any app whose
+// plugins also apply the Kotlin Gradle Plugin. Applying it unconditionally
+// would therefore break future Flutter releases; removing it unconditionally
+// would break every user still on AGP 8, which this plugin supports because
+// pubspec.yaml only requires Flutter >= 3.32. So it is applied only where it is
+// still the thing that provides Kotlin compilation.
+//
+// https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
+def agpMajor = com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')[0] as int
+if (agpMajor < 9) {
+    apply plugin: 'kotlin-android'
+}
+
+android {
+    compileSdk 36
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    defaultConfig {
+        minSdk = 21
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        consumerProguardFiles 'proguard-rules.pro'
+    }
+
+    lint {
+        disable 'InvalidPackage'
+    }
+
+
+    testOptions {
+        // Robolectric needs the merged android resources/manifest on the unit test classpath.
+        unitTests {
+            includeAndroidResources = true
+        }
+        unitTests.all {
+            testLogging {
+               events "passed", "skipped", "failed", "standardOut", "standardError"
+               outputs.upToDateWhen {false}
+               showStandardStreams = true
+            }
+        }
+    }
+    if (project.android.hasProperty("namespace")) { namespace 'io.endigo.plugins.pdfviewflutter' }
+
+    // #287: pdfium-android ships libc++_shared.so; apps that also pull another
+    // native lib (ffmpeg-kit, etc.) hit mergeDebugNativeLibs conflicts.
+    packaging {
+        jniLibs {
+            pickFirsts += ['**/libc++_shared.so']
+        }
+    }
+}
+
+// Replaces the `kotlinOptions` block, which Built-in Kotlin removes. This form
+// is understood both by KGP (AGP 8) and by AGP 9's own Kotlin support.
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}
+
+dependencies {
+    if (flutterJar != null && flutterJar.exists()) {
+        compileOnly files(flutterJar)
+        testImplementation files(flutterJar)
+    }
+    implementation 'com.github.marain87:AndroidPdfViewer:3.2.8'
+    implementation 'androidx.annotation:annotation-jvm:1.9.1'
+
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.mockito:mockito-core:5.19.0'
+    testImplementation 'org.robolectric:robolectric:4.16.1'
+}
+
