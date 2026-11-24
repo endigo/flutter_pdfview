@@ -163,6 +163,10 @@ class PDFView extends StatefulWidget {
   ///
   /// Changing it reopens the document without recreating the platform view.
   /// [onPasswordRequired] reports when it did not open the document.
+  ///
+  /// Clearing it back to `null` at runtime differs by platform: Android
+  /// reopens the document without a password (so an encrypted file asks
+  /// again), while iOS ignores the change and keeps an unlocked document open.
   final String? password;
 
   /// Indicates whether or not the PDF viewer is in night mode. If set to true, the viewer is in

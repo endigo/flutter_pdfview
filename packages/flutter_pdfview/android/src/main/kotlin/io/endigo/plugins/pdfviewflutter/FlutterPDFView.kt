@@ -15,6 +15,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.PixelCopy
 import android.view.View
@@ -375,7 +376,8 @@ class FlutterPDFView(
                     methodChannel.invokeMethod("onRender", args)
                 }.onDraw { _, _, _, _ ->
                     if (disposed) return@onDraw
-                    val now = System.currentTimeMillis()
+                    // Monotonic: a wall-clock rollback would otherwise suppress onDraw.
+                    val now = SystemClock.uptimeMillis()
                     if (now - lastDrawTime < DRAW_THROTTLE_MS) return@onDraw
                     lastDrawTime = now
                     onDrawArgs.clear()

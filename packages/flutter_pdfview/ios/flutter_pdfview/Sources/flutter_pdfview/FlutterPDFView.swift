@@ -315,7 +315,23 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
     ///
     /// Stored rather than derived on demand so the page never has to touch
     /// `traitCollection` — PDFKit renders pages off the main thread.
-    private(set) var isDarkMode = false
+    ///
+    /// Written on the main thread by `setColorMode` and read from PDFKit's
+    /// render threads by `FPVThemedPage.draw`, so access goes through a lock.
+    private(set) var isDarkMode: Bool {
+        get {
+            darkModeLock.lock()
+            defer { darkModeLock.unlock() }
+            return storedIsDarkMode
+        }
+        set {
+            darkModeLock.lock()
+            storedIsDarkMode = newValue
+            darkModeLock.unlock()
+        }
+    }
+    private var storedIsDarkMode = false
+    private let darkModeLock = NSLock()
     /// Set while `rerenderPreservingPosition()` swaps the document out and back,
     /// so the page churn that causes is not reported to Dart as a page change.
     private var isRerendering = false
@@ -1296,6 +1312,10 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         lastLayoutSize = .zero
         isContentRevealed = false
         pdfView.isHidden = true
+        // Android re-runs its configurator on reload, firing onRender,
+        // onLoadComplete and onPageChanged again; mirror that contract.
+        didLoadComplete = false
+        hasSentInitialPage = false
         if let document, document.pageCount > 0, let firstPage = document.page(at: 0) {
             pdfView.go(to: firstPage)
 
@@ -1315,6 +1335,13 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
             }
         }
 
+        if let document {
+            // When PDFKit has not laid out yet the fit scale is 0 and the view is
+            // still hidden; handleRenderCompleted reveals it once the view has a
+            // usable size and schedules the layout pass that applies the fit.
+            handleRenderCompleted(NSNumber(value: document.pageCount))
+        }
+        setNeedsLayout()
         result(NSNumber(value: true))
     }
 
@@ -1379,7 +1406,9 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
         }
 
         // A rebuild with a new password reopens the document; a null one
-        // arrives as NSNull and is ignored here.
+        // arrives as NSNull and is ignored here. PDFKit cannot re-lock an
+        // unlocked PDFDocument, so unlike Android a cleared password keeps the
+        // document open — documented on `PDFView.password`.
         if let password = settings["password"] as? String {
             applyPassword(password)
         }
@@ -1996,6 +2025,31 @@ final class FlutterPDFView: UIView, FlutterPlatformView, PDFViewDelegate, PDFDoc
             captureBackgroundColor.setFill()
             ctx.fill(CGRect(origin: .zero, size: size))
 
+            // Draw each visible page where PDFKit currently shows it, so zoom
+            // and scroll offset match what the user sees.
+            var drewVisiblePage = false
+            for page in pdfView.visiblePages {
+                let pageRect = page.bounds(for: .mediaBox)
+                guard pageRect.width > 0, pageRect.height > 0 else { continue }
+                let viewRect = pdfView.convert(pageRect, from: page)
+                guard viewRect.width > 0, viewRect.height > 0,
+                      viewRect.intersects(CGRect(origin: .zero, size: size))
+                else { continue }
+                cg.saveGState()
+                // PDFKit page coordinates are bottom-up; flip to UIKit space.
+                cg.translateBy(x: viewRect.minX, y: viewRect.maxY)
+                cg.scaleBy(
+                    x: viewRect.width / pageRect.width,
+                    y: -viewRect.height / pageRect.height
+                )
+                cg.translateBy(x: -pageRect.origin.x, y: -pageRect.origin.y)
+                page.draw(with: .mediaBox, to: cg)
+                cg.restoreGState()
+                drewVisiblePage = true
+            }
+            if drewVisiblePage { return }
+
+            // Last resort (no layout yet): fit the current page into the viewport.
             guard let page = pdfView.currentPage else { return }
             let pageRect = page.bounds(for: .mediaBox)
             guard pageRect.width > 0, pageRect.height > 0 else { return }
