@@ -14,8 +14,12 @@ class PDFViewController {
     this._platform,
     PDFView widget, {
     PdfColorMode resolvedColorMode = PdfColorMode.light,
+    PdfViewSettings? creationSettings,
   }) {
-    _settings = _settingsFromWidget(widget, resolvedColorMode: resolvedColorMode);
+    // Diff later updates against what the native view was actually created
+    // with, when known; otherwise against the widget.
+    _settings =
+        creationSettings ?? _settingsFromWidget(widget, resolvedColorMode: resolvedColorMode);
     // The platform controller may have been built with callbacks captured on an
     // earlier build; re-point it at the widget this controller is created for.
     _platform.updateCallbacks(_callbacksFromWidget(widget));

@@ -322,55 +322,21 @@ class _PDFViewState extends State<PDFView> {
   /// Bumped when the native platform view must be recreated (new document).
   int _viewGeneration = 0;
 
-  /// Identity / FNV-1a digest of the last accepted [PDFView.pdfData], so rebuilds
-  /// with a new [Uint8List] of equal content avoid a full per-byte scan after the
-  /// first hash of each instance.
-  Object? _pdfDataIdentity;
-  int? _pdfDataDigest;
+  /// Settings the native view of the current generation was created with.
+  ///
+  /// Captured on the first build of each generation: UiKitView and
+  /// PlatformViewLink both send the creation params of that first build, while
+  /// UiKitView reports creation through the *latest* build's callback. Diffing
+  /// later updates against this snapshot (not against the widget at creation
+  /// time) keeps changes made in between from being dropped.
+  PdfViewSettings? _creationSettings;
+  int _creationSettingsGeneration = -1;
 
   /// Whether the first [didChangeDependencies] has already been observed.
   ///
   /// The initial dependency pass must not schedule an [updateSettings] (there is
   /// no controller yet, and creation params already carry the resolved mode).
   bool _dependenciesReady = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _cachePdfData(widget.pdfData);
-  }
-
-  /// FNV-1a 32-bit content digest used as a constant-time document identity key
-  /// once computed for a given [Uint8List] instance.
-  static int _digestPdfData(Uint8List data) {
-    int hash = 0x811c9dc5;
-    for (int i = 0; i < data.length; i++) {
-      hash ^= data[i];
-      // Keep within 32 bits without depending on platform int width.
-      hash = (hash * 0x01000193) & 0xFFFFFFFF;
-    }
-    return hash;
-  }
-
-  int _digestFor(Uint8List data) {
-    if (identical(data, _pdfDataIdentity) && _pdfDataDigest != null) {
-      return _pdfDataDigest!;
-    }
-    return _digestPdfData(data);
-  }
-
-  void _cachePdfData(Uint8List? data) {
-    if (data == null) {
-      _pdfDataIdentity = null;
-      _pdfDataDigest = null;
-      return;
-    }
-    if (identical(data, _pdfDataIdentity) && _pdfDataDigest != null) {
-      return;
-    }
-    _pdfDataIdentity = data;
-    _pdfDataDigest = _digestPdfData(data);
-  }
 
   bool _documentChanged(PDFView oldWidget) {
     if (widget.filePath != oldWidget.filePath) {
@@ -384,9 +350,15 @@ class _PDFViewState extends State<PDFView> {
     if (a == null || b == null || a.length != b.length) {
       return true;
     }
-    // Same length, different instances: compare cached digests (O(1) when the
-    // previous list is still the cached identity; O(n) once to hash a new list).
-    return _digestFor(a) != _digestFor(b);
+    // Same length, different instances: compare bytes. A single pass that stops
+    // at the first difference — exact, unlike a digest, and never slower than
+    // hashing the new list would be.
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Resolves [PDFView.colorMode] to [PdfColorMode.light] or [PdfColorMode.dark].
@@ -470,12 +442,20 @@ class _PDFViewState extends State<PDFView> {
     // Capture generation at build time so platform-view creation callbacks
     // from a previous mount cannot complete the current Completer.
     final int generation = _viewGeneration;
+    final PdfViewSettings settings = _settingsFromWidget(
+      widget,
+      resolvedColorMode: resolvedColorMode,
+    );
+    if (_creationSettingsGeneration != generation) {
+      _creationSettingsGeneration = generation;
+      _creationSettings = settings;
+    }
     return FlutterPdfViewPlatform.instance.buildView(
       key: ValueKey<int>(generation),
       creationParams: PdfViewCreationParams(
         filePath: widget.filePath,
         pdfData: widget.pdfData,
-        settings: _settingsFromWidget(widget, resolvedColorMode: resolvedColorMode),
+        settings: settings,
       ),
       callbacks: _callbacksFromWidget(widget),
       gestureRecognizers: widget.gestureRecognizers,
@@ -499,6 +479,7 @@ class _PDFViewState extends State<PDFView> {
       platformController,
       widget,
       resolvedColorMode: resolvedColorMode,
+      creationSettings: generation == _creationSettingsGeneration ? _creationSettings : null,
     );
     // Ignore late callbacks from a remounted/disposed platform view so they
     // cannot complete the new Completer with a stale controller.
@@ -512,6 +493,10 @@ class _PDFViewState extends State<PDFView> {
     }
     _controller.complete(controller);
     widget.onViewCreated?.call(controller);
+    // The widget may have been rebuilt with different settings between the
+    // build that created the native view and now; push that difference. A
+    // no-op (no channel call) when nothing changed.
+    _scheduleSettingsUpdate();
   }
 
   @override
@@ -520,7 +505,6 @@ class _PDFViewState extends State<PDFView> {
     // #181: filePath / pdfData changes must load a new document. Settings-only
     // updates go through the method channel; document changes remount the view.
     final bool documentChanged = _documentChanged(oldWidget);
-    _cachePdfData(widget.pdfData);
     if (documentChanged) {
       _remountPlatformView();
       return;

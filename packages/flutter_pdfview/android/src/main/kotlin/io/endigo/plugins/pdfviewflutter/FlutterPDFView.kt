@@ -63,6 +63,13 @@ class FlutterPDFView(
     /** Pending `unlock`, settled from onLoad / onError once the reload lands. */
     private var pendingUnlockResult: Result? = null
 
+    /**
+     * `setPage` results whose deferred jump has not run yet. [dispose] cancels
+     * the main-handler queue, so it settles these with `false` instead of
+     * leaving the Dart caller awaiting forever.
+     */
+    private val pendingSetPageResults: MutableList<Result> = ArrayList()
+
     /** Creation / runtime page alignment (#250, #272). Default centers short docs. */
     private var pageAlignment: PageAlignment = getPageAlignment(params)
 
@@ -839,7 +846,12 @@ class FlutterPDFView(
         // be reattaching; jump on the next frame so the page change sticks.
         // Complete the method channel only after jumpTo so await setPage()
         // followed by getCurrentPage() observes the new page.
+        pendingSetPageResults.add(result)
         val jump = Runnable {
+            // Already settled by dispose(); replying twice would throw.
+            if (!pendingSetPageResults.remove(result)) {
+                return@Runnable
+            }
             val current = pdfView
             if (disposed || current == null) {
                 result.success(false)
@@ -984,6 +996,7 @@ class FlutterPDFView(
         // loop, then a single applyColorTheme() so gutter compensation sees the
         // final mode and loadPages runs once.
         var colorThemeDirty = false
+        var zoomLimitsDirty = false
         for (key in settings.keys) {
             when (key) {
                 "enableSwipe" -> view.setSwipeEnabled(getBoolean(settings, key))
@@ -1021,8 +1034,14 @@ class FlutterPDFView(
                         }
                     }
                 }
-                "maxZoom" -> view.maxZoom = getFloat(settings, key, DEFAULT_MAX_ZOOM)
-                "minZoom" -> view.minZoom = getFloat(settings, key, DEFAULT_MIN_ZOOM)
+                "maxZoom" -> {
+                    view.maxZoom = getFloat(settings, key, DEFAULT_MAX_ZOOM)
+                    zoomLimitsDirty = true
+                }
+                "minZoom" -> {
+                    view.minZoom = getFloat(settings, key, DEFAULT_MIN_ZOOM)
+                    zoomLimitsDirty = true
+                }
                 "password" -> applyPassword(settings[key] as? String, null)
                 // disableLongpress() is Configurator-only, so this takes effect
                 // on the next document load rather than immediately.
@@ -1033,6 +1052,11 @@ class FlutterPDFView(
                 "enableCopy" -> Unit
                 else -> throw IllegalArgumentException("Unknown PDFView setting: $key")
             }
+        }
+        if (zoomLimitsDirty && view.minZoom > view.maxZoom) {
+            // Same rule as creation (loadDocument): an inverted pair clamps the
+            // minimum down to the maximum.
+            view.minZoom = view.maxZoom
         }
         if (colorThemeDirty) {
             applyColorTheme(reloadPages = true)
@@ -1104,6 +1128,12 @@ class FlutterPDFView(
         disposed = true
         // Settle an unlock that will never load now, so its caller stops waiting.
         completeUnlock(false)
+        // Same for page jumps still queued: the queue is cleared just below.
+        val pendingPages = ArrayList(pendingSetPageResults)
+        pendingSetPageResults.clear()
+        for (pending in pendingPages) {
+            pending.success(false)
+        }
         methodChannel.setMethodCallHandler(null)
         mainHandler.removeCallbacksAndMessages(null)
         val view = pdfView
