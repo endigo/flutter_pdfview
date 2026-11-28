@@ -151,6 +151,10 @@ class PDFView extends StatefulWidget {
 
   /// Indicates whether or not the user can swipe horizontally to change pages in the PDF document.
   /// If set to true, horizontal swiping is enabled.
+  ///
+  /// On Android this needs `flutter_pdfview_android_pdfium`; the default
+  /// `androidx.pdf` engine scrolls vertically only and ignores it, as it does
+  /// [pageFling] and [pageSnap].
   final bool swipeHorizontal;
 
   /// Indicates whether or not the PDF viewer should show scroll indicators - scroll handles on
@@ -299,9 +303,11 @@ class PDFView extends StatefulWidget {
   ///   to `false` disables the long-press recognizers and clears any selection,
   ///   which is the supported way to stop users copying text out of a document
   ///   ([#108](https://github.com/endigo/flutter_pdfview/issues/108)).
-  /// - **Android**: AndroidPdfViewer has no selection UI, so `false` only
-  ///   suppresses the long-press callback. There is nothing to select either
-  ///   way. Applied on the next document load rather than immediately.
+  /// - **Android** (default `androidx.pdf` engine): `false` clears any selection
+  ///   and drops new ones as they appear, at runtime.
+  /// - **Android with `flutter_pdfview_android_pdfium`**: no selection UI, so
+  ///   `false` only suppresses the long-press callback, applied on the next
+  ///   document load.
   final bool enableTextSelection;
 
   /// Whether the system edit menu offers copy / share / look-up for a selection.
@@ -309,7 +315,9 @@ class PDFView extends StatefulWidget {
   /// Defaults to `true`. Set both this and [enableTextSelection] to `false` to
   /// stop text leaving the document entirely.
   ///
-  /// **iOS only** — Android has no selection menu to suppress.
+  /// Supported on iOS and on Android's default `androidx.pdf` engine, where it
+  /// removes Copy, Copy link and smart actions from the selection menu. No
+  /// effect with `flutter_pdfview_android_pdfium`, which has no selection.
   final bool enableCopy;
 
   @override

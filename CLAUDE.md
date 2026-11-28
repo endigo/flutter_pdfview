@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Flutter plugin that provides native PDF viewing capabilities for iOS and Android platforms. The plugin wraps platform-specific PDF rendering libraries:
 - **iOS**: Uses native PDFKit (iOS 13.0+), implemented in Swift
-- **Android**: Uses AndroidPdfViewer library (com.github.marain87:AndroidPdfViewer:3.2.8), implemented in Kotlin
+- **Android**: Uses Jetpack androidx.pdf (Android's own renderer, `PdfView` + `SandboxedPdfLoader`), implemented in Kotlin. The 1.x AndroidPdfViewer/PDFium engine lives on as the opt-in `packages/flutter_pdfview_android_pdfium` package (federated override: an app that depends on it directly gets it instead)
 
 ## Repository Layout
 
@@ -120,10 +120,14 @@ is `publish_to: none`. The `Publish to pub.dev` GitHub workflow already sets
 
 3. **Android Implementation** (`android/src/main/kotlin/io/endigo/plugins/pdfviewflutter/`):
    - `PDFViewFlutterPlugin.kt` - Plugin registration
-   - `FlutterPDFView.kt` - Android view implementation wrapping AndroidPdfViewer
+   - `FlutterPDFView.kt` - Android view implementation on androidx.pdf `PdfView` (loading,
+     zoom/position, links, password, screenshot, text layer)
+   - `ViewportMath.kt` - Pure fit/scale/page/search math (relative scale ↔ PdfView's absolute zoom)
+   - `TouchInterceptLayout.kt` - Container that sees touches first (onTap, enableSwipe: false)
    - `PDFViewFactory.kt` - Factory for creating platform views
-   - `PDFLinkHandler.kt` - Handles PDF link navigation
    - `PdfColorMatrix.kt` - Luminance-preserving inversion for dark mode
+   - The PDFium engine (`packages/flutter_pdfview_android_pdfium/android/`, Kotlin package
+     `io.endigo.plugins.pdfviewflutter.pdfium`) keeps `PDFLinkHandler.kt` and the 1.x behaviour
 
 4. **iOS Implementation** (`ios/flutter_pdfview/Sources/flutter_pdfview/`):
    - `FlutterPDFView.swift` - iOS view implementation using PDFKit
@@ -145,10 +149,10 @@ is `publish_to: none`. The `Publish to pub.dev` GitHub workflow already sets
   horizontal/vertical scrolling, page alignment, optional inter-page `spacing`
 - **Rendering Options**: Color mode (light/dark/system), auto-spacing, page snap, fit policies
 - **Security**: Password-protected PDF support with `onPasswordRequired` / `unlock()`
-- **Text layer (iOS)**: find-in-document (`searchText` / next/previous match), selection,
-  and `enableCopy` to suppress the edit-menu copy path (#137 #285 #108). Android has no text
-  layer yet — `isTextLayerSupported()` is `false` and query methods throw `UnsupportedError`
-  (check first; never treat empty results as “unsupported”)
+- **Text layer (iOS + Android default engine)**: find-in-document (`searchText` /
+  next/previous match), selection, and `enableCopy` to suppress the copy path (#137 #285 #108).
+  The PDFium package has no text layer — `isTextLayerSupported()` is `false` and query methods
+  throw `UnsupportedError` (check first; never treat empty results as “unsupported”)
 - **Callbacks**: Page change, render complete, error handling, link handling, tap, search /
   selection (iOS)
 - **Controller Methods**: `getPageCount()`, `getCurrentPage()`, `setPage()`, `setZoomLimits()`,
@@ -164,12 +168,13 @@ is `publish_to: none`. The `Publish to pub.dev` GitHub workflow already sets
   ancestors do not affect the native view (see #213)
 
 ### Android
-- Minimum SDK: 21, Compile SDK: 36
-- Kotlin, KGP 2.0.0, JVM target 17
+- Default engine: minimum SDK 28, compile SDK 36 with `compileSdkExtension 19` (required by
+  androidx.pdf in the plugin *and* the app). Vertical scrolling only
+- PDFium package: minimum SDK 21; horizontal paging; no text layer
+- Kotlin, JVM target 17. KGP is applied whenever AGP's built-in Kotlin is off — via
+  `pluginManager.apply`, never an `apply plugin:` line, which Flutter text-matches
 - True hybrid composition (`initExpensiveAndroidView`)
-- Uses AndroidX libraries; ProGuard rules included for release builds
-- Text search/selection not implemented (Pdfium `FPDFText_*` needs a JNI shim; see README
-  “Text layer”)
+- CI (`.github/workflows/ci.yml`) builds the example with each engine and runs both suites
 
 ## Testing Approach
 
@@ -180,8 +185,9 @@ the method-channel controller, and text-layer method-channel decoding
 (`test/text_layer_test.dart`). `melos run test` runs both.
 
 Android has a Robolectric/JUnit suite run via `melos run test:android` (wraps
-`scripts/run_android_unit_tests.sh`), including `FlutterPDFViewTextLayerTest` for the
-unsupported-path codes. Keep it green.
+`scripts/run_android_unit_tests.sh`; set `ANDROID_MODULE=packages/flutter_pdfview_android_pdfium/android`
+for the PDFium package, whose suite includes `FlutterPDFViewTextLayerTest` for the
+unsupported-path codes). Keep both green.
 
 `example/integration_test/` drives the real native viewers end to end (`password_test.dart`,
 `text_layer_test.dart`). Text fixtures: `scripts/make_text_pdf.py` → `assets/demo-text.pdf`.

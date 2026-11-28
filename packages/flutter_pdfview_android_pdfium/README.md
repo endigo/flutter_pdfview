@@ -4,8 +4,9 @@ The opt-in **PDFium** Android engine for [`flutter_pdfview`](https://pub.dev/pac
 
 Since `flutter_pdfview` 2.0, Android renders PDFs with Android's own PDF
 engine through Jetpack [`androidx.pdf`](https://developer.android.com/jetpack/androidx/releases/pdf),
-so apps no longer ship PDFium. That engine scrolls vertically only and needs
-Android 9 (API 28). Add this package if your app needs either of:
+so apps no longer ship PDFium. That engine scrolls vertically only, needs
+Android 9 (API 28), and requires the app to compile against SDK extension 19.
+Add this package if your app needs either of:
 
 - **Horizontal paging**: `swipeHorizontal`, `pageFling`, `pageSnap`
 - **Android 5.0–8.1** (API 21–27)
@@ -25,7 +26,9 @@ dependencies:
 ```
 
 Keep importing `package:flutter_pdfview/flutter_pdfview.dart`; this package
-has no Dart API of its own. iOS is unaffected.
+has no Dart API of its own. iOS is unaffected. With this package the default
+engine is left out of your build entirely, so its `minSdk 28` and
+`compileSdkExtension 19` requirements do not apply.
 
 ## Limitations
 

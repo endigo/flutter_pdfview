@@ -113,7 +113,8 @@ class PDFViewController {
 
   /// Whether this platform has a text layer at all.
   ///
-  /// `true` on iOS. `false` on Android: AndroidPdfViewer does not bind Pdfium's
+  /// `true` on iOS and on Android's default `androidx.pdf` engine. `false` with
+  /// `flutter_pdfview_android_pdfium`: AndroidPdfViewer does not bind Pdfium's
   /// `FPDFText_*` API, so there is nothing to select or search
   /// ([#137](https://github.com/endigo/flutter_pdfview/issues/137),
   /// [#285](https://github.com/endigo/flutter_pdfview/issues/285)).

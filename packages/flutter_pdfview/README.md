@@ -20,16 +20,18 @@ dependencies:
 
 #### Trying the 2.0.0 beta
 
-`2.0.0-beta.1` is the Kotlin/Swift rewrite with a PDFKit **text layer** — search, selection and
-copy control on iOS ([#137](https://github.com/endigo/flutter_pdfview/issues/137),
+`2.0.0-beta.1` is the Kotlin/Swift rewrite with a new Android engine (Android's own PDF
+renderer, no bundled PDFium) and a **text layer** — search, selection and copy control on iOS
+and Android ([#137](https://github.com/endigo/flutter_pdfview/issues/137),
 [#285](https://github.com/endigo/flutter_pdfview/issues/285),
 [#108](https://github.com/endigo/flutter_pdfview/issues/108)) — password unlock
 ([#274](https://github.com/endigo/flutter_pdfview/issues/274)), luminance-preserving
 `PdfColorMode` dark theming ([#215](https://github.com/endigo/flutter_pdfview/issues/215),
 [#138](https://github.com/endigo/flutter_pdfview/issues/138)), animated page navigation and
 configurable page spacing. It is a new major version: pages now follow the app's theme by
-default (pass `colorMode: PdfColorMode.light` for the `1.4.5` look), and iOS now applies settings
-changed on rebuild. See the [CHANGELOG](CHANGELOG.md) for the full list. Pre-releases are not
+default (pass `colorMode: PdfColorMode.light` for the `1.4.5` look), iOS now applies settings
+changed on rebuild, and Android needs Android 9 unless you add the PDFium engine — see
+[Android engines](#android-engines). See the [CHANGELOG](CHANGELOG.md) for the full list. Pre-releases are not
 picked up by a `^` constraint, so pin it explicitly:
 
 ```yaml
@@ -38,6 +40,48 @@ dependencies:
 ```
 
 Feedback is welcome in [#351](https://github.com/endigo/flutter_pdfview/issues/351).
+
+### Android engines
+
+Since 2.0, Android renders PDFs with **Android's own PDF engine** through
+Jetpack [`androidx.pdf`](https://developer.android.com/jetpack/androidx/releases/pdf),
+so your app no longer ships PDFium. It also brings the
+[text layer](#text-layer) — search, selection and copy control — to Android.
+
+It needs **Android 9 (API 28)** and an app that compiles against SDK extension
+19. Set both in `android/app/build.gradle`; without them the build fails with a
+`minSdkVersion` / `compileSdkExtension` error that names `androidx.pdf`:
+
+```groovy
+android {
+    compileSdk 36
+    compileSdkExtension 19   // required by androidx.pdf
+    defaultConfig {
+        minSdkVersion 28
+    }
+}
+```
+
+If your app needs **horizontal paging** (`swipeHorizontal`, `pageFling`,
+`pageSnap`) or must run on **Android 5.0–8.1**, add the opt-in PDFium engine,
+which is the engine `flutter_pdfview` 1.x used, next to `flutter_pdfview`:
+
+```yaml
+dependencies:
+  flutter_pdfview: 2.0.0-beta.1
+  flutter_pdfview_android_pdfium: 1.0.0-beta.1
+```
+
+Nothing else changes in your code; iOS is unaffected.
+
+| | Default (`androidx.pdf`) | `flutter_pdfview_android_pdfium` |
+|---|---|---|
+| Minimum Android | 9 (API 28) | 5.0 (API 21) |
+| Bundled native PDF libraries | None | PDFium, several MB per CPU architecture |
+| Text layer (search, selection, copy control) | ✅ | ❌ (`UnsupportedError`) |
+| Horizontal paging (`swipeHorizontal`, `pageFling`, `pageSnap`) | ❌ vertical only | ✅ |
+| `thumbnailRatio`, `useBestQuality`, `enableAntialiasing`, `enableRenderDuringScale` | Ignored (managed by Android) | ✅ |
+| `setPage(withAnimation:)` | Ignored | ✅ |
 
 ### 2. Install it
 
@@ -103,12 +147,13 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 | thumbnailRatio*       |   ✅    | ❌  |        0.8        |
 
 Notes:
-- ⚠️ `enableTextSelection` on Android only suppresses the long-press callback — AndroidPdfViewer has no selection UI to disable. See [Text layer](#text-layer) for why selection and search are iOS-only, and always check `isTextLayerSupported()` before offering that UI.
+- `enableTextSelection` and `enableCopy` work on iOS and on Android's default engine. With `flutter_pdfview_android_pdfium` there is no text layer, so they have no effect — see [Text layer](#text-layer), and always check `isTextLayerSupported()` before offering that UI.
+- `swipeHorizontal`, `pageFling` and `pageSnap` need `flutter_pdfview_android_pdfium` on Android: the default engine scrolls vertically only. `enableAntialiasing`, `useBestQuality`, `enableRenderDuringScale` and `thumbnailRatio` are PDFium-engine settings and are ignored by the default engine. See [Android engines](#android-engines).
 - `colorMode` themes page content and the gutter on both platforms. Values: `PdfColorMode.light`, `PdfColorMode.dark`, `PdfColorMode.system` (default). `system` follows the app `Theme` brightness (or platform brightness when no `Theme` is present) and is resolved in Dart before being sent to the native view. Dark mode uses a luminance-preserving inversion (hue kept; photos do not become pure negatives). Live updates apply without remounting the platform view.
 - `nightMode` is **deprecated**. Prefer `colorMode`. When `colorMode` is left at `system` and `nightMode: true`, the resolved mode is `dark`. An explicit `colorMode` always wins.
 - `backgroundColor` can be updated at runtime together with `colorMode`. Setting it back to `null` after a non-null value leaves the previous color on screen.
 - `password` can be changed after the first build: the document is reopened in place, so the platform view is not recreated. See [Password-protected documents](#password-protected-documents).
-- `spacing` sets the gap between pages when `autoSpacing` is true (dp on Android, points on iOS). `null` keeps each platform's historical default (Android 0 / 8 with top alignment; iOS 4 top+bottom / 8 bottom-only with top alignment). Creation-time only — remount the view to change it ([#335](https://github.com/endigo/flutter_pdfview/pull/335)).
+- `spacing` sets the gap between pages when `autoSpacing` is true (dp on Android, points on iOS). `null` keeps each platform's default (Android: the default engine's own gap, or 0 / 8 with top alignment on the PDFium engine; iOS 4 top+bottom / 8 bottom-only with top alignment). Creation-time only — remount the view to change it ([#335](https://github.com/endigo/flutter_pdfview/pull/335)).
 - `showScrollIndicators` is ignored on iOS while horizontal page-flipping is active (`pageFling: true` together with `swipeHorizontal: true`).
 - `autoSpacing` only adds gaps between pages. It does not change initial zoom or `fitPolicy` (fixed in [#150](https://github.com/endigo/flutter_pdfview/issues/150)).
 - `thumbnailRatio` must be in `(0, 1]`. Higher values look sharper while tiles load but use more memory.
@@ -129,7 +174,11 @@ should stay sharp when zooming. This plugin sets the platform view’s
 `contentScaleFactor` / layer `contentsScale` to the native display scale so
 Flutter embedding never leaves the layer at 1×.
 
-**Android (AndroidPdfViewer + Pdfium)** rasterizes each page into bitmap tiles:
+**Android, default engine (`androidx.pdf`)**: rendering, tiling and caching are
+managed by Android's own renderer; the knobs below do not apply.
+
+**Android, `flutter_pdfview_android_pdfium` (AndroidPdfViewer + Pdfium)**
+rasterizes each page into bitmap tiles:
 
 | Knob | What it does | Cost |
 |:-----|:-------------|:-----|
@@ -189,7 +238,7 @@ This plugin is a **viewer**, not a form editor. Platform behavior:
 
 | Platform | Engine | Annotation / form field painting |
 |:---------|:-------|:---------------------------------|
-| Android  | Pdfium (via [AndroidPdfViewer](https://github.com/barteksc/AndroidPdfViewer)) | Widget appearance streams (`/AP`) are painted when `enableAnnotationRendering` is on (always enabled by this plugin). Pdfium does **not** regenerate appearances from `/V` + `/DA` the way Adobe Reader does. |
+| Android  | Android's PDF renderer (default, via `androidx.pdf`) or Pdfium (via [AndroidPdfViewer](https://github.com/barteksc/AndroidPdfViewer) in `flutter_pdfview_android_pdfium`) | Widget appearance streams (`/AP`) are painted. Neither regenerates appearances from `/V` + `/DA` the way Adobe Reader does. |
 | iOS      | PDFKit | Uses the system renderer; typically more tolerant of incomplete appearances. |
 
 **Implication:** if a PDF’s form field has a missing, empty, or **broken** `/AP` entry, Android can omit that field even when Adobe shows it. A common producer-side failure mode (seen with PDFBox + incremental saves / digital signing) is an object-number collision where the field’s `/AP` indirect reference is later reused for an XRef stream — the field value is still in the file, but the appearance object is no longer valid. See [#303](https://github.com/endigo/flutter_pdfview/issues/303).
@@ -242,11 +291,11 @@ find-in-document ([#137](https://github.com/endigo/flutter_pdfview/issues/137))
 and blocking copy ([#108](https://github.com/endigo/flutter_pdfview/issues/108))
 all need the document's text layer.
 
-**This is iOS-only today.** PDFKit provides text on iOS. On Android,
-AndroidPdfViewer's `PdfiumCore` binds none of Pdfium's `FPDFText_*` API in Java,
-so there is no text to search or select — even though the bundled `libpdfium`
-does export those symbols natively. Reaching them would require a JNI shim this
-plugin does not yet ship.
+**Supported on iOS (PDFKit) and on Android's default engine (`androidx.pdf`).**
+The opt-in `flutter_pdfview_android_pdfium` engine has no text layer:
+AndroidPdfViewer's `PdfiumCore` binds none of Pdfium's `FPDFText_*` API in Java.
+On Android, a search is case-insensitive in the renderer; `caseSensitive: true`
+filters those hits against the page text.
 
 **Always branch on `isTextLayerSupported()`.** The query methods throw
 `UnsupportedError` where there is no text layer, deliberately: returning an empty
@@ -293,10 +342,10 @@ PDFView(
 
 Both update at runtime without remounting the view. `enableCopy` needs a
 selection to suppress, so `enableTextSelection: false` disables copying too.
-On Android, `enableTextSelection: false` only suppresses the long-press callback
-(there is nothing to select either way), and `enableCopy` has no effect. Note
-that neither prevents screenshots, nor a user extracting text from a copy of the
-file obtained elsewhere.
+On Android's default engine, `enableCopy: false` removes Copy, Copy link and the
+smart actions from the selection menu. With `flutter_pdfview_android_pdfium`
+both settings have no effect. Note that neither prevents screenshots, nor a user
+extracting text from a copy of the file obtained elsewhere.
 
 ### Using PDFView inside a scrollable widget
 
@@ -454,10 +503,13 @@ enableCopy: false, // hide copy/share/look-up in the iOS edit menu
 
 # Dependencies
 
-### Android
+### Android (9.0+)
 
+Jetpack [`androidx.pdf`](https://developer.android.com/jetpack/androidx/releases/pdf)
+(`pdf-viewer`, `pdf-document-service`) on Android's own PDF renderer. The opt-in
+`flutter_pdfview_android_pdfium` package uses
 [AndroidPdfViewer](https://github.com/barteksc/AndroidPdfViewer) (via
-`com.github.marain87:AndroidPdfViewer`)
+`com.github.marain87:AndroidPdfViewer`) and supports Android 5.0+.
 
 ### iOS (13.0+)
 
@@ -465,8 +517,8 @@ enableCopy: false, // hide copy/share/look-up in the iOS edit menu
 
 # Future plans
 
-- Android text layer (JNI shim over Pdfium `FPDFText_*` already present in the AAR)
-- Replace / augment AndroidPdfViewer with MuPDF or the Android native PDF renderer where useful
+- Horizontal paging on the default Android engine, once `androidx.pdf` supports it
+- Text layer for `flutter_pdfview_android_pdfium` (JNI shim over Pdfium `FPDFText_*`)
 - Support other platforms (macOS, Windows, Linux, Web) via the federated interface
 - Improve performance on zooming and page changes
 - More integration tests and device coverage

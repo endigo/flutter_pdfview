@@ -17,6 +17,14 @@ Pre-releases are not picked up by a `^` constraint; pin `flutter_pdfview: 2.0.0-
   `backgroundColor`, `password`, `minZoom` / `maxZoom`, `pageAlignment`,
   `preventLinkNavigation`) are now applied on iOS. `1.4.5` silently ignored them there; Android
   already applied them
+- **BREAKING (Android)**: the default Android engine is now Android's own PDF renderer through
+  Jetpack `androidx.pdf`, replacing AndroidPdfViewer/PDFium. Apps no longer bundle PDFium and gain
+  the text layer on Android, but the app must set `minSdkVersion 28` (Android 9) and
+  `compileSdkExtension 19`, pages scroll vertically only (`swipeHorizontal`, `pageFling`,
+  `pageSnap` are ignored), and the PDFium-specific `enableAntialiasing`, `useBestQuality`,
+  `enableRenderDuringScale`, `thumbnailRatio` and `setPage(withAnimation:)` have no effect. Apps
+  that need horizontal paging or Android 5.0–8.1 add the new opt-in
+  `flutter_pdfview_android_pdfium` package, which keeps the 1.x engine unchanged
 - **BREAKING (build)**: the Android plugin is written in Kotlin (Kotlin Gradle plugin 2.0.0,
   JVM 17) and the iOS plugin in Swift 5.9. Public Dart API, import path and the registered
   native class names are unchanged
@@ -35,13 +43,15 @@ Pre-releases are not picked up by a `^` constraint; pin `flutter_pdfview: 2.0.0-
 - **iOS**: implemented on PDFKit — `findString` with every match highlighted, the active one
   scrolled into view, wrapping navigation, and an edit menu that drops copy / share / look-up
   when `enableCopy` is `false`
-- **Android**: there is no text layer. AndroidPdfViewer's `PdfiumCore` binds none of Pdfium's
-  `FPDFText_*` API in Java, even though the bundled `libpdfium` exports those symbols natively;
-  reaching them needs a JNI shim this plugin does not ship yet. The query methods therefore
-  **throw `UnsupportedError`** rather than returning an empty list, which would be
-  indistinguishable from "this document contains no matches" and would let apps ship broken
-  search unnoticed. Check `isTextLayerSupported()` before offering search or selection UI.
-  `clearSearch` and `clearSelection` remain no-ops everywhere
+- **Android**: implemented on `androidx.pdf` — `searchDocument` with every match highlighted and
+  the active one scrolled into view, wrapping navigation, `PdfView` selection reported through
+  `onTextSelectionChanged`, and `enableCopy: false` removing Copy, Copy link and smart actions
+  from the selection menu. The renderer searches case-insensitively; `caseSensitive: true`
+  filters hits against the page text
+- **`flutter_pdfview_android_pdfium`** has no text layer (AndroidPdfViewer's `PdfiumCore` binds
+  none of Pdfium's `FPDFText_*` API). There the query methods **throw `UnsupportedError`** rather
+  than returning an empty list, which would read as "no matches". Check `isTextLayerSupported()`
+  before offering search or selection UI
 - Adds `example/integration_test/text_layer_test.dart`, which drives the real native viewer, and
   a deterministic text fixture (`scripts/make_text_pdf.py`)
 - Example app: **Search Text in PDF** home action + `TextSearchScreen` (gate on
@@ -51,6 +61,11 @@ Pre-releases are not picked up by a `^` constraint; pin `flutter_pdfview: 2.0.0-
 - Depends on `flutter_pdfview_platform_interface` ^1.1.0
 
 ### Fixes since `1.5.0-beta.12`
+
+- Android: apps on Flutter 3.50's default template (AGP 9 with `android.builtInKotlin=false`)
+  failed to build with "Could not find method kotlin()": the plugin skipped the Kotlin Gradle
+  plugin on AGP 9, and Flutter, matching the plugin's `apply plugin: 'kotlin-android'` text,
+  skipped it too. The plugin now applies it whenever built-in Kotlin is off
 
 - Settings changed while the native view was still being created are no longer dropped: they are
   sent once the view exists
