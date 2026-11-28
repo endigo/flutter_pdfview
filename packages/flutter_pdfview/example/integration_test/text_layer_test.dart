@@ -1,12 +1,15 @@
 // End-to-end coverage for the text layer, driving the real native viewers:
-// PDFKit on iOS and AndroidPdfViewer on Android.
+// PDFKit on iOS, and on Android either the default androidx.pdf engine or the
+// opt-in flutter_pdfview_android_pdfium package.
 //
 //   cd example && flutter test integration_test/text_layer_test.dart
+//   # with the PDFium package added to the example:
+//   flutter test integration_test/text_layer_test.dart --dart-define=PDFVIEW_ENGINE=pdfium
 //
 // The fixture has known text on known pages; see scripts/make_text_pdf.py.
-// Every assertion here is deliberately platform-aware: iOS has a text layer,
-// Android does not, and the point of these tests is that the difference is
-// reported honestly rather than as "no matches found".
+// Every assertion here is deliberately engine-aware: iOS and androidx.pdf have
+// a text layer, the PDFium engine does not, and the point of these tests is
+// that the difference is reported honestly rather than as "no matches found".
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -23,6 +26,12 @@ const String searchTerm = 'searchable';
 const String singleMatchTerm = 'Gamma';
 
 const int textPageCount = 3;
+
+/// Which Android engine the example was built with; see the header comment.
+const String androidEngine = String.fromEnvironment('PDFVIEW_ENGINE', defaultValue: 'androidx');
+
+/// Whether the engine under test is expected to have a text layer.
+bool get expectsTextLayer => Platform.isIOS || (Platform.isAndroid && androidEngine != 'pdfium');
 
 Future<File> copyAsset(String asset, String fileName) async {
   final Directory dir = await getApplicationDocumentsDirectory();
@@ -99,7 +108,7 @@ void main() {
 
     // This is the contract the rest of the suite branches on, so pin it per
     // platform rather than accepting whatever the native side happens to say.
-    expect(supported, Platform.isIOS);
+    expect(supported, expectsTextLayer);
   });
 
   group('search', () {

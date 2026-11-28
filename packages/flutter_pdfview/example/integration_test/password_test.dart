@@ -1,5 +1,5 @@
 // End-to-end coverage for password-protected documents, driving the real native
-// viewers: AndroidPdfViewer on Android and PDFKit on iOS.
+// viewers: PDFKit on iOS, and androidx.pdf (or the opt-in PDFium package) on Android.
 //
 //   cd example && flutter test integration_test/password_test.dart
 //

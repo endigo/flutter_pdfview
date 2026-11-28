@@ -88,3 +88,59 @@ jobs:
         env:
           ANDROID_MODULE: ${{ matrix.module }}
         run: ./scripts/run_android_unit_tests.sh
+
+  emulator:
+    # Drives example/integration_test against the real native viewer.
+    name: Emulator (${{ matrix.engine }} engine, API ${{ matrix.api }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # androidx.pdf's floor: Android 9, where it runs without the
+          # S Extensions 13 system update.
+          - engine: androidx
+            api: 28
+            target: google_apis
+          - engine: androidx
+            api: 35
+            target: google_apis
+          - engine: pdfium
+            api: 35
+            target: google_apis
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Opt the example into the PDFium engine
+        if: matrix.engine == 'pdfium'
+        working-directory: packages/flutter_pdfview/example
+        run: dart pub add 'flutter_pdfview_android_pdfium:{"path":"../../flutter_pdfview_android_pdfium"}'
+      - name: Resolve workspace
+        run: flutter pub get
+      - name: Pre-build the test APK
+        # Building outside the emulator step keeps the emulator's lifetime short.
+        working-directory: packages/flutter_pdfview/example
+        run: flutter build apk --debug
+      - name: Run integration tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          working-directory: packages/flutter_pdfview/example
+          script: flutter test integration_test --dart-define=PDFVIEW_ENGINE=${{ matrix.engine }} -r expanded
