@@ -28,7 +28,9 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId "com.example.flutter_pdfview_example"
-        minSdkVersion flutter.minSdkVersion
+        // flutter_pdfview's default Android engine (androidx.pdf) needs Android 9.
+        // Apps that must run on older devices add flutter_pdfview_android_pdfium.
+        minSdkVersion Math.max(flutter.minSdkVersion, 28)
         targetSdkVersion 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

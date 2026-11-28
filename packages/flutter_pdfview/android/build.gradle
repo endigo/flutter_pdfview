@@ -35,7 +35,6 @@ rootProject.allprojects {
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://jitpack.io' }
     }
 }
 
@@ -75,7 +74,9 @@ android {
     }
 
     defaultConfig {
-        minSdk = 21
+        // androidx.pdf's floor: Android 9. Apps that support older devices
+        // opt into flutter_pdfview_android_pdfium instead.
+        minSdk = 28
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         consumerProguardFiles 'proguard-rules.pro'
     }
@@ -99,14 +100,6 @@ android {
         }
     }
     if (project.android.hasProperty("namespace")) { namespace 'io.endigo.plugins.pdfviewflutter' }
-
-    // #287: pdfium-android ships libc++_shared.so; apps that also pull another
-    // native lib (ffmpeg-kit, etc.) hit mergeDebugNativeLibs conflicts.
-    packaging {
-        jniLibs {
-            pickFirsts += ['**/libc++_shared.so']
-        }
-    }
 }
 
 // Replaces the `kotlinOptions` block, which Built-in Kotlin removes. This form
@@ -122,7 +115,10 @@ dependencies {
         compileOnly files(flutterJar)
         testImplementation files(flutterJar)
     }
-    implementation 'com.github.marain87:AndroidPdfViewer:3.2.8'
+    // Android's own PDF renderer behind Jetpack's PdfView; no bundled PDFium.
+    implementation 'androidx.pdf:pdf-viewer:1.0.0-beta01'
+    implementation 'androidx.pdf:pdf-document-service:1.0.0-beta01'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
     implementation 'androidx.annotation:annotation-jvm:1.9.1'
 
     testImplementation 'junit:junit:4.13.2'

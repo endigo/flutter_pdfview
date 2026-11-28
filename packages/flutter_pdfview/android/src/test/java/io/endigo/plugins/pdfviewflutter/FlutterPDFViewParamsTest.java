@@ -6,8 +6,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
-import com.github.barteksc.pdfviewer.util.FitPolicy;
-
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -236,45 +234,34 @@ public class FlutterPDFViewParamsTest {
     }
 
     @Test
-    public void resolveInterPageSpacingDp_autoSpacingOff_isZero() {
-        assertEquals(0, FlutterPDFView.resolveInterPageSpacingDp(false, true, 20));
-        assertEquals(0, FlutterPDFView.resolveInterPageSpacingDp(false, false, null));
+    public void resolvePageSpacingDp_autoSpacingOff_isZero() {
+        assertEquals(Integer.valueOf(0), FlutterPDFView.resolvePageSpacingDp(false, 20));
+        assertEquals(Integer.valueOf(0), FlutterPDFView.resolvePageSpacingDp(false, null));
     }
 
     @Test
-    public void resolveInterPageSpacingDp_userOverrideWins() {
-        assertEquals(16, FlutterPDFView.resolveInterPageSpacingDp(true, false, 16));
-        assertEquals(0, FlutterPDFView.resolveInterPageSpacingDp(true, true, 0));
+    public void resolvePageSpacingDp_userOverrideWins() {
+        assertEquals(Integer.valueOf(16), FlutterPDFView.resolvePageSpacingDp(true, 16));
+        assertEquals(Integer.valueOf(0), FlutterPDFView.resolvePageSpacingDp(true, 0));
     }
 
     @Test
-    public void resolveInterPageSpacingDp_topAlignDefault_isEight() {
-        assertEquals(8, FlutterPDFView.resolveInterPageSpacingDp(true, true, null));
+    public void resolvePageSpacingDp_negativeOverride_isClampedToZero() {
+        assertEquals(Integer.valueOf(0), FlutterPDFView.resolvePageSpacingDp(true, -4));
     }
 
     @Test
-    public void resolveInterPageSpacingDp_centerDefault_isZero() {
-        assertEquals(0, FlutterPDFView.resolveInterPageSpacingDp(true, false, null));
-    }
-
-    /**
-     * #197: secondary-axis centering math used after setPage / jumpTo.
-     * When the page strip is narrower than the viewport the offset is positive
-     * (centered); when wider it is negative (moveTo clamps).
-     */
-    @Test
-    public void centerSecondaryOffset_pageNarrowerThanViewport_isPositive() {
-        assertEquals(50f, FlutterPDFView.centerSecondaryOffset(200f, 100f), 0.001f);
+    public void resolvePageSpacingDp_noOverride_keepsPdfViewDefault() {
+        assertNull(FlutterPDFView.resolvePageSpacingDp(true, null));
     }
 
     @Test
-    public void centerSecondaryOffset_pageEqualsViewport_isZero() {
-        assertEquals(0f, FlutterPDFView.centerSecondaryOffset(200f, 200f), 0.001f);
-    }
-
-    @Test
-    public void centerSecondaryOffset_pageWiderThanViewport_isNegative() {
-        assertEquals(-50f, FlutterPDFView.centerSecondaryOffset(200f, 300f), 0.001f);
+    public void isBrowserScheme_onlyHttpAndHttps() {
+        assertTrue(FlutterPDFView.isBrowserScheme("https"));
+        assertTrue(FlutterPDFView.isBrowserScheme("HTTP"));
+        assertFalse(FlutterPDFView.isBrowserScheme("file"));
+        assertFalse(FlutterPDFView.isBrowserScheme("intent"));
+        assertFalse(FlutterPDFView.isBrowserScheme(null));
     }
 
     // ---------------------------------------------------- issue #150 independence

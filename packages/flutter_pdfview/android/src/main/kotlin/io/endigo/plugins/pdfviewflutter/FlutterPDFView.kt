@@ -1,35 +1,47 @@
 package io.endigo.plugins.pdfviewflutter
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Rect
-import android.graphics.drawable.ColorDrawable
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import android.util.SparseArray
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.PixelCopy
 import android.view.View
+import android.view.ViewGroup
 import android.view.Window
+import android.widget.FrameLayout
 
 import androidx.annotation.VisibleForTesting
-
-import com.github.barteksc.pdfviewer.PDFView
-import com.github.barteksc.pdfviewer.PDFView.Configurator
-import com.github.barteksc.pdfviewer.link.LinkHandler
-import com.github.barteksc.pdfviewer.scroll.DefaultScrollHandle
-import com.github.barteksc.pdfviewer.util.Constants
-import com.github.barteksc.pdfviewer.util.FitPolicy
-import com.shockwave.pdfium.PdfPasswordException
+import androidx.pdf.Highlight
+import androidx.pdf.PdfDocument
+import androidx.pdf.PdfPasswordException
+import androidx.pdf.PdfPoint
+import androidx.pdf.PdfRect
+import androidx.pdf.SandboxedPdfLoader
+import androidx.pdf.content.ExternalLink
+import androidx.pdf.selection.ContextMenuComponent
+import androidx.pdf.selection.PdfSelectionMenuKeys
+import androidx.pdf.selection.Selection
+import androidx.pdf.selection.model.TextSelection
+import androidx.pdf.view.PdfView
 
 import java.io.File
 import java.io.FileOutputStream
@@ -41,769 +53,599 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.platform.PlatformView
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/**
+ * Android engine built on Jetpack androidx.pdf: Android's own PDF renderer,
+ * loaded in a sandboxed service, behind `PdfView`. It replaces
+ * AndroidPdfViewer/PDFium (now the opt-in `flutter_pdfview_android_pdfium`
+ * package) and speaks the same method-channel contract, plus the text layer.
+ *
+ * Not available here, by design of `PdfView`: horizontal paging
+ * (`swipeHorizontal`, `pageFling`, `pageSnap` are ignored) and Android < 9.
+ */
 class FlutterPDFView(
     private val context: Context,
     messenger: BinaryMessenger,
     id: Int,
-    creationParams: Map<String, Any?>
+    creationParams: Map<String, Any?>,
 ) : PlatformView, MethodCallHandler {
 
-    private var pdfView: PDFView?
-    private var configurator: Configurator? = null
-    private val methodChannel: MethodChannel
-    private val linkHandler: LinkHandler
-    private val onDrawArgs: MutableMap<String, Any> = HashMap()
-    private var lastDrawTime: Long = 0
-    private val displayDensity: Float
-    private val mainHandler = Handler(Looper.getMainLooper())
-
-    /** Mutable so a password set later still reaches the deferred first load. */
+    /** Mutable so a password given later is used by every reopen. */
     private val params: MutableMap<String, Any?> = HashMap(creationParams)
 
-    /** Pending `unlock`, settled from onLoad / onError once the reload lands. */
-    private var pendingUnlockResult: Result? = null
+    private val methodChannel = MethodChannel(messenger, "plugins.endigo.io/pdfview_$id")
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val loader = SandboxedPdfLoader(context, Dispatchers.IO)
+    private val displayDensity = context.resources.displayMetrics.density
+    private val viewId = id
 
-    /**
-     * `setPage` results whose deferred jump has not run yet. [dispose] cancels
-     * the main-handler queue, so it settles these with `false` instead of
-     * leaving the Dart caller awaiting forever.
-     */
-    private val pendingSetPageResults: MutableList<Result> = ArrayList()
-
-    /** Creation / runtime page alignment (#250, #272). Default centers short docs. */
-    private var pageAlignment: PageAlignment = getPageAlignment(params)
-
-    /**
-     * Active color transform, or null for light mode. Stored as the matrix
-     * (not a boolean) so sepia/soft-dark is a one-constant addition later.
-     */
-    private var colorMatrix: FloatArray? = null
-
-    /** Last background requested by Dart (pre-compensation), or null. */
-    private var requestedBackgroundColor: Int? = null
+    private val container = TouchInterceptLayout(context)
+    private var pdfView: PdfView? = PdfView(context, null, 0)
 
     @Volatile
     private var disposed = false
 
-    @Volatile
-    private var documentLoadStarted = false
+    // ---------------------------------------------------------------- document
+    private var document: PdfDocument? = null
+    private var loadJob: Job? = null
+    private var pageCount = 0
+    private var pageWidths = FloatArray(0)
+    private var pageHeights = FloatArray(0)
+    private var maxPageWidth = 0f
+    private var maxPageHeight = 0f
 
-    /** Width/height at the moment load started — used to detect a first-layout resize. */
-    private var loadWidth = 0
-    private var loadHeight = 0
+    /** Copy of `pdfData` on disk; `PdfRenderer` needs a seekable file descriptor. */
+    private var dataFile: File? = null
 
-    /** True once onRender has revealed the view (or load failed and we un-hide). */
-    @Volatile
-    private var contentRevealed = false
+    /** Pending `unlock`, settled once its reopen succeeds or fails. */
+    private var pendingUnlockResult: Result? = null
 
-    /** Remains attached after load so a late size settle can re-fit (#127). */
-    private var sizeSettleListener: View.OnLayoutChangeListener? = null
+    // ---------------------------------------------------------------- layout
+    private val fitPolicy = getFitPolicy(params)
+    private var pageAlignment = getPageAlignment(params)
+    private var minZoomFactor = getFloat(params, "minZoom", DEFAULT_MIN_ZOOM)
+    private var maxZoomFactor = getFloat(params, "maxZoom", DEFAULT_MAX_ZOOM)
 
-    /**
-     * Whether long-press is left enabled (#285). AndroidPdfViewer has no
-     * selection UI, so `false` only suppresses the long-press callback — there is
-     * nothing to select either way. `disableLongpress()` is Configurator-only, so
-     * a runtime change takes effect on the next document load.
-     */
-    private var enableTextSelection: Boolean =
+    /** Absolute zoom of "page fitted per [fitPolicy]"; 0 until measured. */
+    private var fitZoom = 0f
+    private var hasAppliedInitialFit = false
+    private var defaultPage = getInt(params, "defaultPage")
+    private var firstContentLoaded = false
+    private var currentPage = -1
+    private var lastDrawTime = 0L
+    private val onDrawArgs: MutableMap<String, Any> = HashMap()
+
+    // ---------------------------------------------------------------- behaviour
+    private var enableSwipe = getBoolean(params, "enableSwipe", true)
+    private var preventLinkNavigation = getBoolean(params, "preventLinkNavigation")
+    private var enableTextSelection =
         getBoolean(params, "enableTextSelection", DEFAULT_ENABLE_TEXT_SELECTION)
+    private var enableCopy = getBoolean(params, "enableCopy", DEFAULT_ENABLE_COPY)
+
+    /** Active color transform, or null for light mode. */
+    private var colorMatrix: FloatArray? = null
+    private var requestedBackgroundColor: Int? = null
+
+    // ---------------------------------------------------------------- text layer
+    private class SearchMatch(val page: Int, val bounds: List<RectF>, val text: String)
+
+    private var searchMatches: List<SearchMatch> = emptyList()
+    private var currentSearchIndex = -1
+    private var searchJob: Job? = null
+    private var lastReportedSelectionText: String? = null
 
     init {
-        val view = PDFView(context, null)
-        pdfView = view
-        // Stay invisible until first successful render so transitions / first
-        // layout do not flash an empty or wrongly-fitted surface (#40, #127).
-        // Also avoids premature Hybrid Composition draws (#263, #280).
-        view.visibility = View.INVISIBLE
-        displayDensity = context.resources.displayMetrics.density
-        val preventLinkNavigation = getBoolean(params, "preventLinkNavigation")
-
-        methodChannel = MethodChannel(messenger, "plugins.endigo.io/pdfview_$id")
+        val view = pdfView!!
+        container.addView(
+            view,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
         methodChannel.setMethodCallHandler(this)
 
-        linkHandler = PDFLinkHandler(context, view, methodChannel, preventLinkNavigation)
+        if (getBoolean(params, "swipeHorizontal")) {
+            Log.w(
+                TAG,
+                "swipeHorizontal is not supported by the androidx.pdf engine; pages scroll " +
+                    "vertically. Add flutter_pdfview_android_pdfium for horizontal paging.",
+            )
+        }
 
-        // Quality defaults match Dart PDFView so incomplete param maps still render
-        // with ARGB_8888, antialiasing, and live re-render while pinching (#158).
-        view.useBestQuality(
-            getBoolean(params, "useBestQuality", DEFAULT_USE_BEST_QUALITY)
-        )
-        view.enableRenderDuringScale(
-            getBoolean(params, "enableRenderDuringScale", DEFAULT_ENABLE_RENDER_DURING_SCALE)
-        )
-        applyDisplayQualityDefaults(displayDensity, params)
+        applyPagePlacement(view)
+        if (!getBoolean(params, "showScrollIndicators")) {
+            hideFastScroller(view)
+        }
 
-        // Record creation-time theme; single applyColorTheme (no loadPages yet).
         requestedBackgroundColor = (params["backgroundColor"] as? Number)?.toInt()
         colorMatrix = resolveColorMatrix(params)
-        applyColorTheme(reloadPages = false)
+        applyColorTheme()
 
-        // Defer load until the view has a non-zero size so Pdfium does not render
-        // into a zero-sized / unattached surface (#298 blank, #280 quick-open crash).
-        val initialLayoutListener = object : View.OnLayoutChangeListener {
-            override fun onLayoutChange(
-                v: View, left: Int, top: Int, right: Int, bottom: Int,
-                oldLeft: Int, oldTop: Int, oldRight: Int, oldBottom: Int
-            ) {
-                val currentView = pdfView
-                if (documentLoadStarted || disposed || currentView == null) {
-                    return
-                }
-                if (right - left <= 0 || bottom - top <= 0) {
-                    return
-                }
-                currentView.removeOnLayoutChangeListener(this)
-                loadDocument()
-                // Keep INVISIBLE until onRender — do not flash mid-load (#40).
-            }
-        }
-        view.addOnLayoutChangeListener(initialLayoutListener)
-        // Fallback if layout already has size (e.g. recycled view / tests).
-        view.post {
-            val currentView = pdfView
-            if (disposed || currentView == null || documentLoadStarted) {
-                return@post
-            }
-            if (currentView.width > 0 && currentView.height > 0) {
-                currentView.removeOnLayoutChangeListener(initialLayoutListener)
-                loadDocument()
-            }
-        }
+        installListeners(view)
+        openDocument(passwordParam(), result = null)
     }
 
-    private fun revealContent() {
-        if (contentRevealed || disposed) {
-            return
+    override fun getView(): View = container
+
+    // ================================================================ loading
+
+    private fun passwordParam(): String? = (params["password"] as? String)?.takeIf { it.isNotEmpty() }
+
+    /** URI of the document to open, writing `pdfData` to a private file first. */
+    private suspend fun documentUri(): Uri? {
+        val filePath = params["filePath"] as? String
+        if (filePath != null) {
+            return getURI(filePath)
         }
-        contentRevealed = true
-        pdfView?.visibility = View.VISIBLE
+        val data = params["pdfData"] as? ByteArray ?: return null
+        val existing = dataFile
+        if (existing != null && existing.exists()) {
+            return Uri.fromFile(existing)
+        }
+        val file = withContext(Dispatchers.IO) {
+            val dir = File(context.cacheDir, DATA_DIR).apply { mkdirs() }
+            File.createTempFile("pdfview_${viewId}_", ".pdf", dir).also { it.writeBytes(data) }
+        }
+        dataFile = file
+        return Uri.fromFile(file)
     }
 
     /**
-     * When the first non-zero layout is not the final size (common with hybrid
-     * composition and nested containers), re-apply default fit so the first
-     * painted frame matches the settled bounds (#127).
+     * Opens (or reopens) the document with [password]. [result], when given, is
+     * settled with whether the document is now readable.
      */
-    private fun attachSizeSettleListener(view: PDFView) {
-        sizeSettleListener?.let { view.removeOnLayoutChangeListener(it) }
-        val listener = View.OnLayoutChangeListener { v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
-            if (disposed || pdfView == null) {
-                return@OnLayoutChangeListener
-            }
-            val newW = right - left
-            val newH = bottom - top
-            val oldW = oldRight - oldLeft
-            val oldH = oldBottom - oldTop
-            if (newW <= 0 || newH <= 0) {
-                return@OnLayoutChangeListener
-            }
-            // Only care about meaningful size changes after load.
-            if (loadWidth <= 0 || loadHeight <= 0) {
-                return@OnLayoutChangeListener
-            }
-            val sizeChanged =
-                kotlin.math.abs(newW - loadWidth) > 1 || kotlin.math.abs(newH - loadHeight) > 1
-            val grewFromPrevious =
-                kotlin.math.abs(newW - oldW) > 1 || kotlin.math.abs(newH - oldH) > 1
-            if (!sizeChanged || !grewFromPrevious) {
-                return@OnLayoutChangeListener
-            }
-            // User still at default fit zoom (1f) — re-fit to new size.
-            val current = pdfView ?: return@OnLayoutChangeListener
-            if (current.pageCount <= 0) {
-                return@OnLayoutChangeListener
-            }
-            val atDefaultZoom = kotlin.math.abs(current.zoom - 1f) < 0.02f
-            if (!atDefaultZoom) {
-                // User has zoomed; stop watching for settle re-fit.
-                sizeSettleListener?.let { current.removeOnLayoutChangeListener(it) }
-                sizeSettleListener = null
-                return@OnLayoutChangeListener
-            }
-            loadWidth = newW
-            loadHeight = newH
+    private fun openDocument(password: String?, result: Result?) {
+        // A newer open supersedes one still in flight.
+        completeUnlock(false)
+        pendingUnlockResult = result
+        loadJob?.cancel()
+        loadJob = scope.launch {
             try {
-                // jumpTo + zoomTo(1) forces AndroidPdfViewer to recompute fit
-                // against the new viewport after the late size settle.
-                current.zoomTo(1f)
-                current.loadPages()
-                current.invalidate()
+                val uri = documentUri()
+                if (uri == null) {
+                    reportError("cannot create document: No filePath or pdfData provided.")
+                    completeUnlock(false)
+                    return@launch
+                }
+                val opened = loader.openDocument(uri, password)
+                if (disposed) {
+                    opened.close()
+                    return@launch
+                }
+                val infos = opened.getPageInfos(0 until opened.pageCount)
+                onDocumentOpened(opened, infos)
+                completeUnlock(true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: PdfPasswordException) {
+                if (!disposed) {
+                    notifyPasswordRequired(passwordSupplied = !password.isNullOrEmpty())
+                    reportError(e.toString())
+                }
+                completeUnlock(false)
             } catch (e: Exception) {
-                Log.w(TAG, "size-settle re-fit", e)
+                Log.w(TAG, "openDocument", e)
+                if (!disposed) {
+                    reportError(e.toString())
+                }
+                completeUnlock(false)
             }
         }
-        sizeSettleListener = listener
-        view.addOnLayoutChangeListener(listener)
-        // Drop the settle listener after a short window — only first-load
-        // wrong size is in scope (#127), not every later resize/rotation
-        // (library onSizeChanged already handles those).
-        mainHandler.postDelayed({
-            val current = pdfView
-            val settle = sizeSettleListener
-            if (current != null && settle != null) {
-                current.removeOnLayoutChangeListener(settle)
-            }
-            sizeSettleListener = null
-        }, SIZE_SETTLE_WINDOW_MS)
     }
 
-    private fun loadDocument() {
-        val view = pdfView
-        if (disposed || view == null || documentLoadStarted) {
+    private fun onDocumentOpened(opened: PdfDocument, infos: List<PdfDocument.PageInfo>) {
+        val view = pdfView ?: run {
+            opened.close()
             return
         }
-        documentLoadStarted = true
-        loadWidth = view.width
-        loadHeight = view.height
-        var config: Configurator? = null
-        if (params["filePath"] != null) {
-            val filePath = params["filePath"] as String
-            // Prefer fromFile for absolute filesystem paths (#266 No content provider).
-            val uri = getURI(filePath)
-            config = if ("file" == uri.scheme || uri.scheme == null) {
-                val file = File(if (filePath.startsWith("file:")) uri.path!! else filePath)
-                if (file.exists()) {
-                    view.fromFile(file)
-                } else {
-                    view.fromUri(uri)
-                }
-            } else {
-                view.fromUri(uri)
+        val previous = document
+        document = opened
+        pageCount = opened.pageCount
+        pageWidths = FloatArray(pageCount)
+        pageHeights = FloatArray(pageCount)
+        for (info in infos) {
+            if (info.pageNum in 0 until pageCount) {
+                pageWidths[info.pageNum] = info.width.toFloat()
+                pageHeights[info.pageNum] = info.height.toFloat()
             }
-        } else if (params["pdfData"] != null) {
-            val data = params["pdfData"] as ByteArray
-            config = view.fromBytes(data)
         }
+        maxPageWidth = pageWidths.maxOrNull() ?: 0f
+        maxPageHeight = pageHeights.maxOrNull() ?: 0f
 
-        if (config != null) {
-            // PageAlignment.top disables AndroidPdfViewer's autoSpacing "center each
-            // page in the viewport" pads (#250). Keep a small fixed gap when the user
-            // still asked for spacing between multi-page documents. Optional Dart
-            // `spacing` (#335) overrides the historical default when present.
-            val userAutoSpacing = getBoolean(params, "autoSpacing")
-            val topAlign = pageAlignment == PageAlignment.TOP
-            val effectiveAutoSpacing = userAutoSpacing && !topAlign
-            val interPageSpacingDp = resolveInterPageSpacingDp(
-                autoSpacing = userAutoSpacing,
-                topAlign = topAlign,
-                spacing = getIntOrNull(params, "spacing"),
-            )
-            // Do not call nightMode() — hardware-layer colorMode is applied via
-            // applyColorTheme(); composing both would double-invert.
-            config
-                .enableSwipe(getBoolean(params, "enableSwipe"))
-                .swipeHorizontal(getBoolean(params, "swipeHorizontal"))
-                .password(getString(params, "password"))
-                .autoSpacing(effectiveAutoSpacing)
-                .spacing(interPageSpacingDp)
-                .pageFling(getBoolean(params, "pageFling"))
-                .pageSnap(getBoolean(params, "pageSnap"))
-                .pageFitPolicy(getFitPolicy(params))
-                .enableAnnotationRendering(true)
-                .scrollHandle(
-                    if (getBoolean(params, "showScrollIndicators")) DefaultScrollHandle(context) else null
-                )
-                .linkHandler(linkHandler)
-                .enableAntialiasing(
-                    getBoolean(params, "enableAntialiasing", DEFAULT_ENABLE_ANTIALIASING)
-                )
-                .enableDoubletap(true)
-                .defaultPage(getInt(params, "defaultPage"))
-                // First-class tap callback (#133). Return false so links and
-                // double-tap zoom still receive the event.
-                .onTap { _ ->
+        firstContentLoaded = false
+        hasAppliedInitialFit = false
+        currentPage = -1
+        clearSearchState(notify = false)
+
+        view.pdfDocument = opened
+        previous?.close()
+        applyFitZoom(view)
+
+        methodChannel.invokeMethod("onLoadComplete", mapOf("pages" to pageCount))
+    }
+
+    private fun onFirstContentLoad() {
+        val view = pdfView ?: return
+        if (disposed || document == null) return
+        firstContentLoaded = true
+        applyFitZoom(view)
+        if (defaultPage in 1 until pageCount) {
+            view.scrollToPage(defaultPage)
+        }
+        updateCurrentPage(view, force = true)
+        methodChannel.invokeMethod("onRender", mapOf("pages" to pageCount))
+    }
+
+    // ================================================================ listeners
+
+    private fun installListeners(view: PdfView) {
+        view.addOnFirstContentLoadListener { onFirstContentLoad() }
+
+        view.addOnViewportChangedListener(object : PdfView.OnViewportChangedListener {
+            override fun onViewportChanged(
+                firstVisiblePage: Int,
+                visiblePagesCount: Int,
+                pageLocations: SparseArray<RectF>,
+                zoomLevel: Float,
+            ) {
+                if (disposed) return
+                updateCurrentPage(view, firstVisiblePage, pageLocations)
+                reportDraw(view)
+            }
+        })
+
+        view.setLinkClickListener(object : PdfView.LinkClickListener {
+            override fun onLinkClicked(externalLink: ExternalLink): Boolean {
+                handleExternalLink(externalLink.uri.toString())
+                // Always handled here: only http(s) is opened, and only when the
+                // app has not asked to handle links itself.
+                return true
+            }
+        })
+
+        view.addOnSelectionChangedListener(object : PdfView.OnSelectionChangedListener {
+            override fun onSelectionChanged(newSelection: Selection?) {
+                onSelectionChanged(view, newSelection)
+            }
+        })
+
+        view.addSelectionMenuItemPreparer(object : PdfView.SelectionMenuItemPreparer {
+            override fun onPrepareSelectionMenuItems(components: MutableList<ContextMenuComponent>) {
+                if (!enableCopy) {
+                    components.removeAll { it.key in COPY_MENU_KEYS }
+                }
+            }
+        })
+
+        val tapDetector = GestureDetector(
+            context,
+            object : GestureDetector.SimpleOnGestureListener() {
+                override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                     if (!disposed) {
                         methodChannel.invokeMethod("onTap", null)
                     }
-                    false
+                    return false
                 }
-                .apply {
-                    // Nothing to select in 3.2.8; this only stops the long-press
-                    // callback from firing (#108, #285).
-                    if (!enableTextSelection) {
-                        disableLongpress()
-                    }
-                }
-                .onPageChange { page, total ->
-                    if (disposed) return@onPageChange
-                    val args: MutableMap<String, Any> = HashMap()
-                    args["page"] = page
-                    args["total"] = total
-                    methodChannel.invokeMethod("onPageChanged", args)
-                }
-                .onError { t ->
-                    // Always settle a pending unlock, even after dispose, so an
-                    // awaiting Dart caller is never left hanging.
-                    completeUnlock(false)
-                    if (disposed) return@onError
-                    // Un-hide so the host is not stuck with an invisible view
-                    // after a failed open.
-                    revealContent()
-                    if (isPasswordError(t)) {
-                        notifyPasswordRequired()
-                    }
-                    val args: MutableMap<String, Any> = HashMap()
-                    args["error"] = t.toString()
-                    methodChannel.invokeMethod("onError", args)
-                }.onPageError { page, t ->
-                    if (disposed) return@onPageError
-                    val args: MutableMap<String, Any> = HashMap()
-                    args["page"] = page
-                    args["error"] = t.toString()
-                    methodChannel.invokeMethod("onPageError", args)
-                }.onRender { pages ->
-                    if (disposed) return@onRender
-                    // First painted frame — safe to show (#40). Then watch for a
-                    // late size settle that needs a re-fit (#127).
-                    revealContent()
-                    attachSizeSettleListener(view)
-                    // One more pass on the next frame in case the surface size
-                    // changed between load and first draw; then re-center the
-                    // secondary axis and apply PageAlignment.top (#197, #250).
-                    view.post {
-                        if (disposed || pdfView == null) return@post
-                        try {
-                            if (kotlin.math.abs(view.zoom - 1f) < 0.02f &&
-                                (view.width != loadWidth || view.height != loadHeight) &&
-                                view.width > 0 && view.height > 0
-                            ) {
-                                loadWidth = view.width
-                                loadHeight = view.height
-                                view.zoomTo(1f)
-                                view.loadPages()
-                            }
-                            applyPagePlacement(view)
-                            view.invalidate()
-                        } catch (e: Exception) {
-                            Log.w(TAG, "post-render re-fit", e)
-                        }
-                    }
-                    val args: MutableMap<String, Any> = HashMap()
-                    args["pages"] = pages
-                    methodChannel.invokeMethod("onRender", args)
-                }.onDraw { _, _, _, _ ->
-                    if (disposed) return@onDraw
-                    // Monotonic: a wall-clock rollback would otherwise suppress onDraw.
-                    val now = SystemClock.uptimeMillis()
-                    if (now - lastDrawTime < DRAW_THROTTLE_MS) return@onDraw
-                    lastDrawTime = now
-                    onDrawArgs.clear()
-                    onDrawArgs["pdfXOffset"] = view.currentXOffset / displayDensity
-                    onDrawArgs["pdfYOffset"] = view.currentYOffset / displayDensity
-                    onDrawArgs["pdfScale"] = view.zoom
-                    methodChannel.invokeMethod("onDraw", onDrawArgs)
-                }.onLoad { nbPages ->
-                    // The document opened, so a pending unlock succeeded.
-                    completeUnlock(true)
-                    if (disposed) return@onLoad
-                    val args: MutableMap<String, Any> = HashMap()
-                    args["pages"] = nbPages
-                    methodChannel.invokeMethod("onLoadComplete", args)
-                }.load()
-
-            val effectiveMax = getFloat(params, "maxZoom", DEFAULT_MAX_ZOOM)
-            var effectiveMin = getFloat(params, "minZoom", DEFAULT_MIN_ZOOM)
-            if (effectiveMin > effectiveMax) {
-                effectiveMin = effectiveMax
-            }
-            view.maxZoom = effectiveMax
-            view.minZoom = effectiveMin
-        } else {
-            // No filePath / pdfData — reveal so the host is not stuck hidden.
-            revealContent()
-            // No load callback will ever settle an unlock queued before this.
-            completeUnlock(false)
+            },
+        )
+        container.interceptor = { event ->
+            tapDetector.onTouchEvent(event)
+            // enableSwipe: false keeps the reader on the current position by
+            // withholding one-finger drags; pinch-zoom and taps still work.
+            !enableSwipe && event.pointerCount == 1 && event.actionMasked == MotionEvent.ACTION_MOVE
         }
-        configurator = config
+
+        container.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            if ((right - left) != (oldRight - oldLeft) || (bottom - top) != (oldBottom - oldTop)) {
+                pdfView?.let { applyFitZoom(it) }
+            }
+        }
     }
 
-    override fun getView(): View? {
-        return pdfView
+    private fun updateCurrentPage(
+        view: PdfView,
+        firstVisiblePage: Int = view.firstVisiblePage,
+        pageLocations: SparseArray<RectF>? = null,
+        force: Boolean = false,
+    ) {
+        if (pageCount <= 0) return
+        var page = firstVisiblePage
+        if (pageLocations != null && pageLocations.size() > 0) {
+            val n = pageLocations.size()
+            val pages = IntArray(n)
+            val tops = FloatArray(n)
+            val bottoms = FloatArray(n)
+            for (i in 0 until n) {
+                pages[i] = pageLocations.keyAt(i)
+                val rect = pageLocations.valueAt(i)
+                tops[i] = rect.top
+                bottoms[i] = rect.bottom
+            }
+            page = ViewportMath.mostVisiblePage(
+                pages, tops, bottoms, view.height.toFloat(), firstVisiblePage,
+            )
+        }
+        page = page.coerceIn(0, pageCount - 1)
+        if ((page != currentPage || force) && firstContentLoaded) {
+            currentPage = page
+            methodChannel.invokeMethod(
+                "onPageChanged",
+                mapOf("page" to page, "total" to pageCount),
+            )
+        }
     }
+
+    private fun reportDraw(view: PdfView) {
+        // Monotonic: a wall-clock rollback would otherwise suppress onDraw.
+        val now = SystemClock.uptimeMillis()
+        if (now - lastDrawTime < DRAW_THROTTLE_MS) return
+        lastDrawTime = now
+        onDrawArgs.clear()
+        onDrawArgs["pdfXOffset"] = -view.scrollX / displayDensity
+        onDrawArgs["pdfYOffset"] = -view.scrollY / displayDensity
+        onDrawArgs["pdfScale"] = ViewportMath.toRelativeScale(view.zoom, fitZoom)
+        methodChannel.invokeMethod("onDraw", onDrawArgs)
+    }
+
+    private fun handleExternalLink(uri: String) {
+        if (disposed) return
+        if (!preventLinkNavigation && isBrowserScheme(Uri.parse(uri).scheme)) {
+            // Only browser links are launched: file:// throws on API 24+, and
+            // intent:// / content:// can reach host-app components.
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri))
+                    .addCategory(Intent.CATEGORY_BROWSABLE)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+            } catch (e: ActivityNotFoundException) {
+                Log.w(TAG, "No activity for link $uri", e)
+            } catch (e: RuntimeException) {
+                Log.w(TAG, "Failed to open link $uri", e)
+            }
+        }
+        methodChannel.invokeMethod("onLinkHandler", uri)
+    }
+
+    // ================================================================ zoom / placement
+
+    /** Re-derives [fitZoom] and PdfView's absolute zoom limits from the current size. */
+    private fun applyFitZoom(view: PdfView) {
+        val newFit = ViewportMath.fitZoom(
+            fitPolicy, container.width, container.height, maxPageWidth, maxPageHeight,
+        )
+        if (newFit <= 0f) return
+        val relative = if (hasAppliedInitialFit) {
+            ViewportMath.toRelativeScale(view.zoom, fitZoom)
+        } else {
+            1f
+        }
+        fitZoom = newFit
+        applyZoomLimits(view)
+        view.zoom = ViewportMath.toViewZoom(relative, fitZoom)
+        hasAppliedInitialFit = true
+    }
+
+    private fun applyZoomLimits(view: PdfView) {
+        if (fitZoom <= 0f) return
+        var min = minZoomFactor
+        val max = maxZoomFactor
+        if (min > max) {
+            // Same rule as AndroidPdfViewer's creation path.
+            min = max
+        }
+        view.minZoom = ViewportMath.toViewZoom(min, fitZoom)
+        view.maxZoom = ViewportMath.toViewZoom(max, fitZoom)
+    }
+
+    private fun applyPagePlacement(view: PdfView) {
+        view.verticalAlignment = if (pageAlignment == PageAlignment.TOP) {
+            PdfView.VERTICAL_ALIGNMENT_TOP
+        } else {
+            PdfView.VERTICAL_ALIGNMENT_CENTER
+        }
+        val spacingDp = resolvePageSpacingDp(
+            autoSpacing = getBoolean(params, "autoSpacing", true),
+            spacing = getIntOrNull(params, "spacing"),
+        )
+        if (spacingDp != null) {
+            view.verticalPageSpacing = (spacingDp * displayDensity).toInt()
+        }
+    }
+
+    private fun hideFastScroller(view: PdfView) {
+        view.fastScrollVerticalThumbDrawable = ColorDrawable(Color.TRANSPARENT)
+        view.fastScrollPageIndicatorBackgroundDrawable = ColorDrawable(Color.TRANSPARENT)
+    }
+
+    // ================================================================ color
+
+    /**
+     * Applies [colorMatrix] as a hardware-layer color filter, compensating the
+     * gutter background so it still shows the color Dart asked for (the matrix is
+     * an involution). Same approach as the PDFium engine.
+     */
+    private fun applyColorTheme() {
+        val view = pdfView ?: return
+        val matrix = colorMatrix
+        if (matrix != null) {
+            val paint = Paint().apply {
+                colorFilter = ColorMatrixColorFilter(ColorMatrix(matrix.copyOf()))
+            }
+            view.setLayerType(View.LAYER_TYPE_HARDWARE, paint)
+            view.setBackgroundColor(
+                requestedBackgroundColor?.let { PdfColorMatrix.transformColor(it, matrix) }
+                    ?: Color.TRANSPARENT,
+            )
+        } else {
+            view.setLayerType(View.LAYER_TYPE_NONE, null)
+            view.setBackgroundColor(requestedBackgroundColor ?: Color.TRANSPARENT)
+        }
+        view.invalidate()
+    }
+
+    private fun resolveColorMatrix(settings: Map<String, Any?>): FloatArray? {
+        if (settings.containsKey("colorMode")) {
+            return matrixForColorMode(settings["colorMode"] as? String)
+        }
+        return if (getBoolean(settings, "nightMode")) PdfColorMatrix.LUMINANCE_INVERT else null
+    }
+
+    private fun matrixForColorMode(mode: String?): FloatArray? =
+        if (mode == "dark") PdfColorMatrix.LUMINANCE_INVERT else null
+
+    // ================================================================ method channel
 
     override fun onMethodCall(methodCall: MethodCall, result: Result) {
+        if (disposed) {
+            result.success(null)
+            return
+        }
         when (methodCall.method) {
-            "pageCount" -> getPageCount(result)
+            "pageCount" -> result.success(pageCount)
             "currentPageSize" -> getCurrentPageSize(result)
             "getPosition" -> getPosition(result)
-            "getScale" -> getScale(result)
+            "getScale" -> result.success(
+                pdfView?.let { ViewportMath.toRelativeScale(it.zoom, fitZoom) } ?: 1f,
+            )
             "setPosition" -> setPosition(methodCall, result)
             "setScale" -> setScale(methodCall, result)
             "getScreenshot" -> getScreenshot(methodCall, result)
-            "reload" -> reload(result)
+            "reload" -> {
+                openDocument(passwordParam(), result = null)
+                result.success(true)
+            }
             "unlock" -> unlock(methodCall, result)
-            "currentPage" -> getCurrentPage(result)
+            "currentPage" -> result.success(currentPage.coerceAtLeast(0))
             "setPage" -> setPage(methodCall, result)
-            "updateSettings" -> updateSettings(methodCall, result)
+            "updateSettings" -> {
+                @Suppress("UNCHECKED_CAST")
+                applySettings(methodCall.arguments as? Map<String, Any?> ?: emptyMap())
+                result.success(null)
+            }
             "setZoomLimits" -> setZoomLimits(methodCall, result)
-            "isTextLayerSupported" -> result.success(false)
-            // #137 / #285: AndroidPdfViewer 3.2.8 ships a libpdfium that exports
-            // the FPDFText_* family, but PdfiumCore binds none of it in Java, so
-            // there is no text to search or select. Fail loudly rather than
-            // returning an empty result, which an app would read as "this
-            // document contains no matches".
-            "searchText",
-            "nextMatch",
-            "previousMatch",
-            "setCurrentMatch",
-            "getSelectedText" -> textLayerUnsupported(result)
-            // Clearing nothing is a truthful outcome, so these stay no-ops.
-            "clearSearch", "clearSelection" -> result.success(null)
+            "isTextLayerSupported" -> result.success(true)
+            "searchText" -> searchText(methodCall, result)
+            "nextMatch" -> result.success(
+                activateMatch(ViewportMath.nextMatchIndex(currentSearchIndex, searchMatches.size)),
+            )
+            "previousMatch" -> result.success(
+                activateMatch(
+                    ViewportMath.previousMatchIndex(currentSearchIndex, searchMatches.size),
+                ),
+            )
+            "setCurrentMatch" -> result.success(
+                activateMatch(methodCall.argument<Number>("index")?.toInt() ?: -1),
+            )
+            "clearSearch" -> {
+                clearSearchState(notify = true)
+                result.success(null)
+            }
+            "getSelectedText" -> result.success(selectedText())
+            "clearSelection" -> {
+                clearSelection(notify = true)
+                result.success(null)
+            }
             else -> result.notImplemented()
         }
     }
 
-    /** Reports that this platform has no text layer at all (#137, #285). */
-    private fun textLayerUnsupported(result: Result) {
-        result.error(
-            TEXT_LAYER_UNSUPPORTED_CODE,
-            "flutter_pdfview has no text layer on Android: AndroidPdfViewer " +
-                "$ANDROID_PDF_VIEWER_VERSION does not bind Pdfium's FPDFText_* API in Java. " +
-                "Check PDFViewController.isTextLayerSupported() before offering search or " +
-                "selection UI. See https://github.com/endigo/flutter_pdfview/issues/137",
-            null,
-        )
-    }
-
-    fun getPageCount(result: Result) {
-        val view = pdfView
-        if (disposed || view == null) {
-            result.success(0)
-            return
-        }
-        result.success(view.pageCount)
-    }
-
-    fun getCurrentPageSize(result: Result) {
-        val view = pdfView
-        if (disposed || view == null) {
-            result.error("INVALID_STATE", "PDFView disposed", null)
-            return
-        }
-        if (view.pageCount == 0) {
+    private fun getCurrentPageSize(result: Result) {
+        val page = currentPage.coerceAtLeast(0)
+        if (pageCount == 0 || page >= pageCount) {
             result.error("INVALID_STATE", "No pages loaded", null)
             return
         }
-        val size = view.getPageSize(view.currentPage)
-        if (size == null) {
-            result.error("FAIL", "Could not get page size", null)
-            return
-        }
-        result.success(floatArrayOf(size.width, size.height))
+        // Same unit as the PDFium engine: pixels at the fitted zoom.
+        val zoom = if (fitZoom > 0f) fitZoom else 1f
+        result.success(floatArrayOf(pageWidths[page] * zoom, pageHeights[page] * zoom))
     }
 
-    fun getPosition(result: Result) {
-        val view = pdfView
-        if (disposed || view == null) {
+    private fun getPosition(result: Result) {
+        val view = pdfView ?: run {
             result.error("INVALID_STATE", "PDFView disposed", null)
             return
         }
-        val xOffset = view.currentXOffset / displayDensity
-        val yOffset = view.currentYOffset / displayDensity
-
-        result.success(floatArrayOf(xOffset, yOffset))
+        // Negative scroll offsets, as AndroidPdfViewer reported them.
+        result.success(
+            floatArrayOf(-view.scrollX / displayDensity, -view.scrollY / displayDensity),
+        )
     }
 
-    fun getScale(result: Result) {
-        val view = pdfView
-        if (disposed || view == null) {
-            result.success(1.0f)
-            return
-        }
-        result.success(view.zoom)
-    }
-
-    fun setPosition(call: MethodCall, result: Result) {
-        val view = pdfView
-        if (disposed || view == null) {
+    private fun setPosition(call: MethodCall, result: Result) {
+        val view = pdfView ?: run {
             result.success(false)
             return
         }
-        val xPosObj = call.argument<Double>("xPos")
-        val xOffset = xPosObj ?: 0.0
-        val yPosObj = call.argument<Double>("yPos")
-        val yOffset = yPosObj ?: 0.0
-        view.moveTo(xOffset.toFloat() * displayDensity, yOffset.toFloat() * displayDensity)
-        view.loadPages()
+        val x = call.argument<Number>("xPos")?.toFloat() ?: 0f
+        val y = call.argument<Number>("yPos")?.toFloat() ?: 0f
+        view.scrollTo((-x * displayDensity).toInt(), (-y * displayDensity).toInt())
         result.success(true)
     }
 
-    fun setScale(call: MethodCall, result: Result) {
-        val view = pdfView
-        if (disposed || view == null) {
+    private fun setScale(call: MethodCall, result: Result) {
+        val view = pdfView ?: run {
             result.success(false)
             return
         }
-        val scaleObj = call.argument<Double>("scale")
-        val zoom = scaleObj ?: 1.0
-
-        view.zoomTo(zoom.toFloat())
-        view.loadPages()
+        val scale = call.argument<Number>("scale")?.toFloat() ?: 1f
+        if (fitZoom > 0f) {
+            view.zoom = ViewportMath.toViewZoom(scale, fitZoom)
+        }
         result.success(true)
     }
 
-    fun setZoomLimits(call: MethodCall, result: Result) {
-        val view = pdfView
-        if (disposed || view == null) {
-            result.success(false)
-            return
-        }
-        val minZoom = call.argument<Double>("minZoom")
-        val midZoom = call.argument<Double>("midZoom")
-        val maxZoom = call.argument<Double>("maxZoom")
-        val minZ = minZoom ?: 1.0
-        val midZ = midZoom ?: 1.0
-        val maxZ = maxZoom ?: 1.0
-        if (minZ <= 0 || midZ <= 0 || maxZ <= 0 || minZ > midZ || midZ > maxZ) {
+    private fun setZoomLimits(call: MethodCall, result: Result) {
+        val min = call.argument<Number>("minZoom")?.toFloat() ?: 1f
+        val mid = call.argument<Number>("midZoom")?.toFloat() ?: 1f
+        val max = call.argument<Number>("maxZoom")?.toFloat() ?: 1f
+        if (min <= 0f || mid <= 0f || max <= 0f || min > mid || mid > max) {
             result.error("INVALID_ARGS", "Expected 0 < minZoom ≤ midZoom ≤ maxZoom", null)
             return
         }
-        view.minZoom = minZ.toFloat()
-        view.midZoom = midZ.toFloat()
-        view.maxZoom = maxZ.toFloat()
+        // PdfView's double tap has its own targets, so midZoom is validated
+        // for compatibility but has no effect.
+        minZoomFactor = min
+        maxZoomFactor = max
+        pdfView?.let { applyZoomLimits(it) }
         result.success(true)
     }
 
-    fun getScreenshot(call: MethodCall, result: Result) {
-        val pdfFileName = call.argument<String>("fileName")
-        if (pdfFileName == null || pdfFileName.isEmpty()) {
-            result.error("FAIL", "fileName is required", null)
-            return
-        }
-        val outputFile = File(pdfFileName)
-        if (outputFile.parentFile == null) {
-            result.error("FAIL", "fileName must include a directory path", null)
-            return
-        }
+    private fun setPage(call: MethodCall, result: Result) {
+        val page = call.argument<Number>("page")?.toInt()
         val view = pdfView
-        if (disposed || view == null) {
-            result.error("FAIL", "PDFView is not laid out yet", null)
-            return
-        }
-        val width = view.width
-        val height = view.height
-        if (width <= 0 || height <= 0) {
-            result.error("FAIL", "PDFView is not laid out yet", null)
-            return
-        }
-
-        // Prefer PixelCopy of the real window pixels when the hybrid-composition
-        // platform view is attached (#175). Fall back to a software-layer draw.
-        val window = findWindow(context)
-        if (window != null &&
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            view.isAttachedToWindow
-        ) {
-            val location = IntArray(2)
-            view.getLocationInWindow(location)
-            val srcRect = Rect(
-                location[0],
-                location[1],
-                location[0] + width,
-                location[1] + height
-            )
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            try {
-                PixelCopy.request(
-                    window,
-                    srcRect,
-                    bitmap,
-                    { copyResult ->
-                        if (disposed) {
-                            bitmap.recycle()
-                            result.error("FAIL", "PDFView disposed", null)
-                            return@request
-                        }
-                        if (copyResult == PixelCopy.SUCCESS) {
-                            writeScreenshot(outputFile, bitmap, result)
-                        } else {
-                            bitmap.recycle()
-                            val fallback = loadBitmapFromPDFView()
-                            if (fallback == null) {
-                                result.error(
-                                    "FAIL",
-                                    "Failed to generate image",
-                                    "PixelCopy result=$copyResult"
-                                )
-                            } else {
-                                writeScreenshot(outputFile, fallback, result)
-                            }
-                        }
-                    },
-                    mainHandler
-                )
-                return
-            } catch (e: IllegalArgumentException) {
-                // Window not ready / invalid rect — fall through to software draw.
-                bitmap.recycle()
-                Log.w(TAG, "PixelCopy unavailable, using software capture", e)
-            }
-        }
-
-        try {
-            val bmp = loadBitmapFromPDFView()
-            if (bmp == null) {
-                result.error("FAIL", "PDFView is not laid out yet", null)
-                return
-            }
-            writeScreenshot(outputFile, bmp, result)
-        } catch (e: Exception) {
-            result.error("FAIL", "Failed to generate image", e.message)
-        }
-    }
-
-    private fun writeScreenshot(outputFile: File, bmp: Bitmap, result: Result) {
-        try {
-            val parent = outputFile.parentFile
-            if (parent != null && !parent.exists()) {
-                parent.mkdirs()
-            }
-            FileOutputStream(outputFile, false).use { fileOut ->
-                bmp.compress(Bitmap.CompressFormat.PNG, 100, fileOut)
-            }
-            result.success(outputFile.absolutePath)
-        } catch (e: Exception) {
-            result.error("FAIL", "Failed to generate image", e.message)
-        } finally {
-            bmp.recycle()
-        }
-    }
-
-    /**
-     * Rasterizes the PDFView into an ARGB bitmap.
-     *
-     * A plain [View.draw] into a software [Canvas] returns a blank white image when
-     * the view (or its children) uses a hardware layer — which is the default under
-     * Flutter hybrid composition (`initExpensiveAndroidView`). Temporarily force a
-     * software layer so Pdfium page bitmaps are actually drawn into the capture (#175).
-     * Drawing-cache APIs are intentionally avoided; they are broken for the same reason.
-     */
-    fun loadBitmapFromPDFView(): Bitmap? {
-        val view = pdfView
-        if (disposed || view == null) {
-            return null
-        }
-        val width = view.width
-        val height = view.height
-        if (width <= 0 || height <= 0) {
-            return null
-        }
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val background = view.background
-        if (background is ColorDrawable) {
-            canvas.drawColor(background.color)
-        } else if (background != null) {
-            background.setBounds(0, 0, width, height)
-            background.draw(canvas)
-        } else {
-            canvas.drawColor(Color.WHITE)
-        }
-        try {
-            // LAYER_TYPE_SOFTWARE rebuilds the display list into a CPU bitmap so
-            // subsequent draw() copies real page content instead of an empty HW layer.
-            view.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-            // View.draw bypasses the hardware layer paint, so without saveLayer
-            // screenshots would silently stay light-mode while dark is on screen.
-            val matrix = colorMatrix
-            if (matrix != null) {
-                val paint = Paint().apply {
-                    colorFilter = ColorMatrixColorFilter(ColorMatrix(matrix.copyOf()))
-                }
-                canvas.saveLayer(null, paint)
-                view.draw(canvas)
-                canvas.restore()
-            } else {
-                view.draw(canvas)
-            }
-        } finally {
-            // Restoring only the layer type would drop the color-filter paint
-            // used by dark themes. Reapply the complete theme configuration.
-            applyColorTheme(reloadPages = false)
-        }
-        return bitmap
-    }
-
-    private fun findWindow(context: Context): Window? {
-        var ctx: Context? = context
-        while (ctx is ContextWrapper) {
-            if (ctx is Activity) {
-                return ctx.window
-            }
-            ctx = ctx.baseContext
-        }
-        return null
-    }
-
-    fun reload(result: Result) {
-        val view = pdfView
-        if (disposed || view == null) {
+        if (page == null || view == null) {
             result.success(false)
             return
         }
-        val config = configurator
-        if (config != null) {
-            // Recycle before reloading to free Pdfium memory (#261).
-            try {
-                view.recycle()
-            } catch (e: Exception) {
-                Log.w(TAG, "recycle before reload", e)
-            }
-            config.load()
+        if (!firstContentLoaded) {
+            // Applied once the first content is laid out.
+            defaultPage = page
             result.success(true)
-        } else {
-            result.success(false)
+            return
         }
+        // PdfView has no instant/animated choice; withAnimation is accepted.
+        view.scrollToPage(page.coerceIn(0, (pageCount - 1).coerceAtLeast(0)))
+        result.success(true)
     }
 
-    fun unlock(call: MethodCall, result: Result) {
+    private fun unlock(call: MethodCall, result: Result) {
         val password = call.argument<String>("password")
         if (password == null) {
             result.error("INVALID_ARGS", "password is required", null)
             return
         }
-        applyPassword(password, result)
-    }
-
-    /**
-     * Reloads the document with [password], settling [result] from onLoad /
-     * onError. The `updateSettings` path passes null and relies on callbacks.
-     */
-    private fun applyPassword(password: String?, result: Result?) {
-        if (disposed) {
-            result?.success(false)
-            return
-        }
-        // A still-pending unlock loses its reload to this one.
-        completeUnlock(false)
         params["password"] = password
-
-        val view = pdfView
-        val config = configurator
-        if (config == null) {
-            if (documentLoadStarted) {
-                // No usable document source, so there is nothing to reopen.
-                result?.success(false)
-                return
-            }
-            // The deferred first load picks the password up from params.
-            pendingUnlockResult = result
-            return
-        }
-        if (view == null) {
-            result?.success(false)
-            return
-        }
-
-        pendingUnlockResult = result
-        config.password(password)
-        // Recycle first so Pdfium releases the previous (locked) document (#261).
-        try {
-            view.recycle()
-        } catch (e: Exception) {
-            Log.w(TAG, "recycle before password reload", e)
-        }
-        config.load()
+        openDocument(password.takeIf { it.isNotEmpty() }, result)
     }
 
     private fun completeUnlock(success: Boolean) {
@@ -812,205 +654,24 @@ class FlutterPDFView(
         pending.success(success)
     }
 
-    private fun notifyPasswordRequired() {
-        val password = params["password"] as? String
-        val args: MutableMap<String, Any> = HashMap()
-        args["incorrect"] = !password.isNullOrEmpty()
-        methodChannel.invokeMethod("onPasswordRequired", args)
+    private fun notifyPasswordRequired(passwordSupplied: Boolean) {
+        methodChannel.invokeMethod("onPasswordRequired", mapOf("incorrect" to passwordSupplied))
     }
 
-    fun getCurrentPage(result: Result) {
-        val view = pdfView
-        if (disposed || view == null) {
-            result.success(0)
-            return
-        }
-        result.success(view.currentPage)
-    }
-
-    fun setPage(call: MethodCall, result: Result) {
-        val view = pdfView
-        if (disposed || view == null) {
-            result.success(false)
-            return
-        }
-        if (call.argument<Any>("page") == null) {
-            result.success(false)
-            return
-        }
-        val pageObj = call.argument<Int>("page")
-        val page = pageObj ?: 0
-        // #251: optional animated scroll; default false matches historical jumpTo(page).
-        val withAnimation = call.argument<Boolean>("withAnimation") ?: false
-        // #182: After an AlertDialog the Hybrid Composition surface may still
-        // be reattaching; jump on the next frame so the page change sticks.
-        // Complete the method channel only after jumpTo so await setPage()
-        // followed by getCurrentPage() observes the new page.
-        pendingSetPageResults.add(result)
-        val jump = Runnable {
-            // Already settled by dispose(); replying twice would throw.
-            if (!pendingSetPageResults.remove(result)) {
-                return@Runnable
-            }
-            val current = pdfView
-            if (disposed || current == null) {
-                result.success(false)
-                return@Runnable
-            }
-            try {
-                current.jumpTo(page, withAnimation)
-                // #197: jumpTo keeps the previous secondary-axis offset, so after
-                // a pan/zoom the new page can sit left-aligned. Re-center X (or Y
-                // in horizontal mode) and re-apply PageAlignment.top when needed.
-                applyPagePlacement(current)
-                current.loadPages()
-                current.invalidate()
-                result.success(true)
-            } catch (e: Exception) {
-                Log.w(TAG, "setPage failed", e)
-                result.success(false)
-            }
-        }
-        if (view.width > 0 && view.height > 0) {
-            view.post(jump)
-        } else {
-            mainHandler.post(jump)
-        }
-    }
-
-    /**
-     * Re-centers the secondary axis (#197) and optionally pins the primary axis
-     * to the start for [PageAlignment.TOP] when the document is shorter than the
-     * viewport (#250, #272).
-     *
-     * AndroidPdfViewer's [PDFView.moveTo] always vertical-centers short
-     * documents and [PDFView.jumpTo] preserves the previous X offset, so we
-     * recompute offsets here after load / setPage.
-     */
-    private fun applyPagePlacement(view: PDFView) {
-        if (disposed || view.pageCount <= 0 || view.width <= 0 || view.height <= 0) {
-            return
-        }
-        try {
-            // Preserve the primary-axis offset from jumpTo / current scroll; only
-            // recompute the secondary axis (#197). For short docs + TOP, force
-            // primary to 0 after moveTo undoes library vertical-centering (#250).
-            val secondary = centeredSecondaryOffset(view)
-            if (view.isSwipeVertical) {
-                view.moveTo(secondary, view.currentYOffset)
-                if (pageAlignment == PageAlignment.TOP) {
-                    forcePrimaryOffsetIfShort(view, isVertical = true)
-                }
-            } else {
-                view.moveTo(view.currentXOffset, secondary)
-                if (pageAlignment == PageAlignment.TOP) {
-                    forcePrimaryOffsetIfShort(view, isVertical = false)
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "applyPagePlacement", e)
-        }
-    }
-
-    /**
-     * Offset that centers the max-page strip on the secondary axis (X when
-     * swiping vertically, Y when swiping horizontally).
-     */
-    private fun centeredSecondaryOffset(view: PDFView): Float {
-        val pageCount = view.pageCount
-        if (pageCount <= 0) {
-            return 0f
-        }
-        var maxSecondary = 0f
-        for (i in 0 until pageCount) {
-            val size = view.getPageSize(i) ?: continue
-            val dim = if (view.isSwipeVertical) size.width else size.height
-            if (dim > maxSecondary) {
-                maxSecondary = dim
-            }
-        }
-        val scaled = view.toCurrentScale(maxSecondary)
-        return if (view.isSwipeVertical) {
-            centerSecondaryOffset(view.width.toFloat(), scaled)
-        } else {
-            centerSecondaryOffset(view.height.toFloat(), scaled)
-        }
-    }
-
-    /**
-     * [PDFView.moveTo] overwrites the primary offset when content fits the
-     * viewport (centers it). For [PageAlignment.TOP] we write 0 after moveTo so
-     * free space sits below / after the content.
-     */
-    private fun forcePrimaryOffsetIfShort(view: PDFView, isVertical: Boolean) {
-        if (!documentFitsAlongPrimary(view, isVertical)) {
-            return
-        }
-        try {
-            val fieldName = if (isVertical) "currentYOffset" else "currentXOffset"
-            val field = PDFView::class.java.getDeclaredField(fieldName)
-            field.isAccessible = true
-            field.setFloat(view, 0f)
-            view.loadPages()
-            view.invalidate()
-        } catch (e: Exception) {
-            Log.w(TAG, "forcePrimaryOffsetIfShort", e)
-        }
-    }
-
-    /** True when the tight document length is smaller than the viewport. */
-    private fun documentFitsAlongPrimary(view: PDFView, isVertical: Boolean): Boolean {
-        val pageCount = view.pageCount
-        if (pageCount <= 0) {
-            return true
-        }
-        var length = 0f
-        val spacingPx = view.spacingPx.toFloat() * view.zoom
-        for (i in 0 until pageCount) {
-            val size = view.getPageSize(i) ?: continue
-            length += if (isVertical) {
-                view.toCurrentScale(size.height)
-            } else {
-                view.toCurrentScale(size.width)
-            }
-            if (i < pageCount - 1) {
-                length += spacingPx
-            }
-        }
-        val viewport = if (isVertical) view.height.toFloat() else view.width.toFloat()
-        return length < viewport - 1f
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun updateSettings(methodCall: MethodCall, result: Result) {
-        applySettings(methodCall.arguments as Map<String, Any?>)
-        result.success(null)
+    private fun reportError(message: String) {
+        methodChannel.invokeMethod("onError", mapOf("error" to message))
     }
 
     private fun applySettings(settings: Map<String, Any?>) {
-        val view = pdfView
-        if (disposed || view == null) {
-            return
-        }
-        // colorMode + backgroundColor arrive together; only record during the
-        // loop, then a single applyColorTheme() so gutter compensation sees the
-        // final mode and loadPages runs once.
+        val view = pdfView ?: return
         var colorThemeDirty = false
-        var zoomLimitsDirty = false
-        for (key in settings.keys) {
+        for ((key, value) in settings) {
             when (key) {
-                "enableSwipe" -> view.setSwipeEnabled(getBoolean(settings, key))
+                "enableSwipe" -> enableSwipe = getBoolean(settings, key, true)
                 "colorMode" -> {
-                    colorMatrix = matrixForColorMode(settings[key] as? String)
+                    colorMatrix = matrixForColorMode(value as? String)
                     colorThemeDirty = true
                 }
-                "backgroundColor" -> {
-                    val bg = settings[key]
-                    requestedBackgroundColor = if (bg is Number) bg.toInt() else null
-                    colorThemeDirty = true
-                }
-                // Legacy: map nightMode through the color-matrix path; never
-                // call setNightMode (would compose with the layer and double-invert).
                 "nightMode" -> {
                     colorMatrix = if (getBoolean(settings, key)) {
                         PdfColorMatrix.LUMINANCE_INVERT
@@ -1019,168 +680,322 @@ class FlutterPDFView(
                     }
                     colorThemeDirty = true
                 }
-                "pageFling" -> view.setPageFling(getBoolean(settings, key))
-                "pageSnap" -> view.setPageSnap(getBoolean(settings, key))
-                "preventLinkNavigation" -> {
-                    val plh = this.linkHandler as PDFLinkHandler
-                    plh.setPreventLinkNavigation(getBoolean(settings, key))
+                "backgroundColor" -> {
+                    requestedBackgroundColor = (value as? Number)?.toInt()
+                    colorThemeDirty = true
                 }
+                "preventLinkNavigation" -> preventLinkNavigation = getBoolean(settings, key)
                 "pageAlignment" -> {
                     pageAlignment = getPageAlignment(settings)
-                    // Re-apply offsets; full autoSpacing flip needs a remount.
-                    view.post {
-                        if (!disposed && pdfView != null) {
-                            applyPagePlacement(view)
-                        }
-                    }
+                    applyPagePlacement(view)
                 }
-                "maxZoom" -> {
-                    view.maxZoom = getFloat(settings, key, DEFAULT_MAX_ZOOM)
-                    zoomLimitsDirty = true
+                "maxZoom" -> maxZoomFactor = getFloat(settings, key, DEFAULT_MAX_ZOOM)
+                "minZoom" -> minZoomFactor = getFloat(settings, key, DEFAULT_MIN_ZOOM)
+                "password" -> {
+                    params["password"] = value as? String
+                    openDocument(passwordParam(), result = null)
                 }
-                "minZoom" -> {
-                    view.minZoom = getFloat(settings, key, DEFAULT_MIN_ZOOM)
-                    zoomLimitsDirty = true
-                }
-                "password" -> applyPassword(settings[key] as? String, null)
-                // disableLongpress() is Configurator-only, so this takes effect
-                // on the next document load rather than immediately.
-                "enableTextSelection" ->
+                "enableTextSelection" -> {
                     enableTextSelection =
                         getBoolean(settings, key, DEFAULT_ENABLE_TEXT_SELECTION)
-                // Accepted and ignored: without selection there is no copy menu.
-                "enableCopy" -> Unit
-                else -> throw IllegalArgumentException("Unknown PDFView setting: $key")
+                    if (!enableTextSelection) {
+                        clearSelection(notify = true)
+                    }
+                }
+                "enableCopy" -> enableCopy = getBoolean(settings, key, DEFAULT_ENABLE_COPY)
+                // pageFling / pageSnap only apply to horizontal paging, which
+                // this engine does not have; anything unknown is ignored rather
+                // than failing the rebuild that sent it.
+                else -> Unit
             }
         }
-        if (zoomLimitsDirty && view.minZoom > view.maxZoom) {
-            // Same rule as creation (loadDocument): an inverted pair clamps the
-            // minimum down to the maximum.
-            view.minZoom = view.maxZoom
+        if (settings.containsKey("minZoom") || settings.containsKey("maxZoom")) {
+            applyZoomLimits(view)
         }
         if (colorThemeDirty) {
-            applyColorTheme(reloadPages = true)
+            applyColorTheme()
         }
     }
 
-    /**
-     * Apply [colorMatrix] as a hardware-layer [ColorMatrixColorFilter] and set
-     * the gutter background.
-     *
-     * Because M is an involution, dark mode sets the view background to
-     * `M(requestedBackgroundColor)` so the layer renders the color Dart asked
-     * for. Background is always `null` (never TRANSPARENT): AndroidPdfViewer
-     * self-fills only when `getBackground() == null`; with a dark layer that
-     * fill becomes black.
-     */
-    private fun applyColorTheme(reloadPages: Boolean) {
-        val view = pdfView
-        if (disposed || view == null) {
+    // ================================================================ text layer
+
+    private fun searchText(call: MethodCall, result: Result) {
+        val query = call.argument<String>("query") ?: ""
+        val caseSensitive = call.argument<Boolean>("caseSensitive") ?: false
+        val doc = document
+        searchJob?.cancel()
+        if (query.isEmpty() || doc == null) {
+            clearSearchState(notify = true)
+            result.success(emptyList<Map<String, Any?>>())
             return
         }
+        searchJob = scope.launch {
+            val matches = try {
+                findMatches(doc, query, caseSensitive)
+            } catch (e: CancellationException) {
+                result.success(emptyList<Map<String, Any?>>())
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "searchText", e)
+                result.error("SEARCH_FAILED", e.toString(), null)
+                return@launch
+            }
+            if (disposed || document !== doc) {
+                result.success(emptyList<Map<String, Any?>>())
+                return@launch
+            }
+            searchMatches = matches
+            if (matches.isEmpty()) {
+                currentSearchIndex = -1
+                pdfView?.setHighlights(emptyList())
+                reportSearchResultChanged(-1, 0)
+                result.success(emptyList<Map<String, Any?>>())
+                return@launch
+            }
+            // Activate the first hit so the user sees a result immediately.
+            activateMatch(0)
+            result.success(matches.indices.mapNotNull { matchMap(it) })
+        }
+    }
+
+    private suspend fun findMatches(
+        doc: PdfDocument,
+        query: String,
+        caseSensitive: Boolean,
+    ): List<SearchMatch> {
+        val hits = doc.searchDocument(query, 0 until doc.pageCount)
+        val matches = ArrayList<SearchMatch>()
+        for (page in 0 until doc.pageCount) {
+            val pageHits = hits.get(page) ?: continue
+            if (pageHits.isEmpty()) continue
+            // PdfRenderer searches case-insensitively; narrow the hits against
+            // the page text when the caller asked for an exact-case match.
+            val pageText = if (caseSensitive) {
+                doc.getPageContent(page)?.textContents?.joinToString("") { it.text }
+            } else {
+                null
+            }
+            for (hit in pageHits) {
+                if (caseSensitive &&
+                    !ViewportMath.matchesCaseSensitively(pageText, hit.textStartIndex, query)
+                ) {
+                    continue
+                }
+                val text = pageText
+                    ?.takeIf { hit.textStartIndex >= 0 && hit.textStartIndex + query.length <= it.length }
+                    ?.substring(hit.textStartIndex, hit.textStartIndex + query.length)
+                    ?: query
+                matches.add(SearchMatch(page, hit.bounds.map { RectF(it) }, text))
+            }
+        }
+        return matches
+    }
+
+    /** Makes match [index] current, highlights every match and scrolls to it. */
+    private fun activateMatch(index: Int): Map<String, Any?>? {
+        val view = pdfView ?: return null
+        if (index !in searchMatches.indices) return null
+        currentSearchIndex = index
+        val highlights = ArrayList<Highlight>()
+        searchMatches.forEachIndexed { i, match ->
+            val color = if (i == index) CURRENT_MATCH_COLOR else MATCH_COLOR
+            for (rect in match.bounds) {
+                highlights.add(Highlight(PdfRect(match.page, rect), color))
+            }
+        }
+        view.setHighlights(highlights)
+        val target = searchMatches[index]
+        val first = target.bounds.firstOrNull()
+        if (first != null) {
+            view.scrollToPosition(PdfPoint(target.page, first.left, first.top))
+        } else {
+            view.scrollToPage(target.page)
+        }
+        reportSearchResultChanged(index, searchMatches.size)
+        return matchMap(index)
+    }
+
+    private fun matchMap(index: Int): Map<String, Any?>? {
+        val match = searchMatches.getOrNull(index) ?: return null
+        return mapOf("pageIndex" to match.page, "matchIndex" to index, "text" to match.text)
+    }
+
+    private fun clearSearchState(notify: Boolean) {
+        searchJob?.cancel()
+        searchMatches = emptyList()
+        currentSearchIndex = -1
+        pdfView?.setHighlights(emptyList())
+        // Deliberately leaves any user text selection alone, like iOS.
+        if (notify) {
+            reportSearchResultChanged(-1, 0)
+        }
+    }
+
+    private fun reportSearchResultChanged(currentIndex: Int, total: Int) {
+        methodChannel.invokeMethod(
+            "onSearchResultChanged",
+            mapOf("currentIndex" to currentIndex, "total" to total),
+        )
+    }
+
+    private fun selectedText(): String? {
+        if (!enableTextSelection) return null
+        return (pdfView?.currentSelection as? TextSelection)?.text?.toString()
+    }
+
+    private fun onSelectionChanged(view: PdfView, selection: Selection?) {
+        if (disposed) return
+        if (selection != null && !enableTextSelection) {
+            // PdfView has no switch for text selection; drop it as it appears.
+            view.clearCurrentSelection()
+            return
+        }
+        val text = (selection as? TextSelection)?.text?.toString()
+        if (text == lastReportedSelectionText) return
+        lastReportedSelectionText = text
+        methodChannel.invokeMethod("onTextSelectionChanged", mapOf("text" to text))
+    }
+
+    private fun clearSelection(notify: Boolean) {
+        pdfView?.clearCurrentSelection()
+        val hadSelection = lastReportedSelectionText != null
+        lastReportedSelectionText = null
+        if (notify && hadSelection) {
+            methodChannel.invokeMethod("onTextSelectionChanged", mapOf("text" to null))
+        }
+    }
+
+    // ================================================================ screenshot
+
+    private fun getScreenshot(call: MethodCall, result: Result) {
+        val fileName = call.argument<String>("fileName")
+        if (fileName.isNullOrEmpty()) {
+            result.error("FAIL", "fileName is required", null)
+            return
+        }
+        val outputFile = File(fileName)
+        if (outputFile.parentFile == null) {
+            result.error("FAIL", "fileName must include a directory path", null)
+            return
+        }
+        val target = container
+        val width = target.width
+        val height = target.height
+        if (width <= 0 || height <= 0) {
+            result.error("FAIL", "PDFView is not laid out yet", null)
+            return
+        }
+        // Prefer PixelCopy of the real window pixels under hybrid composition
+        // (#175); fall back to a software draw.
+        val window = findWindow(context)
+        if (window != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            target.isAttachedToWindow
+        ) {
+            val location = IntArray(2)
+            target.getLocationInWindow(location)
+            val srcRect = Rect(location[0], location[1], location[0] + width, location[1] + height)
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            try {
+                PixelCopy.request(window, srcRect, bitmap, { copyResult ->
+                    if (disposed) {
+                        bitmap.recycle()
+                        result.error("FAIL", "PDFView disposed", null)
+                        return@request
+                    }
+                    if (copyResult == PixelCopy.SUCCESS) {
+                        writeScreenshot(outputFile, bitmap, result)
+                    } else {
+                        bitmap.recycle()
+                        val fallback = drawToBitmap(target)
+                        if (fallback == null) {
+                            result.error("FAIL", "Failed to generate image", "PixelCopy result=$copyResult")
+                        } else {
+                            writeScreenshot(outputFile, fallback, result)
+                        }
+                    }
+                }, mainHandler)
+                return
+            } catch (e: IllegalArgumentException) {
+                bitmap.recycle()
+                Log.w(TAG, "PixelCopy unavailable, using software capture", e)
+            }
+        }
+        val bitmap = drawToBitmap(target)
+        if (bitmap == null) {
+            result.error("FAIL", "PDFView is not laid out yet", null)
+        } else {
+            writeScreenshot(outputFile, bitmap, result)
+        }
+    }
+
+    private fun drawToBitmap(target: View): Bitmap? {
+        val width = target.width
+        val height = target.height
+        if (width <= 0 || height <= 0) return null
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(requestedBackgroundColor ?: Color.WHITE)
         val matrix = colorMatrix
         if (matrix != null) {
+            // View.draw bypasses the hardware layer paint, so apply the theme here.
             val paint = Paint().apply {
                 colorFilter = ColorMatrixColorFilter(ColorMatrix(matrix.copyOf()))
             }
-            view.setLayerType(View.LAYER_TYPE_HARDWARE, paint)
-            val bg = requestedBackgroundColor
-            if (bg != null) {
-                view.setBackgroundColor(PdfColorMatrix.transformColor(bg, matrix))
-            } else {
-                view.background = null
-            }
+            canvas.saveLayer(null, paint)
+            target.draw(canvas)
+            canvas.restore()
         } else {
-            view.setLayerType(View.LAYER_TYPE_NONE, null)
-            val bg = requestedBackgroundColor
-            if (bg != null) {
-                view.setBackgroundColor(bg)
-            } else {
-                view.background = null
-            }
+            target.draw(canvas)
         }
-        if (reloadPages && view.pageCount > 0) {
-            // Cached page bitmaps must be flushed; invalidate alone is not enough.
-            view.loadPages()
-            view.invalidate()
+        return bitmap
+    }
+
+    private fun writeScreenshot(outputFile: File, bitmap: Bitmap, result: Result) {
+        try {
+            outputFile.parentFile?.takeIf { !it.exists() }?.mkdirs()
+            FileOutputStream(outputFile, false).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            result.success(outputFile.absolutePath)
+        } catch (e: Exception) {
+            result.error("FAIL", "Failed to generate image", e.message)
+        } finally {
+            bitmap.recycle()
         }
     }
 
-    private fun resolveColorMatrix(params: Map<String, Any?>): FloatArray? {
-        if (params.containsKey("colorMode")) {
-            return matrixForColorMode(params["colorMode"] as? String)
+    private fun findWindow(context: Context): Window? {
+        var ctx: Context? = context
+        while (ctx is ContextWrapper) {
+            if (ctx is Activity) return ctx.window
+            ctx = ctx.baseContext
         }
-        // Creation-time fallback while Dart still sends nightMode.
-        return if (getBoolean(params, "nightMode")) PdfColorMatrix.LUMINANCE_INVERT else null
+        return null
     }
 
-    private fun matrixForColorMode(mode: String?): FloatArray? {
-        return when (mode) {
-            "dark" -> PdfColorMatrix.LUMINANCE_INVERT
-            else -> null // "light", null, or unknown → light
-        }
-    }
+    // ================================================================ lifecycle
 
     override fun dispose() {
-        // #261 memory leak / #263 surface lock / #280 EGL race:
-        // Hide first so Flutter stops drawing into the platform surface, then
-        // recycle Pdfium resources on the main thread and drop channel handlers.
         disposed = true
-        // Settle an unlock that will never load now, so its caller stops waiting.
+        // Settle an unlock that will never finish now, so its caller stops waiting.
         completeUnlock(false)
-        // Same for page jumps still queued: the queue is cleared just below.
-        val pendingPages = ArrayList(pendingSetPageResults)
-        pendingSetPageResults.clear()
-        for (pending in pendingPages) {
-            pending.success(false)
-        }
         methodChannel.setMethodCallHandler(null)
-        mainHandler.removeCallbacksAndMessages(null)
+        container.interceptor = null
+        scope.cancel()
         val view = pdfView
-        val settle = sizeSettleListener
-        sizeSettleListener = null
         pdfView = null
-        configurator = null
-        if (view != null) {
-            if (settle != null) {
-                try {
-                    view.removeOnLayoutChangeListener(settle)
-                } catch (ignored: Exception) {
-                }
-            }
-            try {
-                view.visibility = View.GONE
-            } catch (ignored: Exception) {
-            }
-            // Defer one frame so an in-flight PlatformViewWrapper.draw can finish.
-            // Always use the main-thread handler: View.post() is dropped when the
-            // view is already detached from a window, which would leak Pdfium (#261).
-            // removeCallbacksAndMessages above already ran, so this post is not cancelled.
-            mainHandler.post {
-                try {
-                    view.recycle()
-                } catch (e: Exception) {
-                    Log.w(TAG, "dispose recycle", e)
-                }
-            }
+        val doc = document
+        document = null
+        try {
+            view?.pdfDocument = null
+        } catch (e: Exception) {
+            Log.w(TAG, "dispose: detach document", e)
         }
-    }
-
-    override fun onFlutterViewAttached(flutterView: View) {
-        // Ensure pages re-render when reattached after dialog/rotation (#9, #182).
-        val view = pdfView
-        if (!disposed && view != null && view.pageCount > 0) {
-            view.post {
-                if (!disposed && pdfView != null) {
-                    try {
-                        view.loadPages()
-                        view.invalidate()
-                    } catch (e: Exception) {
-                        Log.w(TAG, "onFlutterViewAttached", e)
-                    }
-                }
-            }
+        try {
+            doc?.close()
+        } catch (e: Exception) {
+            Log.w(TAG, "dispose: close document", e)
         }
+        dataFile?.delete()
+        dataFile = null
     }
 
     /** Dart [PageAlignment] mirrored for creation-param parsing. */
@@ -1194,263 +1009,122 @@ class FlutterPDFView(
 
         private const val DEFAULT_MAX_ZOOM = 4.0f
         private const val DEFAULT_MIN_ZOOM = 1.0f
-        private const val DRAW_THROTTLE_MS = 16L // ~1 frame at 60fps
-        /** How deep to look for a wrapped Pdfium password failure. */
-        private const val MAX_CAUSE_DEPTH = 8
-        /** How long to watch for a late first-layout size settle after onRender. */
-        private const val SIZE_SETTLE_WINDOW_MS = 750L
-        /** Fixed inter-page gap (dp) when top-align disables autoSpacing but user wants gaps. */
-        private const val TOP_ALIGN_SPACING_DP = 8
-
-        /** Matches Dart [PDFView.useBestQuality] default (ARGB_8888 vs RGB_565). */
-        const val DEFAULT_USE_BEST_QUALITY = true
-
-        /** Matches Dart [PDFView.enableAntialiasing] default. */
-        const val DEFAULT_ENABLE_ANTIALIASING = true
-
-        /** Matches Dart [PDFView.enableRenderDuringScale] default. */
-        const val DEFAULT_ENABLE_RENDER_DURING_SCALE = true
+        private const val DRAW_THROTTLE_MS = 16L
+        private const val DATA_DIR = "flutter_pdfview"
 
         /** Matches Dart [PDFView.enableTextSelection] default. */
         const val DEFAULT_ENABLE_TEXT_SELECTION = true
 
+        /** Matches Dart [PDFView.enableCopy] default. */
+        const val DEFAULT_ENABLE_COPY = true
+
+        /** Every match is tinted; the current one stronger. */
+        private const val MATCH_COLOR = 0x55FFEB3B
+        private const val CURRENT_MATCH_COLOR = 0x99FF9800.toInt()
+
+        /** Selection-menu items that let text leave the document. */
+        private val COPY_MENU_KEYS: Set<Any> = setOf(
+            PdfSelectionMenuKeys.CopyKey,
+            PdfSelectionMenuKeys.CopyLinkKey,
+            PdfSelectionMenuKeys.SmartActionKey,
+        )
+
+        @JvmStatic
+        @VisibleForTesting
+        fun isBrowserScheme(scheme: String?): Boolean =
+            scheme != null && (scheme.equals("http", ignoreCase = true) ||
+                scheme.equals("https", ignoreCase = true))
+
         /**
-         * Mirrors `kPdfTextLayerUnsupportedCode` in the platform interface. Dart
-         * turns this code into an `UnsupportedError`.
-         */
-        const val TEXT_LAYER_UNSUPPORTED_CODE = "text_layer_unsupported"
-
-        /** Reported in the unsupported-text-layer message so it stays accurate. */
-        const val ANDROID_PDF_VIEWER_VERSION = "3.2.8"
-
-        /**
-         * Matches Dart [PDFView.thumbnailRatio] default. AndroidPdfViewer's own
-         * static default is 0.3, which looks soft while high-res tiles load (#158).
-         */
-        const val DEFAULT_THUMBNAIL_RATIO = 0.8f
-
-        /** AndroidPdfViewer library baseline for [Constants.Cache.CACHE_SIZE]. */
-        const val BASE_PAGE_PART_CACHE_SIZE = 120
-
-        /** AndroidPdfViewer library baseline for [Constants.Cache.THUMBNAILS_CACHE_SIZE]. */
-        const val BASE_THUMBNAIL_CACHE_SIZE = 8
-
-        /**
-         * Applies process-wide AndroidPdfViewer [Constants] for render quality.
+         * Inter-page gap in dp for `PdfView.verticalPageSpacing`, or null to keep
+         * PdfView's own default.
          *
-         * - [Constants.THUMBNAIL_RATIO]: from params when in (0, 1], else Dart's 0.8
-         *   default (library default 0.3 is notably soft on modern phones).
-         * - Cache sizes: raised modestly on high-DPI displays. A dense viewport
-         *   covers more 256px page tiles; keeping more of them reduces the common
-         *   "only some of the page is sharp after zoom" effect without supersampling
-         *   (which would 2–4× bitmap memory). Growth is capped (~+80 tiles ≈ +20MB
-         *   worst case for ARGB_8888 256² tiles).
-         *
-         * These statics are process-wide (AndroidPdfViewer design). We only ever
-         * raise cache sizes so concurrent views do not shrink a larger setting.
+         * - [autoSpacing] false → 0 (pages touch, as before).
+         * - [spacing] given → that value (#335), never negative.
+         * - otherwise → null.
          */
         @JvmStatic
         @VisibleForTesting
-        fun applyDisplayQualityDefaults(density: Float, params: Map<String, Any?>) {
-            val thumbnailRatioObj = params["thumbnailRatio"]
-            if (thumbnailRatioObj is Number) {
-                val thumbnailRatio = thumbnailRatioObj.toFloat()
-                // A ratio outside (0, 1] makes AndroidPdfViewer create zero-sized or
-                // oversized thumbnail bitmaps, which throws at render time.
-                if (thumbnailRatio > 0f && thumbnailRatio <= 1f) {
-                    Constants.THUMBNAIL_RATIO = thumbnailRatio
-                }
-            } else {
-                Constants.THUMBNAIL_RATIO = DEFAULT_THUMBNAIL_RATIO
-            }
-
-            val sizes = cacheSizesForDensity(density)
-            val cacheSize = sizes[0]
-            val thumbnailCacheSize = sizes[1]
-            if (Constants.Cache.CACHE_SIZE < cacheSize) {
-                Constants.Cache.CACHE_SIZE = cacheSize
-            }
-            if (Constants.Cache.THUMBNAILS_CACHE_SIZE < thumbnailCacheSize) {
-                Constants.Cache.THUMBNAILS_CACHE_SIZE = thumbnailCacheSize
-            }
-        }
-
-        /**
-         * Page-part and thumbnail cache sizes for a display density.
-         *
-         * Returns `{pagePartCache, thumbnailCache}` — library baselines at 1× density;
-         * steps up at 2× / 2.5× / 3.5× (roughly xhdpi / xxhdpi / high-end xxxhdpi+).
-         */
-        @JvmStatic
-        @VisibleForTesting
-        fun cacheSizesForDensity(density: Float): IntArray {
-            return when {
-                density >= 3.5f -> intArrayOf(200, 16)
-                density >= 2.5f -> intArrayOf(180, 12)
-                density >= 2.0f -> intArrayOf(150, 10)
-                else -> intArrayOf(BASE_PAGE_PART_CACHE_SIZE, BASE_THUMBNAIL_CACHE_SIZE)
-            }
-        }
-
-        /** Whether [t] (or anything it wraps) is Pdfium's password failure. */
-        @JvmStatic
-        @VisibleForTesting
-        fun isPasswordError(t: Throwable?): Boolean {
-            var cause = t
-            var depth = 0
-            // Bounded so a cyclic cause chain cannot spin.
-            while (cause != null && depth < MAX_CAUSE_DEPTH) {
-                if (cause is PdfPasswordException) {
-                    return true
-                }
-                // Forks of PdfiumAndroid repackage it under their own name.
-                if (cause.javaClass.simpleName == "PdfPasswordException") {
-                    return true
-                }
-                val next = cause.cause
-                if (next === cause) {
-                    return false
-                }
-                cause = next
-                depth++
-            }
-            return false
+        fun resolvePageSpacingDp(autoSpacing: Boolean, spacing: Int?): Int? {
+            if (!autoSpacing) return 0
+            if (spacing != null) return maxOf(0, spacing)
+            return null
         }
 
         @JvmStatic
         @VisibleForTesting
-        fun getBoolean(params: Map<String, Any?>, key: String): Boolean {
-            return getBoolean(params, key, false)
-        }
+        fun getBoolean(params: Map<String, Any?>, key: String): Boolean =
+            getBoolean(params, key, false)
 
-        /**
-         * Reads a boolean creation param, returning [defaultValue] when the key is
-         * missing or the value is null.
-         */
+        /** Boolean param, [defaultValue] when the key is missing or null. */
         @JvmStatic
         @VisibleForTesting
         fun getBoolean(params: Map<String, Any?>, key: String, defaultValue: Boolean): Boolean {
-            if (!params.containsKey(key)) {
-                return defaultValue
-            }
-            val keyObj = params[key] as Boolean?
-            return keyObj ?: defaultValue
+            if (!params.containsKey(key)) return defaultValue
+            val value = params[key] as Boolean?
+            return value ?: defaultValue
         }
 
         @JvmStatic
         @VisibleForTesting
-        fun getPageAlignment(params: Map<String, Any?>): PageAlignment {
-            return when (getString(params, "pageAlignment")) {
+        fun getPageAlignment(params: Map<String, Any?>): PageAlignment =
+            when (getString(params, "pageAlignment")) {
                 "PageAlignment.top" -> PageAlignment.TOP
                 else -> PageAlignment.CENTER
             }
-        }
-
-        /**
-         * Secondary-axis offset that centers a [scaledMax] strip in [viewport].
-         * Exposed for unit tests of the #197 centering math.
-         */
-        @JvmStatic
-        @VisibleForTesting
-        fun centerSecondaryOffset(viewport: Float, scaledMax: Float): Float {
-            return (viewport - scaledMax) / 2f
-        }
 
         @JvmStatic
         @VisibleForTesting
-        fun getString(params: Map<String, Any?>, key: String): String? {
-            return if (params.containsKey(key)) params[key] as String? else ""
-        }
+        fun getString(params: Map<String, Any?>, key: String): String? =
+            if (params.containsKey(key)) params[key] as String? else ""
 
         @JvmStatic
         @VisibleForTesting
         fun getInt(params: Map<String, Any?>, key: String): Int {
-            val keyObj = params[key] as Int?
-            val intKey: Int = keyObj ?: 0
-            return if (params.containsKey(key)) intKey else 0
+            val value = params[key] as Int?
+            return if (params.containsKey(key)) value ?: 0 else 0
         }
 
-        /**
-         * Reads an optional integer creation param. Missing / null → null so the
-         * caller can keep a platform default (#335 spacing).
-         */
+        /** Optional int param: missing / null → null (#335 spacing). */
         @JvmStatic
         @VisibleForTesting
         fun getIntOrNull(params: Map<String, Any?>, key: String): Int? {
-            if (!params.containsKey(key)) {
-                return null
-            }
-            val value = params[key] ?: return null
-            return when (value) {
+            if (!params.containsKey(key)) return null
+            return when (val value = params[key]) {
                 is Int -> value
                 is Number -> value.toInt()
                 else -> null
             }
         }
 
-        /**
-         * Resolves the fixed inter-page gap in dp for AndroidPdfViewer.spacing().
-         *
-         * - [autoSpacing] false → 0 (no gaps).
-         * - [spacing] non-null → that value (user override, #335).
-         * - else with [topAlign] → [TOP_ALIGN_SPACING_DP] (historical #250/#272).
-         * - else → 0 (library autoSpacing pads handle center mode).
-         */
-        @JvmStatic
-        @VisibleForTesting
-        fun resolveInterPageSpacingDp(
-            autoSpacing: Boolean,
-            topAlign: Boolean,
-            spacing: Int?,
-        ): Int {
-            if (!autoSpacing) {
-                return 0
-            }
-            if (spacing != null) {
-                return maxOf(0, spacing)
-            }
-            return if (topAlign) TOP_ALIGN_SPACING_DP else 0
-        }
-
         @JvmStatic
         @VisibleForTesting
         fun getFloat(params: Map<String, Any?>, key: String, defaultValue: Float): Float {
             val value = params[key]
-            if (value is Number) {
-                return value.toFloat()
-            }
-            return defaultValue
+            return if (value is Number) value.toFloat() else defaultValue
         }
 
         @JvmStatic
         @VisibleForTesting
-        fun getFitPolicy(params: Map<String, Any?>): FitPolicy {
-            return when (getString(params, "fitPolicy")) {
+        fun getFitPolicy(params: Map<String, Any?>): FitPolicy =
+            when (getString(params, "fitPolicy")) {
                 "FitPolicy.WIDTH" -> FitPolicy.WIDTH
                 "FitPolicy.HEIGHT" -> FitPolicy.HEIGHT
                 else -> FitPolicy.BOTH
             }
-        }
 
         @JvmStatic
         @VisibleForTesting
         fun getURI(uri: String?): Uri {
-            if (uri == null || uri.isEmpty()) {
-                return Uri.EMPTY
-            }
-            // Absolute filesystem paths without a scheme (common with path_provider /
-            // temp downloads) must use file:// — Uri.parse alone can yield a path
-            // that ContentResolver rejects with "No content provider" (#266).
+            if (uri == null || uri.isEmpty()) return Uri.EMPTY
+            // Absolute filesystem paths without a scheme (path_provider / temp
+            // downloads) must use file:// (#266 "No content provider").
             if (uri.startsWith("/") || uri.startsWith("file:/")) {
-                if (uri.startsWith("file:")) {
-                    return Uri.parse(uri)
-                }
+                if (uri.startsWith("file:")) return Uri.parse(uri)
                 return Uri.fromFile(File(uri))
             }
             val parsed = Uri.parse(uri)
-            if (parsed.scheme.isNullOrEmpty()) {
-                return Uri.fromFile(File(uri))
-            }
+            if (parsed.scheme.isNullOrEmpty()) return Uri.fromFile(File(uri))
             return parsed
         }
     }
