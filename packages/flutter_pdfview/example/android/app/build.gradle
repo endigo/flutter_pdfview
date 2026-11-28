@@ -23,6 +23,8 @@ if (flutterVersionName == null) {
 
 android {
     compileSdk 36
+    // Required by flutter_pdfview's default Android engine (androidx.pdf).
+    compileSdkExtension 19
 
 
     defaultConfig {

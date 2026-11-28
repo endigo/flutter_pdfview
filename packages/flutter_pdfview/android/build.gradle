@@ -67,6 +67,9 @@ if (!builtInKotlinEnabled) {
 
 android {
     compileSdk 36
+    // androidx.pdf is built against SDK extension 19 and requires its
+    // consumers — this module and the app — to compile against it too.
+    compileSdkExtension 19
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
