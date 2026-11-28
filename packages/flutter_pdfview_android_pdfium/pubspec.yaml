@@ -1,0 +1,37 @@
+name: flutter_pdfview_android_pdfium
+description: >-
+  Opt-in Android implementation of flutter_pdfview built on AndroidPdfViewer
+  (PDFium), for horizontal paging and Android 5.0-8.1 support.
+version: 1.0.0-beta.1
+homepage: https://github.com/endigo/flutter_pdfview
+repository: https://github.com/endigo/flutter_pdfview/tree/master/packages/flutter_pdfview_android_pdfium
+issue_tracker: https://github.com/endigo/flutter_pdfview/issues
+
+# Resolved as part of the workspace declared in the repository-root pubspec.
+resolution: workspace
+
+topics:
+  - pdf
+  - viewer
+  - native
+
+environment:
+  sdk: ">=3.8.0 <4.0.0"
+  flutter: ">=3.32.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    # An app that lists this package as a direct dependency gets this Android
+    # implementation instead of the one bundled with flutter_pdfview.
+    implements: flutter_pdfview
+    platforms:
+      android:
+        package: io.endigo.plugins.pdfviewflutter.pdfium
+        pluginClass: PDFViewFlutterPlugin

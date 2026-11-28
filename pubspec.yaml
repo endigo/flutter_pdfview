@@ -16,6 +16,7 @@ workspace:
   - packages/flutter_pdfview
   - packages/flutter_pdfview/example
   - packages/flutter_pdfview_platform_interface
+  - packages/flutter_pdfview_android_pdfium
 
 dev_dependencies:
   melos: ^7.0.0

@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
-# Run Robolectric/JUnit tests for the Android plugin module.
+# Run Robolectric/JUnit tests for an Android plugin module.
+#
+# Defaults to the engine bundled with flutter_pdfview. Set ANDROID_MODULE to
+# another package's android/ directory (relative to the repository root) to
+# test it instead, e.g.
+#   ANDROID_MODULE=packages/flutter_pdfview_android_pdfium/android scripts/run_android_unit_tests.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT/packages/flutter_pdfview/android"
+MODULE="${ANDROID_MODULE:-packages/flutter_pdfview/android}"
+cd "$ROOT/$MODULE"
 
 if [[ -z "${JAVA_HOME:-}" ]]; then
   if [[ -d /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ]]; then
@@ -28,7 +34,7 @@ if [[ ! -f local.properties ]]; then
     echo "sdk.dir=$ANDROID_SDK"
     echo "flutter.sdk=$FLUTTER_SDK"
   } > local.properties
-  echo "Wrote packages/flutter_pdfview/android/local.properties"
+  echo "Wrote $MODULE/local.properties"
 fi
 
 ./gradlew testDebugUnitTest --console=plain "$@"

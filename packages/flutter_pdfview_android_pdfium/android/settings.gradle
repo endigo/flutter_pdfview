@@ -1,0 +1,28 @@
+pluginManagement {
+    def flutterSdkPath = {
+        def properties = new Properties()
+        file("local.properties").withInputStream { properties.load(it) }
+        def flutterSdkPath = properties.getProperty("flutter.sdk")
+        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+        return flutterSdkPath
+    }
+    settings.ext.flutterSdkPath = flutterSdkPath()
+
+    includeBuild("${settings.ext.flutterSdkPath}/packages/flutter_tools/gradle")
+
+    repositories {
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+    }
+}
+
+plugins {
+    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+    // Library plugin module — AGP version used when running unit tests from android/.
+    id "com.android.library" version "8.13.2" apply false
+}
+
+// This directory *is* the plugin library (root build.gradle). There is no :app
+// subproject here; the example app lives under example/android/.
+rootProject.name = 'flutter_pdfview_android_pdfium'
