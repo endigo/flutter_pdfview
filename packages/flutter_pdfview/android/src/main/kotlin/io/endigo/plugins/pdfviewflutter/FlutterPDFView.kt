@@ -217,7 +217,9 @@ class FlutterPDFView(
                     completeUnlock(false)
                     return@launch
                 }
+                Log.i(TAG, "Opening $uri (password: ${password != null})")
                 val opened = loader.openDocument(uri, password)
+                Log.i(TAG, "Opened document: ${opened.pageCount} pages")
                 if (disposed) {
                     opened.close()
                     return@launch
@@ -228,6 +230,7 @@ class FlutterPDFView(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: PdfPasswordException) {
+                Log.i(TAG, "Password required or incorrect: ${e.message}")
                 if (!disposed) {
                     notifyPasswordRequired(passwordSupplied = !password.isNullOrEmpty())
                     reportError(e.toString())
@@ -270,11 +273,17 @@ class FlutterPDFView(
         view.pdfDocument = opened
         previous?.close()
         applyFitZoom(view)
+        Log.i(
+            TAG,
+            "Document attached: view ${container.width}x${container.height}, fitZoom=$fitZoom, " +
+                "attached=${view.isAttachedToWindow}",
+        )
 
         methodChannel.invokeMethod("onLoadComplete", mapOf("pages" to pageCount))
     }
 
     private fun onFirstContentLoad() {
+        Log.i(TAG, "First content loaded")
         val view = pdfView ?: return
         if (disposed || document == null) return
         firstContentLoaded = true

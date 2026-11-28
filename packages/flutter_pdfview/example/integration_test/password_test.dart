@@ -72,7 +72,6 @@ Future<void> settleFor(
   }
 }
 
-
 /// Runs a platform-channel call in real async time so a native reply that
 /// needs a real event-loop turn cannot stall inside the fake-async test zone.
 Future<T> onPlatform<T>(WidgetTester tester, Future<T> Function() call) async {

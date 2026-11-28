@@ -143,4 +143,6 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           working-directory: packages/flutter_pdfview/example
-          script: flutter test integration_test --dart-define=PDFVIEW_ENGINE=${{ matrix.engine }} -r expanded
+          # On failure, dump the engine's log lines plus every warning/error so
+          # the cause is visible in the job log.
+          script: adb logcat -c; flutter test integration_test --dart-define=PDFVIEW_ENGINE=${{ matrix.engine }} -r expanded || { adb logcat -d -v brief FlutterPDFView:V '*:W' | grep -v -E 'ResourceType|Choreographer' | tail -n 400; exit 1; }
