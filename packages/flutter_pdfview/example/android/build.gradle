@@ -5,19 +5,17 @@ allprojects {
     }
 }
 
-rootProject.buildDir = '../build'
+// Same layout as Flutter's app template: build output goes to example/build.
+def newBuildDir = rootProject.layout.buildDirectory.dir("../../build").get()
+rootProject.layout.buildDirectory.value(newBuildDir)
+
 subprojects {
-    project.buildDir = "${rootProject.buildDir}/${project.name}"
+    project.layout.buildDirectory.value(newBuildDir.dir(project.name))
 }
 subprojects {
     project.evaluationDependsOn(':app')
 }
 
 tasks.register("clean", Delete) {
-    delete rootProject.buildDir
+    delete rootProject.layout.buildDirectory
 }
-// configurations.all {
-//     resolutionStrategy {
-//         force 'androidx.core:core-ktx:1.6.0'
-//     }
-// }
