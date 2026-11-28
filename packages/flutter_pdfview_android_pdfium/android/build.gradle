@@ -43,17 +43,27 @@ apply plugin: 'com.android.library'
 
 // Built-in Kotlin migration (Flutter 3.44+ / AGP 9+).
 //
-// AGP 9 compiles Kotlin itself, and Flutter fails the build of any app whose
-// plugins also apply the Kotlin Gradle Plugin. Applying it unconditionally
-// would therefore break future Flutter releases; removing it unconditionally
-// would break every user still on AGP 8, which this plugin supports because
-// pubspec.yaml only requires Flutter >= 3.32. So it is applied only where it is
-// still the thing that provides Kotlin compilation.
+// With AGP 9 and `android.builtInKotlin` on (AGP 9's default), AGP compiles
+// Kotlin itself and Flutter warns about — and will later reject — plugins that
+// also apply the Kotlin Gradle Plugin. Everywhere else something still has to
+// apply KGP: below AGP 9 (this plugin supports Flutter >= 3.32), and on AGP 9
+// with `android.builtInKotlin=false`, which Flutter 3.50's app template sets.
+// This mirrors Flutter's own isBuiltInKotlinEnabled check.
+//
+// It goes through pluginManager rather than an `apply plugin:` line on
+// purpose: Flutter detects a plugin's KGP usage by matching that line in the
+// build file, anywhere, conditional or not, and then skips applying KGP
+// itself. A conditional `apply plugin:` therefore left AGP 9 builds without
+// Kotlin compilation at all ("Could not find method kotlin()"). Applying it a
+// second time when Flutter has already done so is a no-op.
 //
 // https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
 def agpMajor = com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')[0] as int
-if (agpMajor < 9) {
-    apply plugin: 'kotlin-android'
+def builtInKotlinProperty = providers.gradleProperty('android.builtInKotlin').getOrNull()
+def builtInKotlinEnabled = agpMajor >= 9 &&
+        (builtInKotlinProperty == null || builtInKotlinProperty.toBoolean())
+if (!builtInKotlinEnabled) {
+    pluginManager.apply('kotlin-android')
 }
 
 android {
